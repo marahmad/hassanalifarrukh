@@ -1,0 +1,76 @@
+# Environment, Secrets, and Authentication
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_*
+known_hosts
+cookies*.txt
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node.js & WhatsApp Bridge
+node_modules/
+whatsapp_bridge/node_modules/
+whatsapp_bridge/auth_session/
+whatsapp_bridge/qr.html
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Heavy Media, Audio & Scraping Archives
+instagram_archive/
+*.mp4
+*.mp3
+*.wav
+*.m4a
+*.webm
+*.tar.gz
+*.zip
+
+# Debug Images & Screenshots
+data/*.png
+*.png
+
+# Local Databases, Vector Stores & Runtime Cache
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+data/bot_database.db
+data/bot_database.db*
+data/chroma_db/
+data/extracted_audio/
+data/tiktok_*
+data/transcription_status.json
+
+# Logs & Local Backups
+*.log
+backups/
+
+# Scratch, Dumps & Legacy Archive
+scratch/
+archive/
+
+# OS Artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
