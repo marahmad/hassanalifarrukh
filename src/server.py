@@ -503,19 +503,25 @@ async def api_admin_logout():
     return resp
 
 
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def customer_chat():
     """Customer-facing mobile chat UI — the public product."""
-    return render_chat_html()
+    return HTMLResponse(content=render_chat_html(), status_code=200, headers=NO_CACHE_HEADERS)
 
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
     """Live web analytics dashboard protected by Executive Passkey gate."""
     if not is_admin_authenticated(request):
-        return HTMLResponse(content=render_admin_login_html(), status_code=200)
+        return HTMLResponse(content=render_admin_login_html(), status_code=200, headers=NO_CACHE_HEADERS)
     m = get_system_metrics()
-    return HTMLResponse(content=render_dashboard_html(m), status_code=200)
+    return HTMLResponse(content=render_dashboard_html(m), status_code=200, headers=NO_CACHE_HEADERS)
 
 
 @app.post("/api/admin/activate")

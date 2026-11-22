@@ -793,50 +793,6 @@
             color: var(--text-muted);
         }
 
-        .audio-playback-pill {
-            margin-top: 10px;
-            background: rgba(0,0,0,0.35);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 10px 14px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .play-btn-circle {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--accent-green);
-            color: #0b0b0d;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: transform 0.15s;
-        }
-
-        .play-btn-circle:active {
-            transform: scale(0.92);
-        }
-
-        .waveform-mock {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 2px;
-            height: 20px;
-        }
-
-        .waveform-bar {
-            width: 3px;
-            background: rgba(255,255,255,0.25);
-            border-radius: 2px;
-        }
-
         /* ─── TYPING INDICATOR ──────────────────────────────────────── */
         .typing-row {
             display: none;
@@ -2338,16 +2294,17 @@ function injectInitialWelcome(name) {
     messagesBox.innerHTML = '<div class="date-divider">Today</div>';
 
     const trialLine = APP_STATE.isSubscribed
-        ? `Your <strong>Full Access</strong> membership is active. Ask me anything regarding mindset, fitness, business in Pakistan, or life discipline.`
-        : `You have <strong>${APP_STATE.maxFreeTrial} free questions</strong> on your trial. After that, Full Access is <strong>PKR __MONTHLY_PRICE__/month</strong> with everything included.`;
+        ? `Your <strong>Full Access</strong> pass is active — ask as much as you want.`
+        : `You have <strong>${APP_STATE.maxFreeTrial} free questions</strong> to test it out — unlimited Full Access is <strong>PKR __MONTHLY_PRICE__/month</strong>.`;
 
     const welcomeHtml = `
         <div class="msg-row ai">
             <div class="msg-avatar">HF</div>
             <div class="msg-bubble">
-                <p>Assalamu Alaikum <strong>${escapeHtml(name)}</strong>! 🎯</p>
-                <p>I am an unofficial AI mentor trained on Hassan Ali Farrukh's public video reels, mindset philosophy, and discipline principles.</p>
-                <p>${trialLine}</p>
+                <p>Assalamu Alaikum <strong>${escapeHtml(name)}</strong>! 👋</p>
+                <p>Welcome to <strong>Hassan AI</strong> — an unofficial AI mentor trained on 267 of Hassan Ali Farrukh's public reels on discipline, mindset, fitness, and building a stronger life in Pakistan.</p>
+                <p>No fluff, no sugar-coating. Tell me what you're stuck on right now — career, routine, overthinking, fitness, or dealing with people — and let's break it down.</p>
+                <p style="font-size: 12.5px; color: var(--text-secondary);">${trialLine}</p>
 
                 <div class="msg-meta">
                     <span>Hassan AI • Unofficial AI Mentor</span>
