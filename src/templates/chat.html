@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0b0b0d">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Hassan Ali Farrukh AI — Official Mentorship</title>
+    <title>Hassan AI — Unofficial AI Mentor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -222,11 +222,6 @@
             display: flex;
             align-items: center;
             gap: 6px;
-        }
-
-        .verified-badge {
-            display: inline-flex;
-            color: #38bdf8;
         }
 
         .brand-subtitle {
@@ -1736,7 +1731,7 @@
         <!-- Profile Credentials -->
         <div class="profile-card">
             <p class="profile-bio">
-                Trained on <strong>267 authentic video reels, military history, leadership philosophy</strong>, and tactical guidance from Hassan Ali Farrukh.
+                Unofficial AI mentor trained on <strong>267 public video reels, leadership philosophy</strong>, and mindset talks by Hassan Ali Farrukh. <span style="color: var(--text-muted);">Not officially affiliated.</span>
             </p>
             <div class="knowledge-stats">
                 <div class="live-dot"></div>
@@ -1744,11 +1739,14 @@
             </div>
         </div>
 
-        <!-- Membership Widget -->
+        <!-- Membership Widget (Single All-Access Monthly Plan) -->
         <div class="membership-card">
             <div class="membership-header">
-                <span class="membership-title">Access Plans</span>
-                <span class="membership-price">Starting PKR __BASIC_PRICE__/mo</span>
+                <span class="membership-title">Full Access Pass</span>
+                <span class="membership-price">PKR __MONTHLY_PRICE__/mo</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45;">
+                Everything included — unlimited chats, full reel archive, and deep step-by-step answers.
             </div>
             <div class="quick-pay-box">
                 <div class="quick-pay-item">
@@ -1764,17 +1762,8 @@
                     <span class="copy-pill" onclick="copySnippet('__RAAST_ID_NUMBER__', this)">Copy</span>
                 </div>
             </div>
-            <button class="btn-link btn-primary-action" onclick="toggleDrawer(false); openPaywallModal('basic');">
+            <button class="btn-link btn-primary-action" onclick="toggleDrawer(false); openPaywallModal();">
                 💳 Submit Payment / Activate
-            </button>
-        </div>
-
-        <!-- Coaching Lead Button -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px;">
-            <div style="font-size: 13px; font-weight: 700; margin-bottom: 4px;">Private 1-on-1 Mentorship</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Direct sessions with Hassan Ali Farrukh for career &amp; high-stakes life direction.</div>
-            <button class="btn-link" style="width: 100%; border-color: rgba(56, 189, 248, 0.3); color: var(--accent-blue);" onclick="toggleDrawer(false); sendCoachingRequest();">
-                📞 Request 1-on-1 Call
             </button>
         </div>
 
@@ -1804,14 +1793,11 @@
                     <div class="header-logo-box">HF</div>
                     <div class="header-user-status">
                         <div class="header-user-title">
-                            <span class="header-name-text">Hassan Ali Farrukh</span>
-                            <span class="verified-badge">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                            </span>
+                            <span class="header-name-text">Hassan AI</span>
                         </div>
                         <div class="header-subtitle-status">
                             <span class="live-dot" style="width: 6px; height: 6px;"></span>
-                            <span id="session-status-text">Online • AI Mentor</span>
+                            <span id="session-status-text">Unofficial AI • Public Reels</span>
                         </div>
                     </div>
                 </div>
@@ -1870,9 +1856,6 @@
             <button class="topic-chip" onclick="handleChipClick('What are your daily workout, training, and diet principles?')">
                 🏋️ Fitness &amp; Training
             </button>
-            <button class="topic-chip" onclick="sendCoachingRequest()">
-                📞 Book 1-on-1 Call
-            </button>
         </div>
 
         <!-- Footer Input Bar -->
@@ -1907,7 +1890,7 @@
             <div class="modal-icon-badge">🎯</div>
             <h2 class="modal-title">Join Hassan AI</h2>
             <p class="modal-desc">
-                Direct guidance from Hassan Ali Farrukh. Sign in with Google to protect your chat history, free trial, and membership across devices.
+                Unofficial AI mentor trained on Hassan Ali Farrukh's public reels &amp; talks. Sign in with Google to save your chat history, free trial, and membership across devices.
             </p>
         </div>
 
@@ -1931,35 +1914,30 @@
     </div>
 </div>
 
-<!-- ─── PAYWALL & UPGRADE MODAL ─────────────────────────────── -->
+<!-- ─── PAYWALL & UPGRADE MODAL (SINGLE ALL-ACCESS PLAN) ────── -->
 <div class="modal-overlay" id="paywall-modal-overlay">
     <div class="modal-card">
         <button class="modal-close-icon" onclick="closePaywallModal()" aria-label="Close modal">✕</button>
         <div class="modal-header">
             <div class="modal-icon-badge">👑</div>
-            <h2 class="modal-title">Unlock Full Mentorship</h2>
+            <h2 class="modal-title">Unlock Full Access</h2>
             <p class="modal-desc">
-                Choose a plan to continue receiving direct answers and guidance from Hassan Ali Farrukh.
+                One simple monthly pass with everything included — unlimited chats, full reel archive, and deep step-by-step mentorship replies.
             </p>
         </div>
 
         <div id="paywall-error-box" class="auth-error-banner"></div>
 
         <div class="plan-option-row">
-            <div class="plan-option-card selected" id="plan-card-basic" onclick="selectPlanCard('basic')">
-                <span class="plan-option-name">⚡ Basic Tier</span>
-                <span class="plan-option-price">PKR __BASIC_PRICE__</span>
-                <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Unlimited AI mentorship &amp; direct advice</span>
-            </div>
-            <div class="plan-option-card pro" id="plan-card-pro" onclick="selectPlanCard('pro')">
-                <span class="plan-option-name">👑 Pro Tier</span>
-                <span class="plan-option-price">PKR __PRO_PRICE__</span>
-                <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Deeper answers + priority retrieval + drops</span>
+            <div class="plan-option-card selected" id="plan-card-full" style="cursor: default;">
+                <span class="plan-option-name">👑 Full Access — Monthly Pass</span>
+                <span class="plan-option-price">PKR __MONTHLY_PRICE__ / month</span>
+                <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Unlimited AI chats • Full 1,011-chunk archive • Deep step-by-step answers • Everything included</span>
             </div>
         </div>
 
         <div class="paywall-bank-box">
-            <div class="paywall-bank-title">SEND PAYMENT VIA EASYPAISA / ALLIED BANK / RAAST:</div>
+            <div class="paywall-bank-title">SEND PKR __MONTHLY_PRICE__ VIA EASYPAISA / ALLIED BANK / RAAST:</div>
             
             <div class="quick-pay-item">
                 <span>EasyPaisa: <strong>__EASYPAISA_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
@@ -1992,36 +1970,6 @@
 
         <button class="modal-dismiss-link" onclick="closePaywallModal()">
             Continue Browsing
-        </button>
-    </div>
-</div>
-
-<!-- ─── 1-ON-1 COACHING PHONE COLLECTION MODAL ──────────────── -->
-<div class="modal-overlay" id="coaching-phone-modal-overlay">
-    <div class="modal-card">
-        <button class="modal-close-icon" onclick="closeCoachingPhoneModal()" aria-label="Close modal">✕</button>
-        <div class="modal-header">
-            <div class="modal-icon-badge">📞</div>
-            <h2 class="modal-title">Add Your WhatsApp Number</h2>
-            <p class="modal-desc">
-                Enter your Pakistani mobile number so Hassan’s team can reach you on WhatsApp with available 1-on-1 call slots.
-            </p>
-        </div>
-
-        <div id="coaching-phone-error" class="auth-error-banner"></div>
-
-        <div class="form-group">
-            <label class="form-label" for="coaching-phone-input">Pakistani Mobile / WhatsApp Number</label>
-            <input type="tel" id="coaching-phone-input" class="form-input" placeholder="0300 7560313 or +92 300 7560313" autocomplete="tel" oninput="updatePhonePreview('coaching-phone-input', 'coaching-phone-preview')">
-            <div id="coaching-phone-preview" class="phone-preview-hint"></div>
-        </div>
-
-        <button id="coaching-phone-submit-btn" class="form-btn" onclick="submitCoachingWithPhone()">
-            Save Number &amp; Request 1-on-1 Call ✓
-        </button>
-
-        <button class="modal-dismiss-link" onclick="closeCoachingPhoneModal()">
-            Cancel
         </button>
     </div>
 </div>
@@ -2076,7 +2024,6 @@ const APP_STATE = {
     maxFreeTrial: __FREE_TRIAL_QUESTIONS__,
     currentTier: 'trial',
     referralCode: 'HASSAN-XXXX',
-    selectedPlan: 'basic',
     isSubscribed: false,
     drawerOpen: false,
     googleEnabled: GOOGLE_OAUTH_ENABLED,
@@ -2169,7 +2116,6 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         toggleDrawer(false);
         closePaywallModal();
-        closeCoachingPhoneModal();
         closeReferralModal();
     }
 });
@@ -2194,12 +2140,6 @@ function setupModalBackdropDismiss() {
     if (paywallOverlay) {
         paywallOverlay.addEventListener('click', (e) => {
             if (e.target === paywallOverlay) closePaywallModal();
-        });
-    }
-    const coachingOverlay = document.getElementById('coaching-phone-modal-overlay');
-    if (coachingOverlay) {
-        coachingOverlay.addEventListener('click', (e) => {
-            if (e.target === coachingOverlay) closeCoachingPhoneModal();
         });
     }
     const refOverlay = document.getElementById('referral-modal-overlay');
@@ -2314,7 +2254,7 @@ function syncUserState(user) {
     APP_STATE.avatarUrl = user.avatar_url || '';
     APP_STATE.authProvider = user.auth_provider || 'google';
     APP_STATE.referralCode = user.referral_code || 'HASSAN-XXXX';
-    APP_STATE.currentTier = user.is_subscribed ? (user.tier || 'basic') : 'trial';
+    APP_STATE.currentTier = user.is_subscribed ? 'pro' : 'trial';
     APP_STATE.trialQuestionsUsed = user.trial_questions_used || 0;
     APP_STATE.maxFreeTrial = user.max_free_trial || APP_STATE.maxFreeTrial;
     APP_STATE.isSubscribed = !!user.is_subscribed;
@@ -2352,10 +2292,10 @@ function renderUserProfileUI() {
 
     const statusSub = document.getElementById('session-status-text');
     if (statusSub) {
-        const verifiedLabel = APP_STATE.authProvider === 'google' ? 'Google Verified' : 'Email Verified';
+        const verifiedLabel = APP_STATE.authProvider === 'google' ? 'Google Verified' : 'Verified';
         statusSub.textContent = APP_STATE.authenticated
             ? `${verifiedLabel} • ${APP_STATE.userName}`
-            : 'Online • AI Mentor';
+            : 'Unofficial AI • Public Reels';
     }
 
     const sbName = document.getElementById('sidebar-user-name');
@@ -2398,33 +2338,19 @@ function injectInitialWelcome(name) {
     messagesBox.innerHTML = '<div class="date-divider">Today</div>';
 
     const trialLine = APP_STATE.isSubscribed
-        ? `Your <strong>${escapeHtml(APP_STATE.currentTier.toUpperCase())}</strong> membership is active. Ask me anything regarding mindset, fitness, business in Pakistan, or life discipline.`
-        : `You have <strong>${APP_STATE.maxFreeTrial} free questions</strong> on your trial. Ask me anything regarding mindset, fitness, business in Pakistan, or life discipline.`;
+        ? `Your <strong>Full Access</strong> membership is active. Ask me anything regarding mindset, fitness, business in Pakistan, or life discipline.`
+        : `You have <strong>${APP_STATE.maxFreeTrial} free questions</strong> on your trial. After that, Full Access is <strong>PKR __MONTHLY_PRICE__/month</strong> with everything included.`;
 
     const welcomeHtml = `
         <div class="msg-row ai">
             <div class="msg-avatar">HF</div>
             <div class="msg-bubble">
                 <p>Assalamu Alaikum <strong>${escapeHtml(name)}</strong>! 🎯</p>
-                <p>I am Hassan Ali Farrukh's official AI assistant. I have been trained directly on my philosophy, video lessons, tactical defense principles, and military mindset.</p>
+                <p>I am an unofficial AI mentor trained on Hassan Ali Farrukh's public video reels, mindset philosophy, and discipline principles.</p>
                 <p>${trialLine}</p>
-                
-                <div class="audio-playback-pill">
-                    <button class="play-btn-circle" onclick="simulateVoicePlay(this)">▶</button>
-                    <div class="waveform-mock">
-                        <div class="waveform-bar" style="height: 6px;"></div>
-                        <div class="waveform-bar" style="height: 14px;"></div>
-                        <div class="waveform-bar" style="height: 18px;"></div>
-                        <div class="waveform-bar" style="height: 10px;"></div>
-                        <div class="waveform-bar" style="height: 16px;"></div>
-                        <div class="waveform-bar" style="height: 12px;"></div>
-                        <div class="waveform-bar" style="height: 8px;"></div>
-                    </div>
-                    <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">0:42 Spoken Advice</span>
-                </div>
 
                 <div class="msg-meta">
-                    <span>Hassan Ali Farrukh • Official AI</span>
+                    <span>Hassan AI • Unofficial AI Mentor</span>
                     <span>Just now</span>
                 </div>
             </div>
@@ -2469,11 +2395,7 @@ async function handleSendAction() {
 
         if (data.code === 'phone_required') {
             appendMessageBubble('ai', data.reply || 'Please add your Pakistani mobile number first.');
-            if (text.toUpperCase() === 'CALL') {
-                openCoachingPhoneModal();
-            } else {
-                openPaywallModal();
-            }
+            openPaywallModal();
             return;
         }
 
@@ -2509,10 +2431,10 @@ function appendMessageBubble(role, content) {
     let formattedContent = formatMarkdown(content);
 
     let paywallButtonHtml = '';
-    if (role === 'ai' && (content.includes('free questions are up') || content.includes('reply with your Transaction ID') || content.includes('choose a plan:'))) {
+    if (role === 'ai' && (content.includes('free questions are up') || content.includes('reply with your Transaction ID') || content.includes('Unlock **Full Access'))) {
         paywallButtonHtml = `
             <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
-                <button class="paywall-chat-action-btn" onclick="openPaywallModal('basic')" style="
+                <button class="paywall-chat-action-btn" onclick="openPaywallModal()" style="
                     width: 100%;
                     display: flex;
                     align-items: center;
@@ -2531,7 +2453,7 @@ function appendMessageBubble(role, content) {
                     transition: transform 0.15s ease, box-shadow 0.15s ease;
                 " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
                     <span style="font-size: 16px;">👑</span>
-                    <span>Submit Transaction ID &amp; Choose Plan</span>
+                    <span>Unlock Full Access (PKR __MONTHLY_PRICE__/mo)</span>
                 </button>
             </div>
         `;
@@ -2554,7 +2476,7 @@ function appendMessageBubble(role, content) {
                 <div>${formattedContent}</div>
                 ${paywallButtonHtml}
                 <div class="msg-meta">
-                    <span>Hassan Ali Farrukh • AI Mentor</span>
+                    <span>Hassan AI • Unofficial AI Mentor</span>
                     <span>${timeStr}</span>
                 </div>
             </div>
@@ -2599,7 +2521,7 @@ function updateTrialIndicator() {
     if (pct >= 100) {
         ticker.classList.add('expired');
         if (fillBar.parentElement) fillBar.parentElement.style.display = 'none';
-        countLabel.innerHTML = `👑 <strong>Free Trial Ended</strong> (${used} of ${max} used) • <span style="text-decoration: underline; cursor: pointer; color: #fbbf24; font-weight: 700;" onclick="openPaywallModal('basic')">Unlock Full Mentorship ➔</span>`;
+        countLabel.innerHTML = `👑 <strong>Free Trial Ended</strong> (${used} of ${max} used) • <span style="text-decoration: underline; cursor: pointer; color: #fbbf24; font-weight: 700;" onclick="openPaywallModal()">Unlock Full Access (PKR __MONTHLY_PRICE__/mo) ➔</span>`;
         const chatInput = document.getElementById('user-chat-input');
         if (chatInput) chatInput.placeholder = "Tap Unlock to submit your EasyPaisa / Bank Transaction ID...";
     } else {
@@ -2608,29 +2530,27 @@ function updateTrialIndicator() {
         fillBar.style.background = 'var(--accent-green)';
         countLabel.innerHTML = `Free Trial: <strong>${used} of ${max}</strong> questions used`;
         const chatInput = document.getElementById('user-chat-input');
-        if (chatInput) chatInput.placeholder = "Ask Hassan Bhai anything regarding mindset, fitness, career, or life...";
+        if (chatInput) chatInput.placeholder = "Ask anything regarding mindset, fitness, career, or life...";
     }
 }
 
 function updateTierUI(tier) {
     const badge = document.getElementById('plan-badge-pill');
-    badge.className = `badge-pill ${tier}`;
-    if (tier === 'pro') {
-        badge.innerHTML = '👑 Pro Member';
-    } else if (tier === 'basic') {
-        badge.innerHTML = '⚡ Basic Member';
+    if (APP_STATE.isSubscribed) {
+        badge.className = 'badge-pill pro';
+        badge.innerHTML = '👑 Full Access';
     } else {
+        badge.className = 'badge-pill trial';
         badge.innerHTML = '⚡ Free Trial';
     }
 }
 
-// ── Modals & Actions (Normalized Pakistani Phone Linked on Payment/Call) ──
-function openPaywallModal(tier = 'basic') {
+// ── Modals & Actions (Normalized Pakistani Phone Linked on Payment) ──
+function openPaywallModal() {
     if (!APP_STATE.authenticated) {
         openAuthModal();
         return;
     }
-    selectPlanCard(tier);
     showModalError('paywall-error-box', '');
     const phoneInput = document.getElementById('paywall-phone-input');
     if (phoneInput && APP_STATE.displayPhone && !phoneInput.value) {
@@ -2642,13 +2562,6 @@ function openPaywallModal(tier = 'basic') {
 
 function closePaywallModal() {
     document.getElementById('paywall-modal-overlay').classList.remove('active');
-}
-
-function selectPlanCard(plan) {
-    APP_STATE.selectedPlan = plan;
-    document.querySelectorAll('.plan-option-card').forEach(c => c.classList.remove('selected'));
-    const target = document.getElementById(`plan-card-${plan}`);
-    if (target) target.classList.add('selected');
 }
 
 async function linkUserPhone(rawPhone) {
@@ -2705,9 +2618,9 @@ async function submitPaywallPayment() {
         }
 
         // 2. Submit TRX ID over authenticated cookie session
-        const command = `TRX: ${trx} ${APP_STATE.selectedPlan.toUpperCase()}`;
+        const command = `TRX: ${trx}`;
         closePaywallModal();
-        appendMessageBubble('user', `Payment submitted: ${trx} (${APP_STATE.selectedPlan.toUpperCase()})`);
+        appendMessageBubble('user', `Payment submitted: ${trx} (Full Access — PKR __MONTHLY_PRICE__/mo)`);
         setTypingState(true);
 
         const res = await fetch('/api/chat', {
@@ -2733,90 +2646,6 @@ async function submitPaywallPayment() {
     } finally {
         btn.disabled = false;
         btn.textContent = '✓ Submit Payment for Verification';
-    }
-}
-
-function openCoachingPhoneModal() {
-    showModalError('coaching-phone-error', '');
-    const phoneInput = document.getElementById('coaching-phone-input');
-    if (phoneInput && APP_STATE.displayPhone) {
-        phoneInput.value = APP_STATE.displayPhone;
-        updatePhonePreview('coaching-phone-input', 'coaching-phone-preview');
-    }
-    document.getElementById('coaching-phone-modal-overlay').classList.add('active');
-}
-
-function closeCoachingPhoneModal() {
-    document.getElementById('coaching-phone-modal-overlay').classList.remove('active');
-}
-
-async function submitCoachingWithPhone() {
-    showModalError('coaching-phone-error', '');
-    const rawPhone = document.getElementById('coaching-phone-input').value.trim();
-    const canon = normalizePkPhoneClient(rawPhone);
-    if (!canon) {
-        showModalError('coaching-phone-error', 'Please enter a valid Pakistani mobile number (e.g. 0300 7560313 or +92 300 7560313).');
-        document.getElementById('coaching-phone-input').focus();
-        return;
-    }
-
-    const btn = document.getElementById('coaching-phone-submit-btn');
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
-
-    try {
-        const linkRes = await linkUserPhone(rawPhone);
-        if (!linkRes.ok) {
-            showModalError('coaching-phone-error', linkRes.message);
-            return;
-        }
-        closeCoachingPhoneModal();
-        await dispatchCoachingRequest();
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Save Number & Request 1-on-1 Call ✓';
-    }
-}
-
-function sendCoachingRequest() {
-    if (!APP_STATE.authenticated) {
-        openAuthModal();
-        return;
-    }
-    if (!APP_STATE.userPhone) {
-        openCoachingPhoneModal();
-        return;
-    }
-    dispatchCoachingRequest();
-}
-
-async function dispatchCoachingRequest() {
-    appendMessageBubble('user', 'I would like to request a 1-on-1 private coaching mentorship call with Hassan Ali Farrukh.');
-    setTypingState(true);
-
-    try {
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ message: 'CALL' })
-        });
-        const d = await res.json().catch(() => ({}));
-        setTypingState(false);
-
-        if (res.status === 401) {
-            openAuthModal();
-            return;
-        }
-        if (d.code === 'phone_required') {
-            openCoachingPhoneModal();
-            return;
-        }
-        if (d.user) syncUserState(d.user);
-        appendMessageBubble('ai', d.reply || 'Your mentorship request has been forwarded to the team.');
-    } catch (e) {
-        setTypingState(false);
-        appendMessageBubble('ai', 'Error submitting coaching request. Please try again.');
     }
 }
 
@@ -2898,16 +2727,6 @@ function showToast(msg) {
     toast.textContent = msg;
     toast.classList.add('visible');
     setTimeout(() => toast.classList.remove('visible'), 2800);
-}
-
-function simulateVoicePlay(btn) {
-    if (btn.textContent === '▶') {
-        btn.textContent = '⏸';
-        showToast('Playing voice sample audio...');
-        setTimeout(() => { btn.textContent = '▶'; }, 3000);
-    } else {
-        btn.textContent = '▶';
-    }
 }
 
 function setupInputAutoResize() {

@@ -301,13 +301,51 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
         r2 = self.client.post("/api/auth/google", json={"credential": "eyJhbGciOiJub25lIn0.eyJlbWFpbCI6InZpY3RpbUBnbWFpbC5jb20ifQ."})
         self.assertEqual(r2.status_code, 401)
 
-        # Home page renders clean Google-only sign-in modal (no Email OTP, no unverified mobile login, no fake prompt)
+        # Home page renders clean Google-only sign-in modal & unified PKR 1,000 Full Access plan
         r_home = self.client.get("/")
         self.assertEqual(r_home.status_code, 200)
         self.assertIn("Continue with Google", r_home.text)
+        self.assertIn("PKR 1,000", r_home.text)
+        self.assertIn("Full Access", r_home.text)
+        self.assertNotIn("Starting PKR 500", r_home.text)
+        self.assertNotIn("Basic Tier", r_home.text)
+        self.assertNotIn("1-on-1", r_home.text)
+        self.assertNotIn("verified-badge", r_home.text)
+        self.assertNotIn("Official AI", r_home.text)
         self.assertNotIn("promptGoogleUserEmail", r_home.text)
         self.assertNotIn("submitOnboarding", r_home.text)
         self.assertNotIn("sendEmailOtp", r_home.text)
+
+    def test_single_1000_pkr_plan_dashboard_mrr_and_paywall(self):
+        # Activate 2 users (one via API without tier arg, one via DB helper) -> MRR must be 2 * 1000 = 2000
+        r_adm_login = self.client.post("/api/admin/login", json={"passkey": config.ADMIN_PASSWORD})
+        self.assertEqual(r_adm_login.status_code, 200)
+
+        r_act1 = self.client.post("/api/admin/activate", json={"identifier": "03001234567", "days": 30})
+        self.assertEqual(r_act1.status_code, 200)
+        self.assertEqual(r_act1.json()["tier"], "pro")
+
+        database.activate_user("03219876543", days=30)
+
+        metrics = database.get_system_metrics()
+        self.assertEqual(metrics["monthly_price_pkr"], 1000)
+        self.assertEqual(metrics["active_subscribers"], 2)
+        self.assertEqual(metrics["estimated_mrr_pkr"], 2000)
+
+        # Dashboard shows unified PKR 1,000 plan, PKR 2,000 MRR, and no Basic/Pro tier selector or 1-on-1 leads
+        r_dash = self.client.get("/admin/dashboard")
+        self.assertEqual(r_dash.status_code, 200)
+        self.assertIn("PKR 1,000", r_dash.text)
+        self.assertIn("PKR 2,000", r_dash.text)
+        self.assertIn("FULL ACCESS", r_dash.text)
+        self.assertNotIn("modal-tier", r_dash.text)
+        self.assertNotIn("BASIC (PKR", r_dash.text)
+        self.assertNotIn("1-on-1 Coaching Leads", r_dash.text)
+
+        # Paywall text shows PKR 1,000 single plan with no drops/tiers
+        self.assertIn("PKR 1,000/month", server.PAYWALL_TEXT)
+        self.assertNotIn("BASIC", server.PAYWALL_TEXT)
+        self.assertNotIn("drops", server.PAYWALL_TEXT)
 
     def test_bridge_secret_and_webhook_admin_bug_fixed(self):
         r_bad_bridge = self.client.post(

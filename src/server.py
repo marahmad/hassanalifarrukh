@@ -18,7 +18,6 @@ from src.config import (
     ADMIN_PHONE,
     ALLIED_BANK,
     ALLIED_BANK_ACCOUNT,
-    BASIC_PRICE_PKR,
     EASYPAISA,
     EASYPAISA_NUMBER,
     FREE_TRIAL_QUESTIONS,
@@ -26,7 +25,7 @@ from src.config import (
     GOOGLE_CLIENT_SECRET,
     GROQ_API_KEY,
     JAZZCASH,
-    PRO_PRICE_PKR,
+    MONTHLY_PRICE_PKR,
     RAAST_ID,
     RAAST_ID_NUMBER,
     VERIFY_TOKEN,
@@ -47,9 +46,7 @@ from src.database import (
     get_user_by_identifier,
     init_db,
     link_phone_to_user,
-    mark_coaching_pitch_sent,
     mark_welcome_sent,
-    record_coaching_lead,
     record_user_query,
     save_chat_message,
     submit_trx_id,
@@ -92,6 +89,7 @@ def _public_user_payload(user: dict) -> dict:
     contact_phone = user.get("contact_phone") or (
         user["phone_number"] if is_canonical_pk_phone(user.get("phone_number")) else ""
     )
+    is_sub = bool(user.get("is_subscribed", False))
     return {
         "id": user.get("phone_number", ""),
         "name": user.get("name") or "User",
@@ -100,8 +98,9 @@ def _public_user_payload(user: dict) -> dict:
         "auth_provider": user.get("auth_provider") or "google",
         "contact_phone": contact_phone,
         "display_phone": format_pk_phone_display(contact_phone) if contact_phone else "",
-        "tier": user.get("tier") or "basic",
-        "is_subscribed": bool(user.get("is_subscribed", False)),
+        "tier": "pro" if is_sub else "trial",
+        "is_subscribed": is_sub,
+        "monthly_price_pkr": MONTHLY_PRICE_PKR,
         "subscription_expiry": user.get("subscription_expiry"),
         "trial_questions_used": user.get("trial_questions_used") or 0,
         "max_free_trial": FREE_TRIAL_QUESTIONS,
@@ -116,34 +115,25 @@ def _is_google_oauth_enabled() -> bool:
 
 PAYWALL_TEXT = f"""Your {FREE_TRIAL_QUESTIONS} free questions are up! 🎯
 
-To continue chatting with Hassan's AI, choose a plan:
-
-1️⃣ BASIC — PKR {BASIC_PRICE_PKR}/month
-   Standard mentorship access & direct guidance
-
-2️⃣ PRO — PKR {PRO_PRICE_PKR}/month
-   Deeper answers + priority knowledge retrieval + monthly exclusive drops
+Unlock **Full Access — PKR {MONTHLY_PRICE_PKR:,}/month**:
+• Unlimited AI mentorship chats
+• Full knowledge archive & deep step-by-step answers
+• Refer 3 friends to get 1 month FREE
 
 ━━━━━━━━━━━━━━━━
-Send payment to:
+Send PKR {MONTHLY_PRICE_PKR:,} to:
 • EasyPaisa: {EASYPAISA}
 • Allied Bank: {ALLIED_BANK}
 • Raast: {RAAST_ID}
 
 After paying, reply with your Transaction ID:"""
 
-HIGH_INTENT_KEYWORDS = [
-    "career", "job", "naukri", "business", "startup", "money",
-    "paise", "kamana", "loss", "future", "problem", "stuck",
-    "direction", "guidance", "mentorship", "personally",
-]
-
 
 def build_welcome_message(tier: str, referral_code: str) -> str:
     """Builds the first-time welcome message with referral incentives."""
     return f"""Welcome to Hassan AI! 🎉
 
-You now have full {tier.upper()} access. Ask me anything Hassan has ever talked about — mindset, life, career, relationships, and more.
+Your Full Access monthly pass is now active. Ask me anything from Hassan's reels and philosophy — mindset, discipline, career, fitness, relationships, and more.
 
 ━━━━━━━━━━━━━━━━
 🎁 Your personal referral code: {referral_code}
@@ -159,54 +149,32 @@ def format_stats_summary(metrics: dict) -> str:
         f"• Total Inbound Users: {metrics['total_users']}\n"
         f"• Total Queries Handled: {metrics['total_queries']}\n\n"
         f"💳 *Subscribers & Conversion:*\n"
-        f"• Active Paid Members: {metrics['active_subscribers']}\n"
+        f"• Active Paid Members (PKR {MONTHLY_PRICE_PKR:,}/mo): {metrics['active_subscribers']}\n"
         f"• Conversion Rate: {metrics['conversion_rate']}%\n"
-        f"• Basic Tier (PKR {BASIC_PRICE_PKR}): {metrics['basic_subscribers']}\n"
-        f"• Pro Tier (PKR {PRO_PRICE_PKR}): {metrics['pro_subscribers']}\n"
         f"• Estimated MRR: PKR {metrics['estimated_mrr_pkr']:,} / month\n\n"
         f"🆓 *Trial Funnel:*\n"
         f"• Active Free Trials: {metrics['active_trials']}\n"
         f"• Paywall Reached: {metrics['paywalled_trials']}\n\n"
         f"🔗 *Viral Loop:*\n"
         f"• Total Referrals Generated: {metrics['total_referrals']}\n\n"
-        f"📞 *Coaching Leads:* {metrics['new_coaching_leads']} pending\n"
         f"⏳ *Pending Payments:* {metrics['pending_payments']}\n\n"
-        f"🌐 Web Dashboard: http://localhost:8080/admin/dashboard"
+        f"🌐 Web Dashboard: https://hassanalifarrukh.store/admin/dashboard"
     )
-
-
-def should_trigger_coaching_upsell(user_info: dict, user_text: str) -> bool:
-    """Checks if a paid subscriber qualifies for the high-intent coaching pitch."""
-    queries = user_info.get("total_queries", 0)
-    tier = user_info.get("tier", "basic")
-    already_sent = user_info.get("coaching_pitch_sent", 0)
-
-    if already_sent:
-        return False
-
-    threshold = 5 if tier == "pro" else 7
-    if queries < threshold:
-        return False
-
-    text_lower = user_text.lower()
-    return any(kw in text_lower for kw in HIGH_INTENT_KEYWORDS)
 
 
 def parse_activate_args(parts: list[str]) -> tuple[str | None, str, int, str]:
     """
-    Parses `/activate <phone_or_email_or_id> [plan] [days]`.
+    Parses `/activate <phone_or_email_or_id> [days]` (also tolerates legacy tier token).
     Accepts any Pakistani mobile format (normalized to 923XXXXXXXXX), an email address,
     or an internal user ID (u_.../google_...).
     Returns: (target_identifier_or_None, tier, days, error_message)
     """
     raw_target = parts[1].strip()
-    tier = "basic"
+    tier = "pro"
     days = 30
     for p in parts[2:]:
         p_clean = p.strip().lower()
-        if p_clean in ["basic", "pro"]:
-            tier = p_clean
-        elif p_clean.isdigit():
+        if p_clean.isdigit():
             days = int(p_clean)
 
     if "@" in raw_target:
@@ -225,20 +193,20 @@ def parse_activate_args(parts: list[str]) -> tuple[str | None, str, int, str]:
 
 def parse_trx_text(text: str) -> tuple[str, str, str]:
     """
-    Extracts TRX ID, optional selected plan (basic or pro),
-    and optional friend referral code (e.g. HASSAN-XXXX).
+    Extracts TRX ID and optional friend referral code (e.g. HASSAN-XXXX).
+    All subscriptions use the unified PKR 1,000/mo Full Access plan (`pro`).
     """
     cleaned = text.replace("TRX ID:", " ").replace("TRX:", " ").replace("TRX", " ")
     tokens = cleaned.split()
     trx_id = tokens[0] if tokens else ""
-    plan = "basic"
+    plan = "pro"
     referral_code = ""
 
     for tok in tokens[1:]:
         t_clean = tok.strip()
         t_upper = t_clean.upper()
-        if t_upper in ["BASIC", "PRO"]:
-            plan = t_upper.lower()
+        if t_upper in ["BASIC", "PRO", "FULL", "MONTHLY"]:
+            continue
         elif t_upper.startswith("REF:") or t_upper.startswith("CODE:"):
             referral_code = t_upper.split(":")[-1].strip()
         elif t_upper.startswith("HASSAN-"):
@@ -564,7 +532,6 @@ async def api_admin_activate(request: Request):
         return JSONResponse({"status": "error", "message": "Invalid request payload."}, status_code=400)
 
     raw_target = str(data.get("identifier") or data.get("phone") or "").strip()
-    tier = str(data.get("tier") or "basic").strip().lower()
     days_raw = data.get("days", 30)
     try:
         days = max(1, int(days_raw))
@@ -574,7 +541,7 @@ async def api_admin_activate(request: Request):
     if not raw_target:
         return JSONResponse({"status": "error", "message": "Please enter a phone number or email."}, status_code=400)
 
-    target_id, tier_parsed, days_parsed, err = parse_activate_args(["/activate", raw_target, tier, str(days)])
+    target_id, tier_parsed, days_parsed, err = parse_activate_args(["/activate", raw_target, str(days)])
     if not target_id:
         return JSONResponse({"status": "error", "message": err}, status_code=400)
 
@@ -594,7 +561,7 @@ async def api_admin_activate(request: Request):
 
 @app.post("/api/admin/broadcast")
 async def api_admin_broadcast(request: Request):
-    """Dispatches a broadcast message to active Basic, Pro, or all subscribers. Requires passkey."""
+    """Dispatches a broadcast message to all active subscribers. Requires passkey."""
     if not is_admin_authenticated(request):
         return JSONResponse(
             {"status": "error", "message": "Unauthorized. Executive passkey required."},
@@ -610,13 +577,12 @@ async def api_admin_broadcast(request: Request):
         )
 
     data = await request.json()
-    tier = data.get("tier", "all")
     msg = str(data.get("message") or "").strip()
     if not msg:
         return JSONResponse({"status": "error", "message": "Empty message"}, status_code=400)
 
-    phones = get_subscriber_phones(tier)
-    formatted_msg = f"[Hassan AI] 💬 Message from Hassan:\n\n\"{msg}\"\n\n— Hassan Ali Farrukh"
+    phones = get_subscriber_phones("all")
+    formatted_msg = f"[Hassan AI] 💬 Update:\n\n\"{msg}\"\n\n— Hassan AI"
     sent = 0
     for p in phones:
         try:
@@ -625,7 +591,7 @@ async def api_admin_broadcast(request: Request):
         except Exception:
             pass
 
-    return {"status": "ok", "count": sent, "total_targeted": len(phones), "tier": tier}
+    return {"status": "ok", "count": sent, "total_targeted": len(phones), "tier": "all"}
 
 
 # ── Meta WhatsApp Cloud API Webhook ────────────────────────────────────────
@@ -688,27 +654,21 @@ async def receive_whatsapp(request: Request):
                 return {"status": "ok"}
 
             if user_text.startswith("/broadcast"):
-                target_tier = "all"
                 msg_body = ""
-                if user_text.startswith("/broadcast-basic "):
-                    target_tier = "basic"
-                    msg_body = user_text[len("/broadcast-basic "):].strip()
-                elif user_text.startswith("/broadcast-pro "):
-                    target_tier = "pro"
-                    msg_body = user_text[len("/broadcast-pro "):].strip()
-                elif user_text.startswith("/broadcast "):
-                    target_tier = "all"
-                    msg_body = user_text[len("/broadcast "):].strip()
+                for prefix in ("/broadcast-basic ", "/broadcast-pro ", "/broadcast "):
+                    if user_text.startswith(prefix):
+                        msg_body = user_text[len(prefix):].strip()
+                        break
 
                 if msg_body:
-                    phones = get_subscriber_phones(target_tier)
-                    formatted_msg = f"[Hassan AI] 💬 Message from Hassan:\n\n\"{msg_body}\"\n\n— Hassan Ali Farrukh"
+                    phones = get_subscriber_phones("all")
+                    formatted_msg = f"[Hassan AI] 💬 Update:\n\n\"{msg_body}\"\n\n— Hassan AI"
                     for p in phones:
                         try:
                             send_whatsapp_text(p, formatted_msg)
                         except Exception:
                             pass
-                    send_whatsapp_text(sender_phone, f"📢 Broadcast successfully delivered to {len(phones)} {target_tier.upper()} subscribers!")
+                    send_whatsapp_text(sender_phone, f"📢 Broadcast successfully delivered to {len(phones)} active subscribers!")
                     return {"status": "ok"}
 
             if user_text.startswith("/activate"):
@@ -728,7 +688,7 @@ async def receive_whatsapp(request: Request):
                     label = f"+{target_wa}" if target_wa else target_id
                     send_whatsapp_text(
                         sender_phone,
-                        f"✅ User {label} activated on {tier_activated.upper()} tier for {days} days until {new_exp.strftime('%Y-%m-%d')}!\nReferral Code: {ref_code}",
+                        f"✅ User {label} activated on Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) for {days} days until {new_exp.strftime('%Y-%m-%d')}!\nReferral Code: {ref_code}",
                     )
 
                     if target_wa:
@@ -750,28 +710,7 @@ async def receive_whatsapp(request: Request):
 
                     return {"status": "ok"}
 
-        # 2. Check for Coaching Request (CALL)
-        if user_text.upper() in ["CALL", "BOOK CALL", "1 ON 1", "COACHING"]:
-            can_chat, status, tier = can_user_chat(sender_phone)
-            if status != "subscribed":
-                send_whatsapp_text(sender_phone, "1-on-1 coaching requests are available for active Hassan AI members. Please subscribe to a plan first or ask any question to continue.")
-                return {"status": "ok"}
-
-            ok, lead_msg = record_coaching_lead(sender_phone)
-            send_whatsapp_text(sender_phone, lead_msg)
-            if ok and norm_admin_phone:
-                u_info = get_or_create_user(sender_phone)
-                alert_text = (
-                    f"🔔 *New 1-on-1 Coaching Lead!*\n\n"
-                    f"User: +{sender_phone}\n"
-                    f"Tier: {tier.upper()}\n"
-                    f"Interactions: {u_info.get('total_queries', 0)}\n\n"
-                    f"Contact directly: https://wa.me/{sender_phone}"
-                )
-                send_whatsapp_text(norm_admin_phone, alert_text)
-            return {"status": "ok"}
-
-        # 3. Check for Referral Stats Command (REFERRAL / CODE)
+        # 2. Check for Referral Stats Command (REFERRAL / CODE)
         if user_text.upper() in ["REFERRAL", "CODE", "MY CODE", "REF"]:
             stats = get_referral_stats(sender_phone)
             reply = (
@@ -784,14 +723,14 @@ async def receive_whatsapp(request: Request):
             send_whatsapp_text(sender_phone, reply)
             return {"status": "ok"}
 
-        # 4. Check for standalone Referral Code application (e.g. REF: HASSAN-XXXX)
+        # 3. Check for standalone Referral Code application (e.g. REF: HASSAN-XXXX)
         if user_text.upper().startswith("REF:") or user_text.upper().startswith("CODE:") or user_text.upper().startswith("REFERRAL:"):
             code_input = user_text.split(":")[-1].strip()
             ok, ref_msg = apply_referral_code(sender_phone, code_input)
             send_whatsapp_text(sender_phone, ref_msg)
             return {"status": "ok"}
 
-        # 5. Check for Payment Submission
+        # 4. Check for Payment Submission
         can_chat, status, tier = can_user_chat(sender_phone)
         if is_trx_message(user_text, status):
             trx_clean, plan_chosen, ref_code_in_trx = parse_trx_text(user_text)
@@ -808,7 +747,7 @@ async def receive_whatsapp(request: Request):
             saved = submit_trx_id(sender_phone, trx_clean, plan_selected=plan_chosen)
             if saved:
                 ack_msg = (
-                    f"Thank you! Your payment verification request for {plan_chosen.upper()} tier has been received.{ref_note}\n"
+                    f"Thank you! Your payment verification request for Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) has been received.{ref_note}\n"
                     "Admin will verify and activate your pass within 10-15 minutes."
                 )
                 send_whatsapp_text(sender_phone, ack_msg)
@@ -816,33 +755,33 @@ async def receive_whatsapp(request: Request):
                     admin_alert = (
                         f"🔔 *New Payment Alert!*\n"
                         f"User: +{sender_phone}\n"
-                        f"Plan: {plan_chosen.upper()}\n"
+                        f"Plan: Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo)\n"
                         f"TRX: `{trx_clean}`\n\n"
                         f"To activate, reply with:\n"
-                        f"`/activate {sender_phone} {plan_chosen} 30`"
+                        f"`/activate {sender_phone} 30`"
                     )
                     send_whatsapp_text(norm_admin_phone, admin_alert)
             else:
                 send_whatsapp_text(sender_phone, "This Transaction ID has already been registered or submitted.")
             return {"status": "ok"}
 
-        # 6. Check Subscription & Trial Status
+        # 5. Check Subscription & Trial Status
         can_chat, status, tier = can_user_chat(sender_phone)
         if not can_chat:
             send_whatsapp_text(sender_phone, PAYWALL_TEXT)
             return {"status": "ok"}
 
-        # 7. Search Knowledge Base
-        retrieval_count = 6 if tier == "pro" else 3
+        # 6. Search Knowledge Base (Full 6-chunk archive for all paid subscribers)
+        retrieval_count = 6 if status == "subscribed" else 3
         matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
 
-        # 8. Retrieve Conversation History
+        # 7. Retrieve Conversation History
         history = get_recent_chat_history(sender_phone, limit=6)
 
-        # 9. Generate AI Response via Groq
+        # 8. Generate AI Response via Groq
         if groq_client:
             messages = build_hassan_chat_messages(user_text, matching_chunks, tier=tier, history=history)
-            max_tokens = 700 if tier == "pro" else 450
+            max_tokens = 700 if status == "subscribed" else 450
             chat = groq_client.chat.completions.create(
                 messages=messages,
                 model="openai/gpt-oss-120b",
@@ -851,7 +790,7 @@ async def receive_whatsapp(request: Request):
             )
             ai_reply = chat.choices[0].message.content
         else:
-            ai_reply = f"[Demo Mode] Hassan Ali Farrukh: I received your question: '{user_text}'."
+            ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
 
         save_chat_message(sender_phone, "user", user_text)
         save_chat_message(sender_phone, "assistant", ai_reply)
@@ -863,18 +802,7 @@ async def receive_whatsapp(request: Request):
             if remaining > 0:
                 ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
             else:
-                ai_reply += "\n\n_(You have used your last free question. Please subscribe to continue receiving guidance.)_"
-
-        elif status == "subscribed" and should_trigger_coaching_upsell(u_info, user_text):
-            upsell_box = (
-                f"\n\n━━━━━━━━━━━━━━━━\n"
-                f"💡 It looks like you're serious about making real changes in your life.\n"
-                f"Hassan offers limited 1-on-1 private mentorship sessions where he works through your specific situation directly.\n\n"
-                f"Interested? Reply with: CALL\n"
-                f"(We'll follow up with available slots and booking details)"
-            )
-            ai_reply += upsell_box
-            mark_coaching_pitch_sent(sender_phone)
+                ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month to unlock unlimited full access.)_"
 
         elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
             stats = get_referral_stats(sender_phone)
@@ -938,33 +866,27 @@ async def process_chat(request: Request):
             return {"reply": format_stats_summary(get_system_metrics())}
 
         if user_text.startswith("/broadcast"):
-            target_tier = "all"
             msg_body = ""
-            if user_text.startswith("/broadcast-basic "):
-                target_tier = "basic"
-                msg_body = user_text[len("/broadcast-basic "):].strip()
-            elif user_text.startswith("/broadcast-pro "):
-                target_tier = "pro"
-                msg_body = user_text[len("/broadcast-pro "):].strip()
-            elif user_text.startswith("/broadcast "):
-                target_tier = "all"
-                msg_body = user_text[len("/broadcast "):].strip()
+            for prefix in ("/broadcast-basic ", "/broadcast-pro ", "/broadcast "):
+                if user_text.startswith(prefix):
+                    msg_body = user_text[len(prefix):].strip()
+                    break
 
             if msg_body:
-                phones = get_subscriber_phones(target_tier)
-                formatted_msg = f"[Hassan AI] 💬 Message from Hassan:\n\n\"{msg_body}\"\n\n— Hassan Ali Farrukh"
+                phones = get_subscriber_phones("all")
+                formatted_msg = f"[Hassan AI] 💬 Update:\n\n\"{msg_body}\"\n\n— Hassan AI"
                 for p in phones:
                     try:
                         send_whatsapp_text(p, formatted_msg)
                     except Exception:
                         pass
-                return {"reply": f"📢 Broadcast successfully delivered to {len(phones)} {target_tier.upper()} subscribers!"}
+                return {"reply": f"📢 Broadcast successfully delivered to {len(phones)} active subscribers!"}
 
         if user_text.startswith("/activate"):
             parts = user_text.split()
             if len(parts) < 2:
                 return JSONResponse(
-                    {"status": "error", "reply": "Usage: /activate <phone_or_email> [basic|pro] [days]"},
+                    {"status": "error", "reply": "Usage: /activate <phone_or_email> [days]"},
                     status_code=400,
                 )
             target_id, tier, days, err = parse_activate_args(parts)
@@ -974,7 +896,7 @@ async def process_chat(request: Request):
             new_exp, tier_activated, ref_code, referrer_reward = activate_user(target_id, days=days, tier=tier)
             label = f"+{target_id}" if is_canonical_pk_phone(target_id) else target_id
             reply = (
-                f"✅ User {label} activated on {tier_activated.upper()} tier for {days} days until {new_exp.strftime('%Y-%m-%d')}!\n"
+                f"✅ User {label} activated on Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) for {days} days until {new_exp.strftime('%Y-%m-%d')}!\n"
                 f"Referral Code: {ref_code}"
             )
             if referrer_reward:
@@ -1016,7 +938,7 @@ async def process_chat(request: Request):
             status_code=401,
         )
 
-    # Optional atomic phone link if supplied alongside TRX or CALL from web UI
+    # Optional atomic phone link if supplied alongside TRX from web UI
     supplied_phone = str(data.get("phone") or "").strip()
     if supplied_phone and not is_bridge:
         ok_link, _, link_err = link_phone_to_user(sender_id, supplied_phone)
@@ -1024,27 +946,7 @@ async def process_chat(request: Request):
             status_code = 409 if "already linked" in link_err.lower() else 400
             return JSONResponse({"status": "error", "reply": link_err}, status_code=status_code)
 
-    # 3. Check for Coaching Request (CALL)
-    if user_text.upper() in ["CALL", "BOOK CALL", "1 ON 1", "COACHING"]:
-        can_chat, status, tier = can_user_chat(sender_id)
-        if status != "subscribed":
-            return {"reply": "1-on-1 coaching requests are available for active Hassan AI members. Please subscribe to a plan first or ask any question to continue."}
-
-        u_curr = get_or_create_user(sender_id)
-        if not is_bridge and not u_curr.get("contact_phone"):
-            return JSONResponse(
-                {
-                    "status": "error",
-                    "code": "phone_required",
-                    "reply": "Please add your Pakistani mobile number first so our team can contact you on WhatsApp.",
-                },
-                status_code=400,
-            )
-
-        ok, lead_msg = record_coaching_lead(sender_id)
-        return {"reply": lead_msg, "user": _public_user_payload(u_curr)}
-
-    # 4. Check for Referral Stats Command (REFERRAL / CODE)
+    # 3. Check for Referral Stats Command (REFERRAL / CODE)
     if user_text.upper() in ["REFERRAL", "CODE", "MY CODE", "REF"]:
         stats = get_referral_stats(sender_id)
         return {
@@ -1057,7 +959,7 @@ async def process_chat(request: Request):
             )
         }
 
-    # 5. Check for standalone Referral Code application (e.g. REF: HASSAN-XXXX)
+    # 4. Check for standalone Referral Code application (e.g. REF: HASSAN-XXXX)
     if user_text.upper().startswith("REF:") or user_text.upper().startswith("CODE:") or user_text.upper().startswith("REFERRAL:"):
         code_input = user_text.split(":")[-1].strip()
         ok, ref_msg = apply_referral_code(sender_id, code_input)
@@ -1066,7 +968,7 @@ async def process_chat(request: Request):
     # Check status early for payment routing & access check
     can_chat, status, tier = can_user_chat(sender_id)
 
-    # 6. Check for Payment Submission
+    # 5. Check for Payment Submission
     if is_trx_message(user_text, status):
         trx_clean, plan_chosen, ref_code_in_trx = parse_trx_text(user_text)
         if not trx_clean:
@@ -1093,29 +995,29 @@ async def process_chat(request: Request):
         if saved:
             return {
                 "reply": (
-                    f"✅ Thank you! Your payment verification request for {plan_chosen.upper()} tier has been received (TRX: {trx_clean}).{ref_note}\n\n"
+                    f"✅ Thank you! Your payment verification request for Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) has been received (TRX: {trx_clean}).{ref_note}\n\n"
                     "Admin will verify and activate your pass within 10-15 minutes."
                 ),
                 "user": _public_user_payload(u_curr),
             }
         return {"reply": "This Transaction ID has already been registered or submitted for review."}
 
-    # 7. Check Subscription & Trial Status
+    # 6. Check Subscription & Trial Status
     if not can_chat:
         u_info = get_or_create_user(sender_id)
         return {"reply": PAYWALL_TEXT, "paywalled": True, "user": _public_user_payload(u_info)}
 
-    # 8. Search Knowledge Base (Dynamic depth by tier)
-    retrieval_count = 6 if tier == "pro" else 3
+    # 7. Search Knowledge Base (Full 6-chunk archive for all paid subscribers)
+    retrieval_count = 6 if status == "subscribed" else 3
     matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
 
-    # 9. Retrieve Conversation History for Multi-Turn Context
+    # 8. Retrieve Conversation History for Multi-Turn Context
     history = get_recent_chat_history(sender_id, limit=6)
 
-    # 10. Generate AI Response
+    # 9. Generate AI Response
     if groq_client:
         messages = build_hassan_chat_messages(user_text, matching_chunks, tier=tier, history=history)
-        max_tokens = 700 if tier == "pro" else 450
+        max_tokens = 700 if status == "subscribed" else 450
         chat = groq_client.chat.completions.create(
             messages=messages,
             model="openai/gpt-oss-120b",
@@ -1124,7 +1026,7 @@ async def process_chat(request: Request):
         )
         ai_reply = chat.choices[0].message.content
     else:
-        ai_reply = f"[Demo Mode] Hassan Ali Farrukh: I received your question: '{user_text}'."
+        ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
 
     save_chat_message(sender_id, "user", user_text)
     save_chat_message(sender_id, "assistant", ai_reply)
@@ -1141,18 +1043,7 @@ async def process_chat(request: Request):
         if remaining > 0:
             ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
         else:
-            ai_reply += "\n\n_(You have used your last free question. Please subscribe to continue receiving guidance.)_"
-
-    elif status == "subscribed" and should_trigger_coaching_upsell(u_info, user_text):
-        upsell_box = (
-            f"\n\n━━━━━━━━━━━━━━━━\n"
-            f"💡 It looks like you're serious about making real changes in your life.\n"
-            f"Hassan offers limited 1-on-1 private mentorship sessions where he works through your specific situation directly.\n\n"
-            f"Interested? Reply with: CALL\n"
-            f"(We'll follow up with available slots and booking details)"
-        )
-        ai_reply += upsell_box
-        mark_coaching_pitch_sent(sender_id)
+            ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month to unlock unlimited full access.)_"
 
     elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
         stats = get_referral_stats(sender_id)

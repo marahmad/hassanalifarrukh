@@ -32,11 +32,12 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
 
-# Business Settings
+# Business Settings (Single All-Access Monthly Plan)
 FREE_TRIAL_QUESTIONS = int(os.getenv("FREE_TRIAL_QUESTIONS", "3"))
-BASIC_PRICE_PKR = int(os.getenv("BASIC_PRICE_PKR", "500"))
-PRO_PRICE_PKR = int(os.getenv("PRO_PRICE_PKR", "1500"))
-MONTHLY_PRICE_PKR = PRO_PRICE_PKR  # Backwards compatibility
+MONTHLY_PRICE_PKR = int(os.getenv("MONTHLY_SUBSCRIPTION_PKR", "1000"))
+# Backwards-compatible aliases (all paid access is unified at MONTHLY_PRICE_PKR)
+BASIC_PRICE_PKR = MONTHLY_PRICE_PKR
+PRO_PRICE_PKR = MONTHLY_PRICE_PKR
 ADMIN_PHONE = os.getenv("ADMIN_PHONE_NUMBER", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
 ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "").strip() or secrets.token_hex(32)

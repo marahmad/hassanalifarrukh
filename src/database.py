@@ -506,16 +506,15 @@ def get_referral_stats(phone_number: str) -> dict:
 
 def can_user_chat(phone_number: str) -> tuple[bool, str, str]:
     user = get_or_create_user(phone_number)
-    tier = user.get("tier", "basic") or "basic"
     expiry = _parse_dt(user.get("subscription_expiry"))
     if expiry and expiry > datetime.now():
-        return True, "subscribed", tier
+        return True, "subscribed", "pro"
 
     used = user.get("trial_questions_used", 0) or 0
     if used < FREE_TRIAL_QUESTIONS:
-        return True, "free_trial", "basic"
+        return True, "free_trial", "trial"
 
-    return False, "paywall_required", tier
+    return False, "paywall_required", "trial"
 
 
 def record_user_query(phone_number: str):
@@ -539,13 +538,12 @@ def mark_welcome_sent(phone_number: str):
         db.execute("UPDATE users SET welcome_sent = 1 WHERE phone_number = ?", (user_id,))
 
 
-def submit_trx_id(phone_number: str, trx_id: str, plan_selected: str = "basic") -> bool:
+def submit_trx_id(phone_number: str, trx_id: str, plan_selected: str = "pro") -> bool:
     user = get_or_create_user(phone_number)
     user_id = user["phone_number"]
     now = datetime.now()
-    plan_clean = plan_selected.lower().strip()
-    if plan_clean not in ["basic", "pro"]:
-        plan_clean = "basic"
+    # Single unified all-access monthly plan
+    plan_clean = "pro"
 
     with DBContext() as db:
         try:
@@ -558,10 +556,9 @@ def submit_trx_id(phone_number: str, trx_id: str, plan_selected: str = "basic") 
             return False
 
 
-def activate_user(phone_number: str, days: int = 30, tier: str = "basic") -> tuple[datetime, str, str, dict | None]:
-    tier_clean = tier.lower().strip()
-    if tier_clean not in ["basic", "pro"]:
-        tier_clean = "basic"
+def activate_user(phone_number: str, days: int = 30, tier: str = "pro") -> tuple[datetime, str, str, dict | None]:
+    # Single unified all-access monthly plan
+    tier_clean = "pro"
 
     user = get_or_create_user(phone_number)
     user_id = user["phone_number"]
@@ -652,7 +649,7 @@ def record_coaching_lead(phone_number: str) -> tuple[bool, str]:
 
 
 def get_system_metrics() -> dict:
-    from src.config import BASIC_PRICE_PKR, PRO_PRICE_PKR
+    from src.config import MONTHLY_PRICE_PKR
     now = datetime.now()
 
     with DBContext() as db:
@@ -662,15 +659,9 @@ def get_system_metrics() -> dict:
         db.execute("SELECT COUNT(*) AS count FROM users")
         total_users = db.fetchone()["count"]
 
-        # 2. Subscribers
+        # 2. Subscribers (Unified All-Access Monthly Plan)
         db.execute("SELECT COUNT(*) AS count FROM users WHERE subscription_expiry > ?", (now_ts,))
         active_subscribers = db.fetchone()["count"]
-
-        db.execute("SELECT COUNT(*) AS count FROM users WHERE subscription_expiry > ? AND tier = 'basic'", (now_ts,))
-        basic_subscribers = db.fetchone()["count"]
-
-        db.execute("SELECT COUNT(*) AS count FROM users WHERE subscription_expiry > ? AND tier = 'pro'", (now_ts,))
-        pro_subscribers = db.fetchone()["count"]
 
         # 3. Trials
         db.execute(
@@ -687,7 +678,7 @@ def get_system_metrics() -> dict:
 
         # 4. Conversion & Revenue
         conversion_rate = round((active_subscribers / total_users * 100), 1) if total_users > 0 else 0.0
-        estimated_mrr_pkr = (basic_subscribers * BASIC_PRICE_PKR) + (pro_subscribers * PRO_PRICE_PKR)
+        estimated_mrr_pkr = active_subscribers * MONTHLY_PRICE_PKR
 
         # 5. Queries & Referrals
         db.execute("SELECT SUM(total_queries) AS total_q, SUM(referral_count) AS total_ref FROM users")
@@ -695,14 +686,11 @@ def get_system_metrics() -> dict:
         total_queries = row_totals["total_q"] or 0
         total_referrals = row_totals["total_ref"] or 0
 
-        # 6. Pending Payments & Coaching Leads
+        # 6. Pending Payments
         db.execute("SELECT COUNT(*) AS count FROM payment_requests WHERE status = 'pending'")
         pending_payments = db.fetchone()["count"]
 
-        db.execute("SELECT COUNT(*) AS count FROM coaching_leads WHERE status = 'new'")
-        new_coaching_leads = db.fetchone()["count"]
-
-        # Build lookup map for enriching payments & leads with contact_phone / email / name
+        # Build lookup map for enriching payments with contact_phone / email / name
         db.execute("SELECT phone_number, name, email, contact_phone FROM users")
         user_lookup = {}
         for ur in db.fetchall():
@@ -716,8 +704,8 @@ def get_system_metrics() -> dict:
                 "contact_phone": cp,
             }
 
-        # 7. Recent Transactions (last 8)
-        db.execute("SELECT * FROM payment_requests ORDER BY id DESC LIMIT 8")
+        # 7. Recent Transactions (last 15)
+        db.execute("SELECT * FROM payment_requests ORDER BY id DESC LIMIT 15")
         recent_payments = []
         for r in db.fetchall():
             d = dict(r)
@@ -731,22 +719,7 @@ def get_system_metrics() -> dict:
             d["user_name"] = meta.get("name", "")
             recent_payments.append(d)
 
-        # 8. Recent Coaching Leads (last 8)
-        db.execute("SELECT * FROM coaching_leads ORDER BY id DESC LIMIT 8")
-        recent_leads = []
-        for r in db.fetchall():
-            d = dict(r)
-            if isinstance(d.get("created_at"), datetime):
-                d["created_at"] = d["created_at"].isoformat()
-            meta = user_lookup.get(d["phone_number"], {})
-            d["contact_phone"] = meta.get("contact_phone") or (
-                d["phone_number"] if is_canonical_pk_phone(d["phone_number"]) else ""
-            )
-            d["email"] = meta.get("email", "")
-            d["user_name"] = meta.get("name", "")
-            recent_leads.append(d)
-
-        # 9. All Users list (up to 50 most active)
+        # 8. All Users list (up to 50 most active)
         db.execute("""
             SELECT phone_number, name, email, contact_phone, auth_provider, tier,
                    trial_questions_used, subscription_expiry, total_queries,
@@ -797,8 +770,7 @@ def get_system_metrics() -> dict:
     return {
         "total_users": total_users,
         "active_subscribers": active_subscribers,
-        "basic_subscribers": basic_subscribers,
-        "pro_subscribers": pro_subscribers,
+        "monthly_price_pkr": MONTHLY_PRICE_PKR,
         "active_trials": active_trials,
         "paywalled_trials": paywalled_trials,
         "conversion_rate": conversion_rate,
@@ -806,9 +778,7 @@ def get_system_metrics() -> dict:
         "total_queries": total_queries,
         "total_referrals": total_referrals,
         "pending_payments": pending_payments,
-        "new_coaching_leads": new_coaching_leads,
         "recent_payments": recent_payments,
-        "recent_leads": recent_leads,
         "all_users": all_users,
         "chart_dates": chart_dates,
         "chart_queries": chart_queries,
@@ -818,26 +788,14 @@ def get_system_metrics() -> dict:
 
 
 def get_subscriber_phones(tier: str = "all") -> list[str]:
-    """Returns canonical 923XXXXXXXXX numbers for active subscribers (skips unlinked synthetic IDs)."""
+    """Returns canonical 923XXXXXXXXX numbers for all active subscribers (skips unlinked synthetic IDs)."""
     now = datetime.now()
     with DBContext() as db:
         now_ts = _db_ts(db, now)
-        tier_clean = tier.lower().strip()
-        if tier_clean == "basic":
-            db.execute(
-                "SELECT phone_number, contact_phone FROM users WHERE subscription_expiry > ? AND tier = 'basic'",
-                (now_ts,),
-            )
-        elif tier_clean == "pro":
-            db.execute(
-                "SELECT phone_number, contact_phone FROM users WHERE subscription_expiry > ? AND tier = 'pro'",
-                (now_ts,),
-            )
-        else:
-            db.execute(
-                "SELECT phone_number, contact_phone FROM users WHERE subscription_expiry > ?",
-                (now_ts,),
-            )
+        db.execute(
+            "SELECT phone_number, contact_phone FROM users WHERE subscription_expiry > ?",
+            (now_ts,),
+        )
 
         phones = []
         seen = set()

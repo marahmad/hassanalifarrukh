@@ -9,9 +9,8 @@ import html as html_lib
 import json
 
 from src.config import (
-    BASIC_PRICE_PKR,
     FREE_TRIAL_QUESTIONS,
-    PRO_PRICE_PKR,
+    MONTHLY_PRICE_PKR,
     WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_TOKEN,
 )
@@ -56,12 +55,11 @@ def render_dashboard_html(metrics: dict) -> str:
             is_approved = p.get("status") == "approved"
             status_color = "#34d399" if is_approved else "#fbbf24"
             status_bg = "rgba(52, 211, 153, 0.1)" if is_approved else "rgba(251, 191, 36, 0.1)"
-            tier_label = p.get("plan_selected", "basic").upper()
             user_cell, activate_target, _ = _format_user_cell(p)
             
             action_btn = ""
             if not is_approved:
-                action_btn = f"""<button onclick="quickActivate('{_escape(activate_target)}', '{_escape(p.get('plan_selected', 'basic'))}')" class="btn-action">Approve &amp; Activate</button>"""
+                action_btn = f"""<button onclick="quickActivate('{_escape(activate_target)}')" class="btn-action">Approve &amp; Activate</button>"""
             else:
                 action_btn = "<span style='color: #71717a; font-size: 12px;'>✓ Activated</span>"
 
@@ -69,7 +67,7 @@ def render_dashboard_html(metrics: dict) -> str:
             <tr>
                 <td style="font-weight: 500; color: #f4f4f5;">{user_cell}</td>
                 <td><code class="code-pill">{_escape(p['trx_id'])}</code></td>
-                <td><span class="plan-pill">{_escape(tier_label)}</span></td>
+                <td><span class="plan-pill">PKR {MONTHLY_PRICE_PKR:,} / MO</span></td>
                 <td><span class="status-pill" style="color: {status_color}; background: {status_bg};">● {_escape(p['status'].upper())}</span></td>
                 <td style="color: #71717a; font-size: 13px;">{_escape((p.get('created_at') or '')[:16])}</td>
                 <td style="text-align: right;">{action_btn}</td>
@@ -77,32 +75,6 @@ def render_dashboard_html(metrics: dict) -> str:
             """
         if not rows:
             rows = "<tr><td colspan='6' class='empty-cell'>No payment requests submitted yet</td></tr>"
-        return rows
-
-    def build_leads_rows(leads: list) -> str:
-        rows = ""
-        for lead in leads:
-            user_cell, _, wa_phone = _format_user_cell(lead)
-            email = str(lead.get("email") or "").strip()
-            if wa_phone:
-                contact_action = f"""<a href="https://wa.me/{_escape(wa_phone)}" target="_blank" class="btn-wa">Chat on WhatsApp ↗</a>"""
-            elif email:
-                contact_action = f"""<a href="mailto:{_escape(email)}" class="btn-wa">Email Lead ↗</a>"""
-            else:
-                contact_action = "<span style='color: #71717a; font-size: 12px;'>No phone linked</span>"
-            rows += f"""
-            <tr>
-                <td style="font-weight: 500; color: #f4f4f5;">{user_cell}</td>
-                <td><span class="plan-pill">{_escape(lead.get('tier', 'basic').upper())}</span></td>
-                <td style="color: #a1a1aa;">{lead.get('total_queries', 0)} queries</td>
-                <td style="color: #71717a; font-size: 13px;">{_escape((lead.get('created_at') or '')[:16])}</td>
-                <td style="text-align: right;">
-                    {contact_action}
-                </td>
-            </tr>
-            """
-        if not rows:
-            rows = "<tr><td colspan='5' class='empty-cell'>No 1-on-1 coaching leads requested yet</td></tr>"
         return rows
 
     def build_users_rows(users: list) -> str:
@@ -118,17 +90,14 @@ def render_dashboard_html(metrics: dict) -> str:
                 except Exception:
                     has_sub = True
 
-            tier_val = u.get('tier', 'basic').upper()
-            tier_style = "#a1a1aa"
-            if tier_val == "PRO":
-                tier_style = "#38bdf8"
-            elif tier_val == "BASIC" and has_sub:
-                tier_style = "#34d399"
-
             if has_sub:
-                status_html = f"""<span class="status-pill" style="color: #34d399; background: rgba(52, 211, 153, 0.1);">● ACTIVE ({tier_val})</span>"""
+                plan_label = "FULL ACCESS"
+                plan_style = "#34d399"
+                status_html = """<span class="status-pill" style="color: #34d399; background: rgba(52, 211, 153, 0.1);">● ACTIVE</span>"""
                 expiry_fmt = f"""<span style="color: #ffffff; font-weight: 500;">{_escape((expiry_raw or '')[:10])}</span>"""
             else:
+                plan_label = "FREE TRIAL"
+                plan_style = "#a1a1aa"
                 used = u.get('trial_questions_used', 0) or 0
                 if used >= FREE_TRIAL_QUESTIONS:
                     status_html = f"""<span class="status-pill" style="color: #f87171; background: rgba(248, 113, 113, 0.1);">PAYWALLED ({used}/{FREE_TRIAL_QUESTIONS})</span>"""
@@ -140,7 +109,7 @@ def render_dashboard_html(metrics: dict) -> str:
             rows += f"""
             <tr>
                 <td style="font-weight: 500; color: #f4f4f5;">{user_cell}</td>
-                <td><span class="plan-pill" style="color: {tier_style};">{_escape(tier_val)}</span></td>
+                <td><span class="plan-pill" style="color: {plan_style};">{plan_label}</span></td>
                 <td>{status_html}</td>
                 <td>{expiry_fmt}</td>
                 <td><code class="code-pill">{_escape(u.get('referral_code', 'N/A'))}</code> ({u.get('referral_count', 0)} refs)</td>
@@ -159,11 +128,9 @@ def render_dashboard_html(metrics: dict) -> str:
     default_dates = [(now - timedelta(days=13 - i)).strftime("%b %d") for i in range(13)] + ["Today"]
 
     real_payments = metrics.get("recent_payments", [])
-    real_leads = metrics.get("recent_leads", [])
     real_users = metrics.get("all_users", [])
 
     real_payments_html = build_payments_rows(real_payments)
-    real_leads_html = build_leads_rows(real_leads)
     real_users_html = build_users_rows(real_users)
 
     total_users = metrics.get("total_users", 0) or 0
@@ -171,9 +138,7 @@ def render_dashboard_html(metrics: dict) -> str:
     real_subs_percent = min(100, int((real_active_subs / total_users) * 100)) if total_users > 0 else 0
 
     real_mrr = metrics.get("estimated_mrr_pkr", 0) or 0
-    basic_mrr = (metrics.get("basic_subscribers", 0) or 0) * BASIC_PRICE_PKR
-    pro_mrr = (metrics.get("pro_subscribers", 0) or 0) * PRO_PRICE_PKR
-    pro_share_percent = min(100, int((pro_mrr / real_mrr) * 100)) if real_mrr > 0 else 0
+    mrr_bar_percent = 100 if real_mrr > 0 else 0
 
     total_queries = metrics.get("total_queries", 0) or 0
     avg_queries = round(total_queries / total_users, 1) if total_users > 0 else 0.0
@@ -1264,8 +1229,8 @@ def render_dashboard_html(metrics: dict) -> str:
         <div class="brand-logo">
             <div class="logo-box">H</div>
             <div class="profile-info">
-                <span class="profile-name">Hassan Ali Farrukh</span>
-                <span class="profile-badge">VIP Owner</span>
+                <span class="profile-name">Hassan AI</span>
+                <span class="profile-badge">Admin Hub</span>
             </div>
         </div>
 
@@ -1284,11 +1249,6 @@ def render_dashboard_html(metrics: dict) -> str:
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
                 <span class="nav-label-desktop">Payment Approvals</span>
                 <span class="nav-label-mobile">Payments</span>
-            </button>
-            <button onclick="switchTab('leads')" id="tab-btn-leads" class="nav-item">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                <span class="nav-label-desktop">1-on-1 Leads</span>
-                <span class="nav-label-mobile">Leads</span>
             </button>
             <button onclick="switchTab('broadcast')" id="tab-btn-broadcast" class="nav-item">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
@@ -1317,7 +1277,7 @@ def render_dashboard_html(metrics: dict) -> str:
                         <h1>Executive Overview</h1>
                         <span class="live-badge">● LIVE DATA</span>
                     </div>
-                    <p>Real-time {_escape(db_backend)} metrics for registered users, EasyPaisa/Bank payments, coaching leads, and AI activity.</p>
+                    <p>Real-time {_escape(db_backend)} metrics for registered users, EasyPaisa/Bank payments, and AI activity.</p>
                 </div>
                 
                 <div class="header-actions">
@@ -1334,7 +1294,7 @@ def render_dashboard_html(metrics: dict) -> str:
                     <div class="card-header">
                         <div>
                             <span>Active Subscribers</span>
-                            {info_badge(f"Users with an unexpired paid plan. Basic is PKR {BASIC_PRICE_PKR:,}/mo and Pro is PKR {PRO_PRICE_PKR:,}/mo.")}
+                            {info_badge(f"Users with an unexpired Full Access monthly pass (PKR {MONTHLY_PRICE_PKR:,}/mo).")}
                         </div>
                         <span style="color: var(--text-primary);"><span id="card-conversion-rate">{metrics['conversion_rate']}</span>% paid {info_badge("Percentage of all registered users who currently have an active paid subscription.")}</span>
                     </div>
@@ -1346,8 +1306,8 @@ def render_dashboard_html(metrics: dict) -> str:
                         <div class="progress-bar-fill" style="width: {real_subs_percent}%;"></div>
                     </div>
                     <div class="card-subtext">
-                        <span>Basic (PKR {BASIC_PRICE_PKR:,}): <strong style="color:#ffffff;">{metrics['basic_subscribers']}</strong></span>
-                        <span>Pro (PKR {PRO_PRICE_PKR:,}): <strong style="color:#ffffff;">{metrics['pro_subscribers']}</strong></span>
+                        <span>Full Access: <strong style="color:#ffffff;">PKR {MONTHLY_PRICE_PKR:,}/mo</strong></span>
+                        <span>Active Trials: <strong style="color:#ffffff;">{metrics['active_trials']}</strong></span>
                     </div>
                 </div>
 
@@ -1356,7 +1316,7 @@ def render_dashboard_html(metrics: dict) -> str:
                     <div class="card-header">
                         <div>
                             <span>Active Monthly Revenue</span>
-                            {info_badge("Computed directly from current active Basic and Pro subscribers multiplied by plan price in PKR.")}
+                            {info_badge(f"Computed directly from current active subscribers multiplied by PKR {MONTHLY_PRICE_PKR:,}/mo.")}
                         </div>
                         <span style="color: #34d399; font-weight: 600;">{metrics['pending_payments']} Pending TRX</span>
                     </div>
@@ -1365,11 +1325,11 @@ def render_dashboard_html(metrics: dict) -> str:
                         <span class="denom">/ month</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" style="width: {pro_share_percent}%; background: #34d399;"></div>
+                        <div class="progress-bar-fill" style="width: {mrr_bar_percent}%; background: #34d399;"></div>
                     </div>
                     <div class="card-subtext">
-                        <span>Basic MRR: <strong style="color:#ffffff;">PKR {basic_mrr:,}</strong></span>
-                        <span>Pro MRR: <strong style="color:#ffffff;">PKR {pro_mrr:,}</strong></span>
+                        <span>Rate: <strong style="color:#ffffff;">PKR {MONTHLY_PRICE_PKR:,} / member</strong></span>
+                        <span>Paywalled: <strong style="color:#ffffff;">{metrics['paywalled_trials']}</strong></span>
                     </div>
                 </div>
 
@@ -1390,8 +1350,8 @@ def render_dashboard_html(metrics: dict) -> str:
                         <div class="progress-bar-fill" style="width: 100%; background: #38bdf8;"></div>
                     </div>
                     <div class="card-subtext">
+                        <span>Total Queries: <strong style="color:#ffffff;">{total_queries}</strong></span>
                         <span>Referrals: <strong style="color:#ffffff;">{metrics['total_referrals']}</strong> {info_badge("Total credited referrals across all users. 3 paid referrals award 30 free days automatically.")}</span>
-                        <span>1-on-1 Leads: <strong style="color:#ffffff;">{metrics['new_coaching_leads']}</strong></span>
                     </div>
                 </div>
             </div>
@@ -1435,61 +1395,31 @@ def render_dashboard_html(metrics: dict) -> str:
                 </div>
             </div>
 
-            <!-- Split Tables: Payments & Coaching Leads -->
-            <div class="section-split">
-                <!-- Payment Requests Table -->
-                <div class="table-card">
-                    <div class="table-card-header">
-                        <div>
-                            <h3>Payment Requests (TRX)</h3>
-                            {info_badge("Incoming transactions submitted via EasyPaisa, Allied Bank, or Raast. Click 'Approve & Activate' to grant access.")}
-                        </div>
-                        <span class="code-pill" id="badge-pending-payments">{metrics['pending_payments']} Pending</span>
+            <!-- Recent Payment Requests Table (Full Width) -->
+            <div class="table-card">
+                <div class="table-card-header">
+                    <div>
+                        <h3>Payment Requests (TRX)</h3>
+                        {info_badge(f"Incoming PKR {MONTHLY_PRICE_PKR:,}/mo transactions submitted via EasyPaisa, Allied Bank, or Raast. Click 'Approve & Activate' to grant Full Access.")}
                     </div>
-                    <div class="table-scroll-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>User (Phone / Email)</th>
-                                    <th>TRX ID</th>
-                                    <th>Plan</th>
-                                    <th>Status</th>
-                                    <th>Time</th>
-                                    <th style="text-align: right;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="overview-payments-tbody">
-                                {real_payments_html}
-                            </tbody>
-                        </table>
-                    </div>
+                    <span class="code-pill" id="badge-pending-payments">{metrics['pending_payments']} Pending</span>
                 </div>
-
-                <!-- Coaching Leads Table -->
-                <div class="table-card">
-                    <div class="table-card-header">
-                        <div>
-                            <h3>1-on-1 Coaching Leads</h3>
-                            {info_badge("Subscribers who requested a private 1-on-1 mentorship session.")}
-                        </div>
-                        <span class="plan-pill" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24;">{metrics['new_coaching_leads']} NEW</span>
-                    </div>
-                    <div class="table-scroll-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>User (Phone / Email)</th>
-                                    <th>Tier</th>
-                                    <th>Engagement</th>
-                                    <th>Time</th>
-                                    <th style="text-align: right;">Contact</th>
-                                </tr>
-                            </thead>
-                            <tbody id="overview-leads-tbody">
-                                {real_leads_html}
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="table-scroll-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User (Phone / Email)</th>
+                                <th>TRX ID</th>
+                                <th>Plan</th>
+                                <th>Status</th>
+                                <th>Time</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="overview-payments-tbody">
+                            {real_payments_html}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -1516,7 +1446,7 @@ def render_dashboard_html(metrics: dict) -> str:
                         <thead>
                             <tr>
                                 <th>User (Phone / Email)</th>
-                                <th>Tier</th>
+                                <th>Plan</th>
                                 <th>Status</th>
                                 <th>Expiry Date</th>
                                 <th>Referral Code</th>
@@ -1537,7 +1467,7 @@ def render_dashboard_html(metrics: dict) -> str:
             <div class="header-bar">
                 <div class="header-title">
                     <h1>Payment Approvals (TRX)</h1>
-                    <p>Audit incoming EasyPaisa, Allied Bank, and Raast Transaction IDs and approve access in one click.</p>
+                    <p>Audit incoming EasyPaisa, Allied Bank, and Raast Transaction IDs (PKR {MONTHLY_PRICE_PKR:,}/mo Full Access) and approve in one click.</p>
                 </div>
             </div>
 
@@ -1566,45 +1496,12 @@ def render_dashboard_html(metrics: dict) -> str:
             </div>
         </section>
 
-        <!-- TAB 4: 1-ON-1 COACHING LEADS -->
-        <section id="tab-leads" class="tab-content">
-            <div class="header-bar">
-                <div class="header-title">
-                    <h1>1-on-1 Coaching Leads</h1>
-                    <p>Active subscribers who requested private mentorship calls with Hassan.</p>
-                </div>
-            </div>
-
-            <div class="table-card">
-                <div class="table-card-header">
-                    <h3>Coaching Requests</h3>
-                    <span class="plan-pill" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24;">{metrics['new_coaching_leads']} NEW</span>
-                </div>
-                <div class="table-scroll-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>User (Phone / Email)</th>
-                                <th>Member Tier</th>
-                                <th>Total Engagement</th>
-                                <th>Date / Time</th>
-                                <th style="text-align: right;">Contact</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leads-tab-tbody">
-                            {real_leads_html}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- TAB 5: BROADCAST TOOL -->
+        <!-- TAB 4: BROADCAST TOOL -->
         <section id="tab-broadcast" class="tab-content">
             <div class="header-bar">
                 <div class="header-title">
                     <h1>Broadcast Composer</h1>
-                    <p>Send announcements via Meta WhatsApp Cloud API to active subscribers with linked Pakistani mobile numbers.</p>
+                    <p>Send announcements via Meta WhatsApp Cloud API to active Full Access subscribers with linked Pakistani mobile numbers.</p>
                 </div>
             </div>
 
@@ -1615,12 +1512,10 @@ def render_dashboard_html(metrics: dict) -> str:
                 </div>
                 <div class="card-content-box">
                     <div class="input-group">
-                        <label class="input-label">Target Audience {info_badge("Choose whether to message all active paid subscribers or only Basic/Pro members.")}</label>
-                        <select id="broadcast-tier" class="select-field">
-                            <option value="all">All Active Subscribers ({metrics['active_subscribers']})</option>
-                            <option value="basic">Basic Members Only ({metrics['basic_subscribers']})</option>
-                            <option value="pro">Pro Members Only ({metrics['pro_subscribers']})</option>
-                        </select>
+                        <label class="input-label">Target Audience</label>
+                        <div class="input-field" style="color: #a1a1aa;">
+                            All Active Subscribers — Full Access ({metrics['active_subscribers']})
+                        </div>
                     </div>
 
                     <div class="input-group">
@@ -1643,25 +1538,22 @@ def render_dashboard_html(metrics: dict) -> str:
     <div id="activate-modal" class="modal-overlay">
         <div class="modal-dialog">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="font-size:16px; font-weight:600;">Manage Subscription</h3>
+                <h3 style="font-size:16px; font-weight:600;">Activate / Extend Subscription</h3>
                 <button onclick="closeActivateModal()" style="background:none; border:none; color:#a1a1aa; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+            </div>
+            <div style="background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12.5px; font-weight: 600; color: #34d399;">👑 Full Access Pass</span>
+                <span style="font-size: 13px; font-weight: 700; color: #ffffff;">PKR {MONTHLY_PRICE_PKR:,} / month</span>
             </div>
             <div class="input-group">
                 <label class="input-label">User Pakistani Phone or Email</label>
                 <input id="modal-phone" type="text" class="input-field" placeholder="e.g. 03007560313, +923007560313, or user@gmail.com">
             </div>
             <div class="input-group">
-                <label class="input-label">Select Tier</label>
-                <select id="modal-tier" class="select-field">
-                    <option value="basic">BASIC (PKR {BASIC_PRICE_PKR:,}/mo)</option>
-                    <option value="pro">PRO (PKR {PRO_PRICE_PKR:,}/mo)</option>
-                </select>
-            </div>
-            <div class="input-group">
                 <label class="input-label">Days to Add</label>
                 <input id="modal-days" type="number" inputmode="numeric" class="input-field" value="30">
             </div>
-            <button onclick="submitModalActivate()" class="btn-primary" style="margin-top:8px; padding:12px; font-size:14px;">Activate Pass</button>
+            <button onclick="submitModalActivate()" class="btn-primary" style="margin-top:8px; padding:12px; font-size:14px;">Activate Full Access</button>
         </div>
     </div>
 
@@ -1755,11 +1647,11 @@ def render_dashboard_html(metrics: dict) -> str:
         window.addEventListener('resize', hideTooltip, {{ passive: true }});
 
         // Quick Activation helper (accepts any Pakistani phone format or email)
-        async function quickActivate(identifier, plan) {{
+        async function quickActivate(identifier) {{
             const res = await fetch('/api/admin/activate', {{
                 method: 'POST',
                 headers: {{ 'Content-Type': 'application/json' }},
-                body: JSON.stringify({{ identifier: identifier, tier: plan, days: 30 }})
+                body: JSON.stringify({{ identifier: identifier, days: 30 }})
             }});
             const data = await res.json().catch(() => ({{}}));
             if (res.ok && data.status === 'ok') {{
@@ -1779,14 +1671,13 @@ def render_dashboard_html(metrics: dict) -> str:
         }}
         async function submitModalActivate() {{
             const identifier = document.getElementById('modal-phone').value.trim();
-            const tier = document.getElementById('modal-tier').value;
             const days = parseInt(document.getElementById('modal-days').value || '30', 10);
             if (!identifier) return alert('Please enter a Pakistani phone number or email');
 
             const res = await fetch('/api/admin/activate', {{
                 method: 'POST',
                 headers: {{ 'Content-Type': 'application/json' }},
-                body: JSON.stringify({{ identifier: identifier, tier: tier, days: days }})
+                body: JSON.stringify({{ identifier: identifier, days: days }})
             }});
             const data = await res.json().catch(() => ({{}}));
             if (res.ok && data.status === 'ok') {{
@@ -1807,7 +1698,6 @@ def render_dashboard_html(metrics: dict) -> str:
 
         // Broadcast Helper
         async function sendBroadcast() {{
-            const tier = document.getElementById('broadcast-tier').value;
             const msg = document.getElementById('broadcast-message').value.trim();
             const statusEl = document.getElementById('broadcast-status');
             if (!msg) return alert('Please type a message');
@@ -1816,7 +1706,7 @@ def render_dashboard_html(metrics: dict) -> str:
             const res = await fetch('/api/admin/broadcast', {{
                 method: 'POST',
                 headers: {{ 'Content-Type': 'application/json' }},
-                body: JSON.stringify({{ tier: tier, message: msg }})
+                body: JSON.stringify({{ tier: 'all', message: msg }})
             }});
             const data = await res.json().catch(() => ({{}}));
             if (res.ok && data.status === 'ok') {{

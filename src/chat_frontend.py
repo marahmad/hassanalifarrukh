@@ -7,7 +7,7 @@ mobile-native touch controls, interactive paywall, and real-time Groq/ChromaDB c
 
 from pathlib import Path
 from src.config import (
-    BASIC_PRICE_PKR, PRO_PRICE_PKR, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+    MONTHLY_PRICE_PKR, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
     EASYPAISA, ALLIED_BANK, JAZZCASH, RAAST_ID, FREE_TRIAL_QUESTIONS,
     ACCOUNT_TITLE, EASYPAISA_NUMBER, ALLIED_BANK_ACCOUNT, RAAST_ID_NUMBER
 )
@@ -17,10 +17,11 @@ TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "chat.html"
 def render_chat_html() -> str:
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     google_oauth_enabled = "true" if (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET) else "false"
+    formatted_price = f"{MONTHLY_PRICE_PKR:,}"
     return (
         template
-        .replace("__BASIC_PRICE__", str(BASIC_PRICE_PKR))
-        .replace("__PRO_PRICE__", str(PRO_PRICE_PKR))
+        .replace("__MONTHLY_PRICE__", formatted_price)
+        .replace("__MONTHLY_PRICE_RAW__", str(MONTHLY_PRICE_PKR))
         .replace("__ACCOUNT_TITLE__", str(ACCOUNT_TITLE))
         .replace("__EASYPAISA_NUMBER__", str(EASYPAISA_NUMBER))
         .replace("__ALLIED_BANK_ACCOUNT__", str(ALLIED_BANK_ACCOUNT))

@@ -80,7 +80,7 @@ Log perfection se connect nahi karte, honesty aur authenticity se karte hain. Ba
 
 def build_hassan_chat_messages(user_query: str,
                                retrieved_context: list[str] = None,
-                               tier: str = "basic",
+                               tier: str = "pro",
                                history: list[dict] = None) -> list[dict]:
     """
     Constructs a modern multi-turn chat messages payload for Groq / OpenAI API.
@@ -88,16 +88,15 @@ def build_hassan_chat_messages(user_query: str,
     """
     context_text = "\n---\n".join(retrieved_context) if retrieved_context else "No specific past reel clip found. Rely on core persona and principles."
 
-    tier_instructions = ""
-    if tier.lower() == "pro":
+    if tier.lower() == "trial":
         tier_instructions = """
-### USER MEMBERSHIP: PRO VIP SUBSCRIBER
-This user is a paid PRO subscriber. Give them extra personal dedication, step-by-step accountability, and in-depth tactical guidance from your security and life experience while keeping your direct, brotherly voice intact.
+### USER MEMBERSHIP: FREE TRIAL MEMBER
+Keep the response sharp, conversational, punchy (2 to 3 paragraphs max), and focused on immediate action or diagnostic clarity.
 """
     else:
         tier_instructions = """
-### USER MEMBERSHIP: BASIC / TRIAL MEMBER
-Keep the response sharp, conversational, punchy (2 to 3 paragraphs max), and focused on immediate action or diagnostic clarity.
+### USER MEMBERSHIP: FULL ACCESS SUBSCRIBER
+This user is a paid monthly member. Give them full personal dedication, step-by-step accountability, and in-depth tactical guidance grounded in Hassan's life principles while keeping your direct, brotherly voice intact.
 """
 
     sys_content = f"""{HASSAN_ALI_FARRUKH_SYSTEM_PROMPT}
@@ -129,7 +128,7 @@ Keep the response sharp, conversational, punchy (2 to 3 paragraphs max), and foc
 
 def build_hassan_prompt(user_query: str,
                         retrieved_context: list[str] = None,
-                        tier: str = "basic",
+                        tier: str = "pro",
                         history: list[dict] = None) -> str:
     """
     Backward-compatible single-prompt builder for environments that do not support multi-role messages.
