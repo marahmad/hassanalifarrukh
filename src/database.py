@@ -762,6 +762,38 @@ def get_system_metrics() -> dict:
         """)
         all_users = [_serialize_user_row(r) for r in db.fetchall()]
 
+        # 10. Real 14-day daily activity series from database timestamps (zero mock points)
+        day_keys = [(now.date() - timedelta(days=13 - i)) for i in range(14)]
+        chart_dates = [d.strftime("%b %d") for d in day_keys[:-1]] + ["Today"]
+        day_index = {d.isoformat(): idx for idx, d in enumerate(day_keys)}
+        window_start = datetime.combine(day_keys[0], datetime.min.time())
+
+        chart_queries = [0] * 14
+        db.execute(
+            "SELECT created_at FROM chat_history WHERE role = 'assistant' AND created_at >= ?",
+            (_db_ts(db, window_start),),
+        )
+        for row in db.fetchall():
+            dt = _parse_dt(row["created_at"])
+            if dt:
+                idx = day_index.get(dt.date().isoformat())
+                if idx is not None:
+                    chart_queries[idx] += 1
+
+        chart_new_users = [0] * 14
+        db.execute(
+            "SELECT created_at FROM users WHERE created_at >= ?",
+            (_db_ts(db, window_start),),
+        )
+        for row in db.fetchall():
+            dt = _parse_dt(row["created_at"])
+            if dt:
+                idx = day_index.get(dt.date().isoformat())
+                if idx is not None:
+                    chart_new_users[idx] += 1
+
+        db_backend = "Supabase PostgreSQL" if db.is_pg else "Local SQLite"
+
     return {
         "total_users": total_users,
         "active_subscribers": active_subscribers,
@@ -778,6 +810,10 @@ def get_system_metrics() -> dict:
         "recent_payments": recent_payments,
         "recent_leads": recent_leads,
         "all_users": all_users,
+        "chart_dates": chart_dates,
+        "chart_queries": chart_queries,
+        "chart_new_users": chart_new_users,
+        "db_backend": db_backend,
     }
 
 

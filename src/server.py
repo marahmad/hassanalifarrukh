@@ -30,6 +30,8 @@ from src.config import (
     RAAST_ID,
     RAAST_ID_NUMBER,
     VERIFY_TOKEN,
+    WHATSAPP_PHONE_NUMBER_ID,
+    WHATSAPP_TOKEN,
 )
 from src.dashboard import render_dashboard_html
 from src.database import (
@@ -598,21 +600,32 @@ async def api_admin_broadcast(request: Request):
             {"status": "error", "message": "Unauthorized. Executive passkey required."},
             status_code=401,
         )
+    if not WHATSAPP_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
+        return JSONResponse(
+            {
+                "status": "error",
+                "message": "WhatsApp Cloud API is not configured yet (set WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID in .env). No messages were sent.",
+            },
+            status_code=503,
+        )
+
     data = await request.json()
     tier = data.get("tier", "all")
     msg = str(data.get("message") or "").strip()
     if not msg:
-        return {"status": "error", "message": "Empty message"}
+        return JSONResponse({"status": "error", "message": "Empty message"}, status_code=400)
 
     phones = get_subscriber_phones(tier)
     formatted_msg = f"[Hassan AI] 💬 Message from Hassan:\n\n\"{msg}\"\n\n— Hassan Ali Farrukh"
+    sent = 0
     for p in phones:
         try:
-            send_whatsapp_text(p, formatted_msg)
+            if send_whatsapp_text(p, formatted_msg):
+                sent += 1
         except Exception:
             pass
 
-    return {"status": "ok", "count": len(phones), "tier": tier}
+    return {"status": "ok", "count": sent, "total_targeted": len(phones), "tier": tier}
 
 
 # ── Meta WhatsApp Cloud API Webhook ────────────────────────────────────────

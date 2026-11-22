@@ -1,13 +1,20 @@
 """
-Practical, ultra-functional Cursor-inspired management dashboard for Hassan Ali Farrukh AI.
-Features interactive tabs, desktop hover & mobile tap tooltips, direct actions, real-time metrics,
-and an instant Live / Mock data toggle with dynamic 14-day rolling analytics.
+Live production management dashboard for Hassan Ali Farrukh AI.
+Displays exclusively real database metrics, 14-day database activity telemetry,
+user/payment/lead tables, and subscription activation controls (zero mock data).
 """
 
 from datetime import datetime, timedelta
 import html as html_lib
 import json
 
+from src.config import (
+    BASIC_PRICE_PKR,
+    FREE_TRIAL_QUESTIONS,
+    PRO_PRICE_PKR,
+    WHATSAPP_PHONE_NUMBER_ID,
+    WHATSAPP_TOKEN,
+)
 from src.phone_utils import format_pk_phone_display, normalize_pk_phone_or_none
 
 def render_dashboard_html(metrics: dict) -> str:
@@ -122,11 +129,11 @@ def render_dashboard_html(metrics: dict) -> str:
                 status_html = f"""<span class="status-pill" style="color: #34d399; background: rgba(52, 211, 153, 0.1);">● ACTIVE ({tier_val})</span>"""
                 expiry_fmt = f"""<span style="color: #ffffff; font-weight: 500;">{_escape((expiry_raw or '')[:10])}</span>"""
             else:
-                used = u.get('trial_questions_used', 0)
-                if used >= 3:
-                    status_html = f"""<span class="status-pill" style="color: #f87171; background: rgba(248, 113, 113, 0.1);">PAYWALLED ({used}/3)</span>"""
+                used = u.get('trial_questions_used', 0) or 0
+                if used >= FREE_TRIAL_QUESTIONS:
+                    status_html = f"""<span class="status-pill" style="color: #f87171; background: rgba(248, 113, 113, 0.1);">PAYWALLED ({used}/{FREE_TRIAL_QUESTIONS})</span>"""
                 else:
-                    status_html = f"""<span class="status-pill" style="color: #fbbf24; background: rgba(251, 191, 36, 0.1);">TRIAL ({used}/3)</span>"""
+                    status_html = f"""<span class="status-pill" style="color: #fbbf24; background: rgba(251, 191, 36, 0.1);">TRIAL ({used}/{FREE_TRIAL_QUESTIONS})</span>"""
                 expiry_fmt = '<span style="color: #71717a;">Free Trial</span>'
 
             user_cell, activate_target, _ = _format_user_cell(u)
@@ -147,11 +154,10 @@ def render_dashboard_html(metrics: dict) -> str:
             rows = "<tr><td colspan='7' class='empty-cell'>No users recorded yet</td></tr>"
         return rows
 
-    # 3. Dynamic 14-Day Calendar Window
+    # 3. Compile 100% Real Production Data & 14-Day Activity Series
     now = datetime.now()
-    dates = [(now - timedelta(days=13 - i)).strftime("%b %d") for i in range(13)] + ["Today"]
+    default_dates = [(now - timedelta(days=13 - i)).strftime("%b %d") for i in range(13)] + ["Today"]
 
-    # 4. Compile Real SQLite Data Rows & Metrics
     real_payments = metrics.get("recent_payments", [])
     real_leads = metrics.get("recent_leads", [])
     real_users = metrics.get("all_users", [])
@@ -160,119 +166,37 @@ def render_dashboard_html(metrics: dict) -> str:
     real_leads_html = build_leads_rows(real_leads)
     real_users_html = build_users_rows(real_users)
 
-    real_active_subs = metrics.get("active_subscribers", 0)
-    real_target_subs = 50
-    real_subs_percent = min(100, int((real_active_subs / real_target_subs) * 100)) if real_target_subs > 0 else 0
+    total_users = metrics.get("total_users", 0) or 0
+    real_active_subs = metrics.get("active_subscribers", 0) or 0
+    real_subs_percent = min(100, int((real_active_subs / total_users) * 100)) if total_users > 0 else 0
 
-    real_mrr = metrics.get("estimated_mrr_pkr", 0)
-    real_target_mrr = 50000
-    real_mrr_percent = min(100, int((real_mrr / real_target_mrr) * 100)) if real_target_mrr > 0 else 0
+    real_mrr = metrics.get("estimated_mrr_pkr", 0) or 0
+    basic_mrr = (metrics.get("basic_subscribers", 0) or 0) * BASIC_PRICE_PKR
+    pro_mrr = (metrics.get("pro_subscribers", 0) or 0) * PRO_PRICE_PKR
+    pro_share_percent = min(100, int((pro_mrr / real_mrr) * 100)) if real_mrr > 0 else 0
 
-    # 14-day dynamic chart points for real data (reflects recent ramp up to current query & subscriber numbers)
-    real_chart_queries = [0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 2, 4, 8, max(metrics.get("total_queries", 15), 15)]
-    real_chart_subs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 6, max(real_active_subs, 8)]
+    total_queries = metrics.get("total_queries", 0) or 0
+    avg_queries = round(total_queries / total_users, 1) if total_users > 0 else 0.0
+    db_backend = metrics.get("db_backend") or "Live Database"
+    wa_api_ready = bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID)
 
-    real_data = {
-        "mode": "real",
-        "badge_html": "● LIVE PRODUCTION",
-        "badge_class": "mode-badge-live",
-        "subtext": "Live SQLite records from active WhatsApp callers, verified JazzCash/EasyPaisa payments, and subscribers.",
-        "active_subs": real_active_subs,
-        "target_subs": real_target_subs,
-        "subs_percent": real_subs_percent,
-        "conversion_rate": metrics.get("conversion_rate", 0),
-        "basic_subs": metrics.get("basic_subscribers", 0),
-        "pro_subs": metrics.get("pro_subscribers", 0),
-        "mrr": f"PKR {real_mrr:,}",
-        "target_mrr": f"PKR {real_target_mrr:,}",
-        "mrr_percent": real_mrr_percent,
-        "pending_payments": metrics.get("pending_payments", 0),
-        "pending_payments_badge": f"{metrics.get('pending_payments', 0)} Pending",
-        "total_users": metrics.get("total_users", 0),
-        "total_referrals": metrics.get("total_referrals", 0),
-        "new_coaching_leads": metrics.get("new_coaching_leads", 0),
-        "total_queries": metrics.get("total_queries", 0),
-        "active_trials": metrics.get("active_trials", 0),
-        "paywalled_trials": metrics.get("paywalled_trials", 0),
-        "chart_dates": dates,
-        "chart_queries": real_chart_queries,
-        "chart_subs": real_chart_subs,
-        "payments_rows": real_payments_html,
-        "leads_rows": real_leads_html,
-        "users_rows": real_users_html,
-        "users_count_badge": f"{metrics.get('total_users', 0)} Total Registered"
+    chart_payload = {
+        "dates": metrics.get("chart_dates") or default_dates,
+        "queries": metrics.get("chart_queries") or [0] * 14,
+        "new_users": metrics.get("chart_new_users") or [0] * 14,
     }
+    chart_data_json = json.dumps(chart_payload)
 
-    # 5. Compile Rich Mock Data for Demo Sandbox
-    mock_payments = [
-        {"phone_number": "923015556677", "trx_id": "TRX_JAZZ_882190", "plan_selected": "pro", "status": "pending", "created_at": (now - timedelta(minutes=14)).isoformat()},
-        {"phone_number": "923004342219", "trx_id": "TRX_EP_994102", "plan_selected": "pro", "status": "pending", "created_at": (now - timedelta(hours=1, minutes=20)).isoformat()},
-        {"phone_number": "923449333332", "trx_id": "TRX_JAZZ_771892", "plan_selected": "basic", "status": "pending", "created_at": (now - timedelta(hours=3)).isoformat()},
-        {"phone_number": "923129876543", "trx_id": "TRX_EP_110294", "plan_selected": "pro", "status": "approved", "created_at": (now - timedelta(days=1)).isoformat()},
-        {"phone_number": "923334567890", "trx_id": "TRX_JAZZ_554101", "plan_selected": "basic", "status": "approved", "created_at": (now - timedelta(days=2)).isoformat()},
-        {"phone_number": "923214561234", "trx_id": "TRX_EP_889210", "plan_selected": "basic", "status": "approved", "created_at": (now - timedelta(days=3)).isoformat()}
-    ]
-
-    mock_leads = [
-        {"phone_number": "923004342219", "tier": "pro", "total_queries": 14, "created_at": (now - timedelta(hours=2)).isoformat()},
-        {"phone_number": "923449333332", "tier": "pro", "total_queries": 9, "created_at": (now - timedelta(hours=5)).isoformat()},
-        {"phone_number": "923218899001", "tier": "pro", "total_queries": 18, "created_at": (now - timedelta(days=1, hours=4)).isoformat()},
-        {"phone_number": "923337766554", "tier": "basic", "total_queries": 8, "created_at": (now - timedelta(days=2)).isoformat()}
-    ]
-
-    mock_users = [
-        {"phone_number": "923015556677", "tier": "pro", "trial_questions_used": 3, "subscription_expiry": (now + timedelta(days=29)).isoformat(), "referral_code": "HASSAN-7K9A", "referral_count": 2, "last_active": (now - timedelta(minutes=10)).isoformat()},
-        {"phone_number": "923004342219", "tier": "pro", "trial_questions_used": 3, "subscription_expiry": (now + timedelta(days=28)).isoformat(), "referral_code": "HASSAN-8M2P", "referral_count": 4, "last_active": (now - timedelta(hours=1)).isoformat()},
-        {"phone_number": "923449333332", "tier": "basic", "trial_questions_used": 3, "subscription_expiry": (now + timedelta(days=26)).isoformat(), "referral_code": "HASSAN-99XY", "referral_count": 1, "last_active": (now - timedelta(hours=2)).isoformat()},
-        {"phone_number": "923129876543", "tier": "pro", "trial_questions_used": 3, "subscription_expiry": (now + timedelta(days=24)).isoformat(), "referral_code": "HASSAN-PRO1", "referral_count": 3, "last_active": (now - timedelta(hours=6)).isoformat()},
-        {"phone_number": "923218899001", "tier": "pro", "trial_questions_used": 3, "subscription_expiry": (now + timedelta(days=21)).isoformat(), "referral_code": "HASSAN-VIP4", "referral_count": 0, "last_active": (now - timedelta(days=1)).isoformat()},
-        {"phone_number": "923334567890", "tier": "basic", "trial_questions_used": 3, "subscription_expiry": (now + timedelta(days=19)).isoformat(), "referral_code": "HASSAN-J99B", "referral_count": 1, "last_active": (now - timedelta(days=1)).isoformat()},
-        {"phone_number": "923337766554", "tier": "basic", "trial_questions_used": 3, "subscription_expiry": (now + timedelta(days=18)).isoformat(), "referral_code": "HASSAN-AA12", "referral_count": 0, "last_active": (now - timedelta(days=2)).isoformat()},
-        {"phone_number": "923051239874", "tier": "basic", "trial_questions_used": 2, "subscription_expiry": None, "referral_code": "HASSAN-FREE1", "referral_count": 0, "last_active": (now - timedelta(minutes=45)).isoformat()},
-        {"phone_number": "923456789123", "tier": "basic", "trial_questions_used": 1, "subscription_expiry": None, "referral_code": "HASSAN-FREE2", "referral_count": 0, "last_active": (now - timedelta(hours=3)).isoformat()},
-        {"phone_number": "923119876543", "tier": "basic", "trial_questions_used": 3, "subscription_expiry": None, "referral_code": "HASSAN-PAY1", "referral_count": 0, "last_active": (now - timedelta(hours=8)).isoformat()}
-    ]
-
-    mock_payments_html = build_payments_rows(mock_payments)
-    mock_leads_html = build_leads_rows(mock_leads)
-    mock_users_html = build_users_rows(mock_users)
-
-    mock_chart_queries = [12, 15, 14, 18, 22, 26, 24, 30, 35, 29, 36, 42, 45, 54]
-    mock_chart_subs = [4, 5, 6, 8, 9, 11, 13, 14, 16, 18, 19, 21, 23, 24]
-
-    mock_data = {
-        "mode": "mock",
-        "badge_html": "⚡ DEMO SANDBOX",
-        "badge_class": "mode-badge-demo",
-        "subtext": "Simulated production dataset illustrating full 24-day audience scale, 24 active subscribers, and PKR 20,000 MRR.",
-        "active_subs": 24,
-        "target_subs": 50,
-        "subs_percent": 48,
-        "conversion_rate": 48.0,
-        "basic_subs": 16,
-        "pro_subs": 8,
-        "mrr": "PKR 20,000",
-        "target_mrr": "PKR 50,000",
-        "mrr_percent": 40,
-        "pending_payments": 3,
-        "pending_payments_badge": "3 Pending Approval",
-        "total_users": 50,
-        "total_referrals": 14,
-        "new_coaching_leads": 4,
-        "total_queries": 382,
-        "active_trials": 12,
-        "paywalled_trials": 14,
-        "chart_dates": dates,
-        "chart_queries": mock_chart_queries,
-        "chart_subs": mock_chart_subs,
-        "payments_rows": mock_payments_html,
-        "leads_rows": mock_leads_html,
-        "users_rows": mock_users_html,
-        "users_count_badge": "50 Total Registered"
-    }
-
-    real_data_json = json.dumps(real_data)
-    mock_data_json = json.dumps(mock_data)
+    wa_broadcast_badge = (
+        "<span style='font-size: 12px; color: #34d399; font-weight: 600;'>● WhatsApp Cloud API Ready</span>"
+        if wa_api_ready
+        else "<span style='font-size: 12px; color: #fbbf24; font-weight: 600;'>● WhatsApp Cloud API Not Configured</span>"
+    )
+    wa_broadcast_hint = (
+        "Dispatches via Meta WhatsApp Cloud API to active subscribers with linked Pakistani mobile numbers."
+        if wa_api_ready
+        else "Set WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID in .env to enable live WhatsApp broadcasts."
+    )
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -314,13 +238,13 @@ def render_dashboard_html(metrics: dict) -> str:
             overscroll-behavior-y: none;
         }}
 
-        button, a, [role="button"], .nav-item, .mode-pill {{
+        button, a, [role="button"], .nav-item {{
             touch-action: manipulation;
             user-select: none;
             -webkit-user-select: none;
         }}
 
-        .btn-primary:active, .btn-action:active, .btn-sm-action:active, .btn-refresh:active, .btn-logout:active, .nav-item:active, .mode-pill:active {{
+        .btn-primary:active, .btn-action:active, .btn-sm-action:active, .btn-refresh:active, .btn-logout:active, .nav-item:active {{
             transform: scale(0.97);
             transition: transform 80ms ease-out;
         }}
@@ -485,87 +409,18 @@ def render_dashboard_html(metrics: dict) -> str:
             flex-wrap: wrap;
         }}
 
-        /* Mode Toggle Segment */
-        .data-mode-toggle {{
-            display: inline-flex;
-            background: #111113;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 3px;
-            gap: 3px;
-        }}
-
-        .mode-pill {{
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            padding: 6px 13px;
-            font-size: 12.5px;
-            font-weight: 500;
-            color: var(--text-muted);
-            background: transparent;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }}
-
-        .mode-pill:hover {{
-            color: var(--text-primary);
-        }}
-
-        .mode-pill.active {{
-            background: var(--bg-card-hover);
-            color: #ffffff;
-            font-weight: 600;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-        }}
-
-        .mode-dot {{
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            display: inline-block;
-        }}
-
-        .mode-dot.live {{
-            background: var(--accent-green);
-            box-shadow: 0 0 6px var(--accent-green);
-        }}
-
-        .mode-dot.demo {{
-            color: var(--accent-gold);
-            font-size: 11px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: auto;
-            height: auto;
-            border-radius: 0;
-        }}
-
-        .mode-badge-live {{
+        .live-badge {{
             font-size: 11px;
             font-weight: 600;
-            padding: 3px 8px;
+            padding: 4px 9px;
             border-radius: 6px;
             background: rgba(34, 197, 94, 0.12);
             color: #22c55e;
             letter-spacing: 0.4px;
             border: 1px solid rgba(34, 197, 94, 0.25);
-            display: inline-block;
-        }}
-
-        .mode-badge-demo {{
-            font-size: 11px;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 6px;
-            background: rgba(245, 158, 11, 0.12);
-            color: #f59e0b;
-            letter-spacing: 0.4px;
-            border: 1px solid rgba(245, 158, 11, 0.25);
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }}
 
         .btn-refresh {{
@@ -1036,31 +891,6 @@ def render_dashboard_html(metrics: dict) -> str:
             border-color: rgba(255, 255, 255, 0.3);
         }}
 
-        /* QR Styling */
-        .qr-card {{
-            max-width: 500px;
-            width: 100%;
-            text-align: center;
-            padding: 24px;
-        }}
-
-        .qr-frame-box {{
-            background: #111113;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            display: inline-block;
-            max-width: 100%;
-        }}
-
-        .qr-iframe {{
-            width: 340px;
-            max-width: 100%;
-            height: 380px;
-            border: none;
-            overflow: hidden;
-        }}
-
         /* Modal Dialog Styling */
         .modal-overlay {{
             display: none;
@@ -1281,19 +1111,6 @@ def render_dashboard_html(metrics: dict) -> str:
                 gap: 8px;
             }}
 
-            .data-mode-toggle {{
-                grid-column: 1 / -1;
-                width: 100%;
-                display: flex;
-            }}
-
-            .mode-pill {{
-                flex: 1;
-                justify-content: center;
-                padding: 8px 10px;
-                font-size: 12px;
-            }}
-
             .header-activate-btn {{
                 grid-column: 1 / -1;
                 padding: 11px 16px;
@@ -1437,16 +1254,6 @@ def render_dashboard_html(metrics: dict) -> str:
             .input-field, .textarea-field, .select-field {{
                 font-size: 16px !important;
             }}
-
-            .qr-card {{
-                padding: 18px 14px;
-                max-width: 100%;
-            }}
-
-            .qr-iframe {{
-                max-width: 280px;
-                height: 320px;
-            }}
         }}
     </style>
 </head>
@@ -1488,17 +1295,12 @@ def render_dashboard_html(metrics: dict) -> str:
                 <span class="nav-label-desktop">Broadcast Tool</span>
                 <span class="nav-label-mobile">Broadcast</span>
             </button>
-            <button onclick="switchTab('qr')" id="tab-btn-qr" class="nav-item">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="7" y1="7" x2="7.01" y2="7"></line><line x1="17" y1="17.01" y2="7"></line><line x1="7" y1="17" x2="7.01" y2="17"></line><line x1="12" y1="12" x2="12.01" y2="12"></line></svg>
-                <span class="nav-label-desktop">WhatsApp QR Link</span>
-                <span class="nav-label-mobile">QR Link</span>
-            </button>
         </nav>
 
         <div class="sidebar-footer">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span class="status-dot"></span>
-                <span>Groq 120B AI</span>
+                <span>{_escape(db_backend)}</span>
             </div>
             <span style="color:#ffffff; font-weight:600;">LIVE</span>
         </div>
@@ -1511,23 +1313,14 @@ def render_dashboard_html(metrics: dict) -> str:
         <section id="tab-overview" class="tab-content active">
             <div class="header-bar">
                 <div class="header-title">
-                    <h1>Executive Overview</h1>
-                    <p id="header-mode-subtext">Live SQLite records from active WhatsApp callers, verified JazzCash/EasyPaisa payments, and subscribers.</p>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <h1>Executive Overview</h1>
+                        <span class="live-badge">● LIVE DATA</span>
+                    </div>
+                    <p>Real-time {_escape(db_backend)} metrics for registered users, EasyPaisa/Bank payments, coaching leads, and AI activity.</p>
                 </div>
                 
                 <div class="header-actions">
-                    <!-- Dual-Data Switcher Segment -->
-                    <div class="data-mode-toggle" id="mode-toggle-group">
-                        <button type="button" class="mode-pill active" id="btn-mode-real" onclick="setDataMode('real')">
-                            <span class="mode-dot live"></span>
-                            <span>Live Data</span>
-                        </button>
-                        <button type="button" class="mode-pill" id="btn-mode-mock" onclick="setDataMode('mock')">
-                            <span class="mode-dot demo">⚡</span>
-                            <span>Mock / Demo</span>
-                        </button>
-                    </div>
-
                     <button onclick="openActivateModal('')" class="btn-primary header-activate-btn">+ Quick Activate</button>
                     <a href="/admin/dashboard" class="btn-refresh">↻ Refresh</a>
                     <button onclick="handleAdminLogout()" class="btn-logout" title="Lock Executive Hub">⎋ Lock / Sign Out</button>
@@ -1541,20 +1334,20 @@ def render_dashboard_html(metrics: dict) -> str:
                     <div class="card-header">
                         <div>
                             <span>Active Subscribers</span>
-                            {info_badge("Total members with an active paid pass. Basic gives standard mentorship (PKR 500/mo); Pro unlocks deep answers and monthly exclusive content (PKR 1,500/mo).")}
+                            {info_badge(f"Users with an unexpired paid plan. Basic is PKR {BASIC_PRICE_PKR:,}/mo and Pro is PKR {PRO_PRICE_PKR:,}/mo.")}
                         </div>
-                        <span style="color: var(--text-primary);"><span id="card-conversion-rate">{metrics['conversion_rate']}</span>% conv. {info_badge("Percentage of all trial callers who upgraded to a paid plan. Industry average is 10-25%.")}</span>
+                        <span style="color: var(--text-primary);"><span id="card-conversion-rate">{metrics['conversion_rate']}</span>% paid {info_badge("Percentage of all registered users who currently have an active paid subscription.")}</span>
                     </div>
                     <div class="card-value">
                         <span class="main-num" id="card-active-subs">{real_active_subs}</span>
-                        <span class="denom" id="card-target-subs">/ {real_target_subs} Target</span>
+                        <span class="denom">/ {total_users} Total Users</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" id="card-subs-progress" style="width: {real_subs_percent}%;"></div>
+                        <div class="progress-bar-fill" style="width: {real_subs_percent}%;"></div>
                     </div>
                     <div class="card-subtext">
-                        <span>Basic (PKR 500): <strong id="card-basic-subs" style="color:#ffffff;">{metrics['basic_subscribers']}</strong></span>
-                        <span>Pro (PKR 1500): <strong id="card-pro-subs" style="color:#ffffff;">{metrics['pro_subscribers']}</strong></span>
+                        <span>Basic (PKR {BASIC_PRICE_PKR:,}): <strong style="color:#ffffff;">{metrics['basic_subscribers']}</strong></span>
+                        <span>Pro (PKR {PRO_PRICE_PKR:,}): <strong style="color:#ffffff;">{metrics['pro_subscribers']}</strong></span>
                     </div>
                 </div>
 
@@ -1562,21 +1355,21 @@ def render_dashboard_html(metrics: dict) -> str:
                 <div class="summary-card">
                     <div class="card-header">
                         <div>
-                            <span>Monthly Recurring Revenue</span>
-                            {info_badge("Estimated monthly recurring revenue in PKR based on active Basic and Pro subscriptions. AI compute costs on Groq run under 4%, yielding ~96% net profit.")}
+                            <span>Active Monthly Revenue</span>
+                            {info_badge("Computed directly from current active Basic and Pro subscribers multiplied by plan price in PKR.")}
                         </div>
-                        <span style="color: #34d399; font-weight: 600;">96% Margin</span>
+                        <span style="color: #34d399; font-weight: 600;">{metrics['pending_payments']} Pending TRX</span>
                     </div>
                     <div class="card-value">
                         <span class="main-num" id="card-mrr">PKR {real_mrr:,}</span>
-                        <span class="denom" id="card-target-mrr">/ PKR {real_target_mrr:,} Target</span>
+                        <span class="denom">/ month</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" id="card-mrr-progress" style="width: {real_mrr_percent}%; background: #34d399;"></div>
+                        <div class="progress-bar-fill" style="width: {pro_share_percent}%; background: #34d399;"></div>
                     </div>
                     <div class="card-subtext">
-                        <span>Break-even: 12 users {info_badge("With server and SIM expenses totaling ~PKR 12,000/mo, only 12 paid users cover all operational costs. Every member past 12 is pure profit.")}</span>
-                        <span>Pending: <strong id="card-pending-payments" style="color:#ffffff;">{metrics['pending_payments']}</strong></span>
+                        <span>Basic MRR: <strong style="color:#ffffff;">PKR {basic_mrr:,}</strong></span>
+                        <span>Pro MRR: <strong style="color:#ffffff;">PKR {pro_mrr:,}</strong></span>
                     </div>
                 </div>
 
@@ -1584,54 +1377,56 @@ def render_dashboard_html(metrics: dict) -> str:
                 <div class="summary-card">
                     <div class="card-header">
                         <div>
-                            <span>WhatsApp Automation</span>
-                            {info_badge("State of the automated WhatsApp bot running via Baileys and Groq LLM. Handles message parsing, trial enforcement, and payment submissions.")}
+                            <span>Audience &amp; Engagement</span>
+                            {info_badge("Live counts across all verified web users and linked Pakistani mobile numbers.")}
                         </div>
-                        <span style="color: var(--accent-green); font-weight: 600;">● Connected</span>
+                        <span style="color: var(--accent-blue); font-weight: 600;">{avg_queries} avg / user</span>
                     </div>
                     <div class="card-value">
-                        <span class="main-num" id="card-total-users">{metrics['total_users']}</span>
-                        <span class="denom">Unique Inbound Callers</span>
+                        <span class="main-num" id="card-total-users">{total_users}</span>
+                        <span class="denom">Registered Users</span>
                     </div>
                     <div class="progress-bar-bg">
                         <div class="progress-bar-fill" style="width: 100%; background: #38bdf8;"></div>
                     </div>
                     <div class="card-subtext">
-                        <span>Viral Referrals: <strong id="card-total-referrals" style="color:#ffffff;">{metrics['total_referrals']}</strong> {info_badge("When a user refers 3 paying friends with their unique HASSAN-XXXX code, the system automatically awards them 30 free days.")}</span>
-                        <span>Leads: <strong id="card-new-leads" style="color:#ffffff;">{metrics['new_coaching_leads']}</strong></span>
+                        <span>Referrals: <strong style="color:#ffffff;">{metrics['total_referrals']}</strong> {info_badge("Total credited referrals across all users. 3 paid referrals award 30 free days automatically.")}</span>
+                        <span>1-on-1 Leads: <strong style="color:#ffffff;">{metrics['new_coaching_leads']}</strong></span>
                     </div>
                 </div>
             </div>
 
-            <!-- Analytics Chart Card with Glowing Polyline & Explicit Axes -->
+            <!-- Analytics Chart Card (100% Real 14-Day Database Counts) -->
             <div class="chart-card">
                 <div class="chart-top-bar">
                     <div class="chart-title-box">
-                        <h3>Audience &amp; Revenue Traction</h3>
+                        <h3>14-Day Live Activity</h3>
                         <p style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
-                            Daily AI responses delivered vs. cumulative active paying subscribers over a 14-day window.
+                            Actual daily AI responses logged in chat history vs. new user registrations over the past 14 days.
                         </p>
                     </div>
-
-
+                    <div class="chart-legend-row">
+                        <div class="legend-chip"><span class="legend-line solid-white"></span><span>Daily AI Responses</span></div>
+                        <div class="legend-chip"><span class="legend-line dashed-gray"></span><span>New Users</span></div>
+                    </div>
                 </div>
 
                 <div class="stats-highlight-row">
                     <div class="stat-item">
-                        <span class="stat-number" id="stat-total-queries">{metrics['total_queries']}</span>
-                        <span class="stat-label">AI Responses Delivered {info_badge("Total answers generated from the 954 indexed reel transcripts and personal knowledge chunks.")}</span>
+                        <span class="stat-number" id="stat-total-queries">{total_queries}</span>
+                        <span class="stat-label">Total AI Queries {info_badge("Total lifetime queries recorded across all users in the database.")}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" id="stat-total-users">{metrics['total_users']}</span>
-                        <span class="stat-label">Total Unique Callers {info_badge("Total individual mobile phone numbers that have initiated chats with the bot.")}</span>
+                        <span class="stat-number" id="stat-total-users">{total_users}</span>
+                        <span class="stat-label">Registered Users {info_badge("Total unique user accounts in the database.")}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-number" id="stat-active-trials">{metrics['active_trials']}</span>
-                        <span class="stat-label">Active Free Trials {info_badge("Users currently testing the bot within their 3 free questions.")}</span>
+                        <span class="stat-label">Active Free Trials {info_badge(f"Unsubscribed users with fewer than {FREE_TRIAL_QUESTIONS} trial questions used.")}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-number" id="stat-paywalled-trials">{metrics['paywalled_trials']}</span>
-                        <span class="stat-label">Paywalled (Ready to Convert) {info_badge("Users who used all 3 free questions and have received the JazzCash / EasyPaisa payment instructions.")}</span>
+                        <span class="stat-label">Paywalled Trials {info_badge(f"Unsubscribed users who have used all {FREE_TRIAL_QUESTIONS} free questions.")}</span>
                     </div>
                 </div>
 
@@ -1647,7 +1442,7 @@ def render_dashboard_html(metrics: dict) -> str:
                     <div class="table-card-header">
                         <div>
                             <h3>Payment Requests (TRX)</h3>
-                            {info_badge("Incoming transactions submitted by users after sending payment via JazzCash or EasyPaisa. Click 'Approve & Activate' to grant access.")}
+                            {info_badge("Incoming transactions submitted via EasyPaisa, Allied Bank, or Raast. Click 'Approve & Activate' to grant access.")}
                         </div>
                         <span class="code-pill" id="badge-pending-payments">{metrics['pending_payments']} Pending</span>
                     </div>
@@ -1655,7 +1450,7 @@ def render_dashboard_html(metrics: dict) -> str:
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Phone</th>
+                                    <th>User (Phone / Email)</th>
                                     <th>TRX ID</th>
                                     <th>Plan</th>
                                     <th>Status</th>
@@ -1675,15 +1470,15 @@ def render_dashboard_html(metrics: dict) -> str:
                     <div class="table-card-header">
                         <div>
                             <h3>1-on-1 Coaching Leads</h3>
-                            {info_badge("Subscribers who discussed career/business topics and replied 'CALL' to book a private mentorship session with Hassan.")}
+                            {info_badge("Subscribers who requested a private 1-on-1 mentorship session.")}
                         </div>
-                        <span class="plan-pill" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24;">HIGH INTENT</span>
+                        <span class="plan-pill" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24;">{metrics['new_coaching_leads']} NEW</span>
                     </div>
                     <div class="table-scroll-container">
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Phone</th>
+                                    <th>User (Phone / Email)</th>
                                     <th>Tier</th>
                                     <th>Engagement</th>
                                     <th>Time</th>
@@ -1704,7 +1499,7 @@ def render_dashboard_html(metrics: dict) -> str:
             <div class="header-bar">
                 <div class="header-title">
                     <h1>Subscribers &amp; Free Trial Directory</h1>
-                    <p>Live registry of all mobile users, membership status, trial usage, and referral codes.</p>
+                    <p>Live registry of registered accounts, membership status, trial usage, and referral codes.</p>
                 </div>
                 <div class="header-actions">
                     <button onclick="openActivateModal('')" class="btn-primary header-activate-btn">+ Activate / Extend User</button>
@@ -1714,15 +1509,15 @@ def render_dashboard_html(metrics: dict) -> str:
             <div class="table-card">
                 <div class="table-card-header">
                     <h3>All Users (50 Most Active)</h3>
-                    <span class="code-pill" id="badge-total-users">{metrics['total_users']} Total Registered</span>
+                    <span class="code-pill" id="badge-total-users">{total_users} Total Registered</span>
                 </div>
                 <div class="table-scroll-container">
                     <table>
                         <thead>
                             <tr>
-                                <th>Phone Number</th>
+                                <th>User (Phone / Email)</th>
                                 <th>Tier</th>
-                                <th>Trial Status</th>
+                                <th>Status</th>
                                 <th>Expiry Date</th>
                                 <th>Referral Code</th>
                                 <th>Last Active</th>
@@ -1742,7 +1537,7 @@ def render_dashboard_html(metrics: dict) -> str:
             <div class="header-bar">
                 <div class="header-title">
                     <h1>Payment Approvals (TRX)</h1>
-                    <p>Audit incoming Easypaisa &amp; JazzCash Transaction IDs and approve access in one click.</p>
+                    <p>Audit incoming EasyPaisa, Allied Bank, and Raast Transaction IDs and approve access in one click.</p>
                 </div>
             </div>
 
@@ -1755,7 +1550,7 @@ def render_dashboard_html(metrics: dict) -> str:
                     <table>
                         <thead>
                             <tr>
-                                <th>Phone</th>
+                                <th>User (Phone / Email)</th>
                                 <th>TRX ID</th>
                                 <th>Plan</th>
                                 <th>Status</th>
@@ -1776,24 +1571,24 @@ def render_dashboard_html(metrics: dict) -> str:
             <div class="header-bar">
                 <div class="header-title">
                     <h1>1-on-1 Coaching Leads</h1>
-                    <p>High-ticket qualified prospects who requested private sessions with Hassan.</p>
+                    <p>Active subscribers who requested private mentorship calls with Hassan.</p>
                 </div>
             </div>
 
             <div class="table-card">
                 <div class="table-card-header">
-                    <h3>High-Intent Prospects</h3>
-                    <span class="plan-pill" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24;">READY TO CLOSE</span>
+                    <h3>Coaching Requests</h3>
+                    <span class="plan-pill" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24;">{metrics['new_coaching_leads']} NEW</span>
                 </div>
                 <div class="table-scroll-container">
                     <table>
                         <thead>
                             <tr>
-                                <th>Phone</th>
+                                <th>User (Phone / Email)</th>
                                 <th>Member Tier</th>
                                 <th>Total Engagement</th>
                                 <th>Date / Time</th>
-                                <th style="text-align: right;">WhatsApp Action</th>
+                                <th style="text-align: right;">Contact</th>
                             </tr>
                         </thead>
                         <tbody id="leads-tab-tbody">
@@ -1804,23 +1599,23 @@ def render_dashboard_html(metrics: dict) -> str:
             </div>
         </section>
 
-        <!-- TAB 5: BROADCAST TOOL (PHASE 4) -->
+        <!-- TAB 5: BROADCAST TOOL -->
         <section id="tab-broadcast" class="tab-content">
             <div class="header-bar">
                 <div class="header-title">
                     <h1>Broadcast Composer</h1>
-                    <p>Send a monthly motivational insight or announcement directly to your active subscribers.</p>
+                    <p>Send announcements via Meta WhatsApp Cloud API to active subscribers with linked Pakistani mobile numbers.</p>
                 </div>
             </div>
 
             <div class="table-card broadcast-card">
                 <div class="table-card-header">
                     <h3>Compose Broadcast</h3>
-                    <span style="font-size: 12px; color: var(--text-muted);">98% WhatsApp Open Rate</span>
+                    {wa_broadcast_badge}
                 </div>
                 <div class="card-content-box">
                     <div class="input-group">
-                        <label class="input-label">Target Audience {info_badge("Choose whether to blast all active members, or send tier-exclusive messages.")}</label>
+                        <label class="input-label">Target Audience {info_badge("Choose whether to message all active paid subscribers or only Basic/Pro members.")}</label>
                         <select id="broadcast-tier" class="select-field">
                             <option value="all">All Active Subscribers ({metrics['active_subscribers']})</option>
                             <option value="basic">Basic Members Only ({metrics['basic_subscribers']})</option>
@@ -1829,39 +1624,15 @@ def render_dashboard_html(metrics: dict) -> str:
                     </div>
 
                     <div class="input-group">
-                        <label class="input-label">Broadcast Message (English)</label>
-                        <textarea id="broadcast-message" class="textarea-field" rows="5" placeholder="Example: Hassan's advice this month: Stop waiting for motivation. Wake up, show up, and take action today!"></textarea>
+                        <label class="input-label">Broadcast Message</label>
+                        <textarea id="broadcast-message" class="textarea-field" rows="5" placeholder="Write the announcement you want to send to active subscribers..."></textarea>
                     </div>
 
                     <div class="broadcast-actions">
-                        <span style="font-size: 12px; color: var(--text-muted);">Messages are sent in compliant batches.</span>
+                        <span style="font-size: 12px; color: var(--text-muted);">{wa_broadcast_hint}</span>
                         <button onclick="sendBroadcast()" class="btn-primary">Send Broadcast 🚀</button>
                     </div>
                     <div id="broadcast-status" style="font-size: 13px; margin-top: 10px;"></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- TAB 6: WHATSAPP QR SCAN -->
-        <section id="tab-qr" class="tab-content">
-            <div class="header-bar">
-                <div class="header-title">
-                    <h1>WhatsApp QR Device Link</h1>
-                    <p>Link any phone to act as the Hassan AI WhatsApp Twin.</p>
-                </div>
-            </div>
-
-            <div class="table-card qr-card">
-                <h3 style="margin-bottom: 8px;">Connect Your Device</h3>
-                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">
-                    1. Open WhatsApp &gt; Settings &gt; Linked Devices<br>
-                    2. Tap "Link a Device" and scan the code below:
-                </p>
-                <div class="qr-frame-box">
-                    <iframe class="qr-iframe" src="file:///d:/hassanalifarrukh/whatsapp_bridge/qr.html"></iframe>
-                </div>
-                <div style="margin-top: 16px;">
-                    <a href="file:///d:/hassanalifarrukh/whatsapp_bridge/qr.html" target="_blank" class="btn-refresh">Open QR in New Tab ↗</a>
                 </div>
             </div>
         </section>
@@ -1882,8 +1653,8 @@ def render_dashboard_html(metrics: dict) -> str:
             <div class="input-group">
                 <label class="input-label">Select Tier</label>
                 <select id="modal-tier" class="select-field">
-                    <option value="basic">BASIC (PKR 500/mo)</option>
-                    <option value="pro">PRO (PKR 1,500/mo)</option>
+                    <option value="basic">BASIC (PKR {BASIC_PRICE_PKR:,}/mo)</option>
+                    <option value="pro">PRO (PKR {PRO_PRICE_PKR:,}/mo)</option>
                 </select>
             </div>
             <div class="input-group">
@@ -1896,10 +1667,7 @@ def render_dashboard_html(metrics: dict) -> str:
 
     <!-- Chart.js & Interactive Controller Scripts -->
     <script>
-        // Dual-Data Payloads
-        const REAL_DATA = {real_data_json};
-        const MOCK_DATA = {mock_data_json};
-        let currentMode = 'real';
+        const CHART_DATA = {chart_data_json};
         let analyticsChartInstance = null;
 
         // Tab switching with URL hash & localStorage persistence
@@ -1917,114 +1685,6 @@ def render_dashboard_html(metrics: dict) -> str:
                 history.replaceState(null, '', '#' + tabId);
             }} catch (e) {{}}
             window.scrollTo({{ top: 0, behavior: 'smooth' }});
-        }}
-
-        // Dynamic Mode Switcher (Live Real Data vs Demo Mock Data)
-        function setDataMode(mode) {{
-            currentMode = mode;
-            const d = (mode === 'mock') ? MOCK_DATA : REAL_DATA;
-
-            // 1. Update toggle button pill styles
-            const btnReal = document.getElementById('btn-mode-real');
-            const btnMock = document.getElementById('btn-mode-mock');
-            if (btnReal && btnMock) {{
-                if (mode === 'mock') {{
-                    btnReal.classList.remove('active');
-                    btnMock.classList.add('active');
-                }} else {{
-                    btnMock.classList.remove('active');
-                    btnReal.classList.add('active');
-                }}
-            }}
-
-            // 2. Update Header Mode Badge & Subtext
-            const badge = document.getElementById('header-mode-badge');
-            if (badge) {{
-                badge.className = d.badge_class;
-                badge.textContent = d.badge_html;
-            }}
-            const subtext = document.getElementById('header-mode-subtext');
-            if (subtext) subtext.textContent = d.subtext;
-
-            // 3. Update Summary Card 1 (Active Subscribers)
-            const elActiveSubs = document.getElementById('card-active-subs');
-            if (elActiveSubs) elActiveSubs.textContent = d.active_subs;
-            const elTargetSubs = document.getElementById('card-target-subs');
-            if (elTargetSubs) elTargetSubs.textContent = '/ ' + d.target_subs + ' Target';
-            const elConvRate = document.getElementById('card-conversion-rate');
-            if (elConvRate) elConvRate.textContent = d.conversion_rate;
-            const elSubsProg = document.getElementById('card-subs-progress');
-            if (elSubsProg) elSubsProg.style.width = d.subs_percent + '%';
-            const elBasicSubs = document.getElementById('card-basic-subs');
-            if (elBasicSubs) elBasicSubs.textContent = d.basic_subs;
-            const elProSubs = document.getElementById('card-pro-subs');
-            if (elProSubs) elProSubs.textContent = d.pro_subs;
-
-            // 4. Update Summary Card 2 (MRR)
-            const elMrr = document.getElementById('card-mrr');
-            if (elMrr) elMrr.textContent = d.mrr;
-            const elTargetMrr = document.getElementById('card-target-mrr');
-            if (elTargetMrr) elTargetMrr.textContent = '/ ' + d.target_mrr + ' Target';
-            const elMrrProg = document.getElementById('card-mrr-progress');
-            if (elMrrProg) elMrrProg.style.width = d.mrr_percent + '%';
-            const elPendingPayments = document.getElementById('card-pending-payments');
-            if (elPendingPayments) elPendingPayments.textContent = d.pending_payments;
-
-            // 5. Update Summary Card 3 (WhatsApp Automation)
-            const elTotalUsers = document.getElementById('card-total-users');
-            if (elTotalUsers) elTotalUsers.textContent = d.total_users;
-            const elTotalRef = document.getElementById('card-total-referrals');
-            if (elTotalRef) elTotalRef.textContent = d.total_referrals;
-            const elNewLeads = document.getElementById('card-new-leads');
-            if (elNewLeads) elNewLeads.textContent = d.new_coaching_leads;
-
-            // 6. Update Stats Highlight Row
-            const elStatQueries = document.getElementById('stat-total-queries');
-            if (elStatQueries) elStatQueries.textContent = d.total_queries;
-            const elStatUsers = document.getElementById('stat-total-users');
-            if (elStatUsers) elStatUsers.textContent = d.total_users;
-            const elStatTrials = document.getElementById('stat-active-trials');
-            if (elStatTrials) elStatTrials.textContent = d.active_trials;
-            const elStatPaywall = document.getElementById('stat-paywalled-trials');
-            if (elStatPaywall) elStatPaywall.textContent = d.paywalled_trials;
-
-            // 7. Update Tables
-            const tOverviewPayments = document.getElementById('overview-payments-tbody');
-            if (tOverviewPayments) tOverviewPayments.innerHTML = d.payments_rows;
-            const tTabPayments = document.getElementById('payments-tab-tbody');
-            if (tTabPayments) tTabPayments.innerHTML = d.payments_rows;
-
-            const tOverviewLeads = document.getElementById('overview-leads-tbody');
-            if (tOverviewLeads) tOverviewLeads.innerHTML = d.leads_rows;
-            const tTabLeads = document.getElementById('leads-tab-tbody');
-            if (tTabLeads) tTabLeads.innerHTML = d.leads_rows;
-
-            const tSubscribers = document.getElementById('subscribers-users-tbody');
-            if (tSubscribers) tSubscribers.innerHTML = d.users_rows;
-
-            // Table header badges
-            const bPending = document.getElementById('badge-pending-payments');
-            if (bPending) bPending.textContent = d.pending_payments + ' Pending';
-            const bPendingTab = document.getElementById('badge-pending-payments-tab');
-            if (bPendingTab) bPendingTab.textContent = d.pending_payments_badge;
-            const bUsers = document.getElementById('badge-total-users');
-            if (bUsers) bUsers.textContent = d.users_count_badge;
-
-            // 8. Update Chart Datasets Dynamically
-            if (analyticsChartInstance) {{
-                analyticsChartInstance.data.labels = d.chart_dates;
-                analyticsChartInstance.data.datasets[0].data = d.chart_queries;
-                analyticsChartInstance.data.datasets[1].data = d.chart_subs;
-                analyticsChartInstance.update();
-            }}
-
-            // 9. Rebind Tooltip Listeners on Newly Injected HTML
-            bindTooltips();
-
-            // 10. Persist mode to localStorage
-            try {{
-                localStorage.setItem('hassan_dashboard_mode', mode);
-            }} catch (e) {{}}
         }}
 
         // Smart Universal Floating Tooltip
@@ -2158,27 +1818,28 @@ def render_dashboard_html(metrics: dict) -> str:
                 headers: {{ 'Content-Type': 'application/json' }},
                 body: JSON.stringify({{ tier: tier, message: msg }})
             }});
-            if (res.ok) {{
-                const data = await res.json();
-                statusEl.innerHTML = `<span style="color:#34d399;">✓ Broadcast delivered to ${{data.count}} active subscribers!</span>`;
+            const data = await res.json().catch(() => ({{}}));
+            if (res.ok && data.status === 'ok') {{
+                statusEl.innerHTML = `<span style="color:#34d399;">✓ Broadcast delivered to ${{data.count}} subscriber(s).</span>`;
                 document.getElementById('broadcast-message').value = '';
             }} else {{
-                statusEl.innerHTML = '<span style="color:#ef4444;">Failed to dispatch broadcast.</span>';
+                statusEl.textContent = data.message || 'Failed to dispatch broadcast.';
+                statusEl.style.color = '#ef4444';
             }}
         }}
 
-        // Initialize Analytics Chart & Mode on DOMContentLoaded
+        // Initialize Real 14-Day Analytics Chart on DOMContentLoaded
         document.addEventListener('DOMContentLoaded', () => {{
             const ctx = document.getElementById('analyticsChart');
             if (ctx) {{
                 analyticsChartInstance = new Chart(ctx.getContext('2d'), {{
                     type: 'line',
                     data: {{
-                        labels: REAL_DATA.chart_dates,
+                        labels: CHART_DATA.dates,
                         datasets: [
                             {{
-                                label: 'AI Inquiries Handled',
-                                data: REAL_DATA.chart_queries,
+                                label: 'Daily AI Responses',
+                                data: CHART_DATA.queries,
                                 borderColor: '#ffffff',
                                 backgroundColor: 'rgba(255, 255, 255, 0.04)',
                                 fill: true,
@@ -2191,8 +1852,8 @@ def render_dashboard_html(metrics: dict) -> str:
                                 pointHoverRadius: 6,
                             }},
                             {{
-                                label: 'Active Subscribers',
-                                data: REAL_DATA.chart_subs,
+                                label: 'New Users',
+                                data: CHART_DATA.new_users,
                                 borderColor: '#71717a',
                                 borderDash: [4, 4],
                                 fill: false,
@@ -2227,9 +1888,9 @@ def render_dashboard_html(metrics: dict) -> str:
                                     }},
                                     label: function(item) {{
                                         if (item.datasetIndex === 0) {{
-                                            return '  ● AI Inquiries Delivered: ' + item.parsed.y;
+                                            return '  ● Daily AI Responses: ' + item.parsed.y;
                                         }} else {{
-                                            return '  ┄ Active Subscribers: ' + item.parsed.y;
+                                            return '  ┄ New Users: ' + item.parsed.y;
                                         }}
                                     }}
                                 }}
@@ -2241,7 +1902,7 @@ def render_dashboard_html(metrics: dict) -> str:
                                 ticks: {{ color: '#71717a', font: {{ size: 11 }} }},
                                 title: {{
                                     display: true,
-                                    text: '14-Day Calendar Timeline (Rolling Window)',
+                                    text: '14-Day Calendar Timeline (Live DB)',
                                     color: '#52525b',
                                     font: {{ size: 11, weight: '500' }},
                                     padding: {{ top: 8 }}
@@ -2253,7 +1914,7 @@ def render_dashboard_html(metrics: dict) -> str:
                                 beginAtZero: true,
                                 title: {{
                                     display: true,
-                                    text: 'Volume Count (Queries & Subscribers)',
+                                    text: 'Daily Count',
                                     color: '#52525b',
                                     font: {{ size: 11, weight: '500' }},
                                     padding: {{ bottom: 8 }}
@@ -2264,20 +1925,9 @@ def render_dashboard_html(metrics: dict) -> str:
                 }});
             }}
 
-            // Check saved mode from localStorage
-            try {{
-                const savedMode = localStorage.getItem('hassan_dashboard_mode');
-                if (savedMode === 'mock') {{
-                    setDataMode('mock');
-                }} else {{
-                    setDataMode('real');
-                }}
-            }} catch (e) {{
-                setDataMode('real');
-            }}
-
             // Restore saved active tab from hash or localStorage
             try {{
+                localStorage.removeItem('hassan_dashboard_mode');
                 const hashTab = window.location.hash.replace('#', '');
                 const savedTab = hashTab || localStorage.getItem('hassan_dashboard_tab');
                 if (savedTab && document.getElementById('tab-' + savedTab)) {{
