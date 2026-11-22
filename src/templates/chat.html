@@ -1,0 +1,2954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
+    <meta name="theme-color" content="#0b0b0d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Hassan Ali Farrukh AI — Official Mentorship</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root {
+            --bg-base: #0b0b0d;
+            --bg-surface: #141416;
+            --bg-card: #18181b;
+            --bg-card-hover: #1f1f23;
+            --border: rgba(255, 255, 255, 0.08);
+            --border-subtle: rgba(255, 255, 255, 0.04);
+            --border-focus: rgba(34, 197, 94, 0.4);
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --accent-green: #22c55e;
+            --accent-green-glow: rgba(34, 197, 94, 0.25);
+            --accent-blue: #38bdf8;
+            --accent-gold: #f59e0b;
+            --danger: #ef4444;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-full: 9999px;
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        /* Prevent iOS Safari from auto-styling phone numbers in bright blue */
+        a[href^="tel"],
+        a[href^="tel"]:hover,
+        a[href^="tel"]:active,
+        a[href^="tel"]:focus,
+        a[href^="tel"]:visited {
+            color: inherit !important;
+            text-decoration: none !important;
+            cursor: text !important;
+            pointer-events: none;
+        }
+
+        .quick-pay-item a,
+        .paywall-bank-box a,
+        .membership-card a,
+        .quick-pay-item span strong,
+        .message-bubble a[href^="tel"] {
+            color: #ffffff !important;
+            text-decoration: none !important;
+            font-weight: 700 !important;
+        }
+
+        html, body {
+            height: 100%;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            -webkit-font-smoothing: antialiased;
+            -webkit-text-size-adjust: 100%;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100dvh;
+            width: 100vw;
+            background: var(--bg-base);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ─── DRAWER OVERLAY BACKDROP ────────────────────────────────── */
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 80;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s var(--ease-out);
+        }
+
+        .app-container.drawer-open .drawer-backdrop {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* ─── SLIDE-OUT DRAWER (SIDEBAR) ────────────────────────────── */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 350px;
+            max-width: 88vw;
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            padding: 24px 20px;
+            z-index: 90;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            transform: translateX(-100%);
+            transition: transform 0.28s var(--ease-drawer);
+            box-shadow: none;
+            will-change: transform;
+        }
+
+        .app-container.drawer-open .sidebar {
+            transform: translateX(0);
+            box-shadow: 16px 0 45px rgba(0, 0, 0, 0.7);
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .drawer-user-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            gap: 12px;
+        }
+
+        .drawer-user-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .drawer-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .drawer-close-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .drawer-close-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-card-hover);
+        }
+
+        .drawer-close-btn:active {
+            transform: scale(0.92);
+        }
+
+        .logo-box {
+            width: 44px;
+            height: 44px;
+            background: #ffffff;
+            color: #0b0b0d;
+            border-radius: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 18px;
+            box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15);
+            flex-shrink: 0;
+        }
+
+        .brand-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .brand-title {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .verified-badge {
+            display: inline-flex;
+            color: #38bdf8;
+        }
+
+        .brand-subtitle {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+
+        /* User Profile Status in Drawer */
+        .user-status-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar-img {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #27272a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 700;
+            color: #ffffff;
+            border: 2px solid var(--accent-green);
+            flex-shrink: 0;
+            object-fit: cover;
+        }
+
+        .user-meta-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .user-meta-name {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-meta-auth {
+            font-size: 11px;
+            color: var(--accent-green);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profile-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .profile-bio {
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .knowledge-stats {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11.5px;
+            color: var(--accent-green);
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+        }
+
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulseDot 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseDot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Membership Tier Widget */
+        .membership-card {
+            background: linear-gradient(145deg, #18181b 0%, #1c1c20 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .membership-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .membership-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .membership-price {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .quick-pay-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .quick-pay-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 8px 10px;
+        }
+
+        .copy-pill {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-green);
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            transition: all 0.15s;
+        }
+
+        .copy-pill:active {
+            transform: scale(0.95);
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .btn-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            font-size: 12.5px;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            transition: all 0.15s;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+        }
+
+        .btn-link:hover {
+            color: var(--text-primary);
+            background: var(--bg-card-hover);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-link:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary-action {
+            background: var(--accent-green);
+            color: #0b0b0d;
+            border: none;
+            font-weight: 700;
+        }
+
+        .btn-primary-action:hover {
+            background: #16a34a;
+            color: #ffffff;
+        }
+
+        /* ─── MAIN CHAT AREA (FULL WIDTH CANVAS) ─────────────────────── */
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+            width: 100%;
+            background: var(--bg-base);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Main Top Header */
+        .chat-header {
+            height: calc(64px + env(safe-area-inset-top, 0px));
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-left: 20px;
+            padding-right: 20px;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 20;
+            transition: all 0.2s ease;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        /* ☰ HAMBURGER BUTTON IN TOP LEFT */
+        .hamburger-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .hamburger-btn:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(255, 255, 255, 0.18);
+            transform: translateY(-1px);
+        }
+
+        .hamburger-btn:active {
+            transform: scale(0.92);
+        }
+
+        .header-brand-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo-box {
+            width: 38px;
+            height: 38px;
+            background: #ffffff;
+            color: #0b0b0d;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 15px;
+            box-shadow: 0 2px 8px rgba(255,255,255,0.15);
+            flex-shrink: 0;
+        }
+
+        .header-user-status {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
+            flex: 1;
+            overflow: hidden;
+            gap: 2px;
+        }
+
+        .header-user-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .header-name-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+            line-height: 1.25;
+        }
+
+        .header-subtitle-status {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #session-status-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge-pill {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: var(--radius-full);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .badge-pill:active {
+            transform: scale(0.95);
+        }
+
+        .badge-pill.trial {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            border-color: rgba(251, 191, 36, 0.25);
+        }
+
+        .badge-pill.basic {
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--accent-green);
+            border-color: rgba(34, 197, 94, 0.25);
+        }
+
+        .badge-pill.pro {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent-blue);
+            border-color: rgba(56, 189, 248, 0.25);
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-icon:hover {
+            color: var(--text-primary);
+            background: var(--bg-card-hover);
+        }
+
+        .btn-icon:active {
+            transform: scale(0.92);
+        }
+
+        /* ─── TRIAL TICKER BANNER ───────────────────────────────────── */
+        .trial-ticker {
+            background: rgba(20, 20, 22, 0.98);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 7px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+            gap: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .trial-ticker.expired {
+            background: rgba(245, 158, 11, 0.08);
+            border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+            color: #fbbf24;
+            justify-content: center;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .trial-ticker.expired .trial-bar-container {
+            display: none !important;
+        }
+
+        .trial-bar-container {
+            flex: 1;
+            max-width: 240px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .trial-bar-fill {
+            height: 100%;
+            background: var(--accent-green);
+            border-radius: 3px;
+            transition: width 0.4s var(--ease-out);
+            box-shadow: 0 0 8px var(--accent-green-glow);
+        }
+
+        /* ─── MESSAGES SCROLL AREA ──────────────────────────────────── */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .messages-container::-webkit-scrollbar {
+            width: 5px;
+        }
+        .messages-container::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 5px;
+        }
+
+        .date-divider {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin: 8px 0;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .date-divider::before, .date-divider::after {
+            content: '';
+            flex: 1;
+            max-width: 120px;
+            height: 1px;
+            background: var(--border-subtle);
+        }
+
+        .msg-row {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            max-width: 820px;
+            margin: 0 auto;
+            animation: msgEnter 0.25s var(--ease-out);
+        }
+
+        @keyframes msgEnter {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg-row.user {
+            justify-content: flex-end;
+        }
+
+        .msg-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            flex-shrink: 0;
+            color: var(--text-primary);
+        }
+
+        .msg-bubble {
+            max-width: 78%;
+            padding: 14px 18px;
+            border-radius: var(--radius-lg);
+            font-size: 14.5px;
+            line-height: 1.6;
+            word-break: break-word;
+            position: relative;
+        }
+
+        .msg-row.ai .msg-bubble {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-top-left-radius: 4px;
+            color: #f4f4f5;
+        }
+
+        .msg-row.user .msg-bubble {
+            background: linear-gradient(135deg, #15803d 0%, #22c55e 100%);
+            color: #ffffff;
+            border-top-right-radius: 4px;
+            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.2);
+        }
+
+        .msg-meta {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            font-size: 11px;
+            margin-top: 6px;
+            color: rgba(255, 255, 255, 0.55);
+        }
+
+        .msg-row.ai .msg-meta {
+            justify-content: space-between;
+            color: var(--text-muted);
+        }
+
+        .audio-playback-pill {
+            margin-top: 10px;
+            background: rgba(0,0,0,0.35);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .play-btn-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            color: #0b0b0d;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: transform 0.15s;
+        }
+
+        .play-btn-circle:active {
+            transform: scale(0.92);
+        }
+
+        .waveform-mock {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            height: 20px;
+        }
+
+        .waveform-bar {
+            width: 3px;
+            background: rgba(255,255,255,0.25);
+            border-radius: 2px;
+        }
+
+        /* ─── TYPING INDICATOR ──────────────────────────────────────── */
+        .typing-row {
+            display: none;
+            width: 100%;
+            max-width: 820px;
+            margin: 0 auto;
+            gap: 12px;
+        }
+
+        .typing-row.visible {
+            display: flex;
+        }
+
+        .typing-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            border-top-left-radius: 4px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .typing-dot {
+            width: 7px;
+            height: 7px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: bounceDot 1.4s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounceDot {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-6px); opacity: 1; background: var(--accent-green); }
+        }
+
+        /* ─── QUICK TOPIC CHIPS ─────────────────────────────────────── */
+        .chips-scroll-area {
+            width: 100%;
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 0 20px 10px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            flex-shrink: 0;
+        }
+
+        .chips-scroll-area::-webkit-scrollbar {
+            display: none;
+        }
+
+        .topic-chip {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 12.5px;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .topic-chip:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+
+        .topic-chip:active {
+            transform: scale(0.96);
+        }
+
+        /* ─── INPUT DOCK FOOTER ─────────────────────────────────────── */
+        .chat-footer {
+            background: var(--bg-surface);
+            border-top: 1px solid var(--border);
+            padding: 10px 16px max(14px, env(safe-area-inset-bottom, 14px));
+            flex-shrink: 0;
+            z-index: 20;
+        }
+
+        .input-dock-wrapper {
+            max-width: 820px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 10px 14px;
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .input-box:focus-within {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+        }
+
+        .chat-textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 16px;
+            line-height: 1.45;
+            resize: none;
+            max-height: 140px;
+            min-height: 24px;
+            outline: none;
+            padding: 4px 0;
+            overflow-y: hidden;
+            scrollbar-width: none;
+        }
+
+        .chat-textarea::-webkit-scrollbar {
+            display: none;
+        }
+
+        .chat-textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .send-button {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            background: var(--accent-green);
+            color: #0b0b0d;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .send-button:hover {
+            background: #16a34a;
+            color: #ffffff;
+        }
+
+        .send-button:active {
+            transform: scale(0.94);
+        }
+
+        .send-button:disabled {
+            background: var(--border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .input-hints {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-muted);
+            padding: 0 4px;
+        }
+
+        /* ─── GOOGLE AUTH BUTTON & DIVIDER ──────────────────────────── */
+        .google-auth-btn {
+            width: 100%;
+            background: #ffffff;
+            color: #1f1f23;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-md);
+            padding: 13px 16px;
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.15s var(--ease-out);
+            box-shadow: 0 4px 14px rgba(255, 255, 255, 0.1);
+        }
+
+        .google-auth-btn:hover {
+            background: #f4f4f5;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(255, 255, 255, 0.16);
+        }
+
+        .google-auth-btn:active {
+            transform: scale(0.98);
+        }
+
+        .google-icon-svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .fast-badge {
+            font-size: 10.5px;
+            font-weight: 700;
+            background: rgba(34, 197, 94, 0.15);
+            color: #15803d;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            padding: 2px 7px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .divider-line-text {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin: 4px 0;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .divider-line-text::before, .divider-line-text::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-subtle);
+        }
+
+        /* ─── MODALS & OVERLAYS ─────────────────────────────────────── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            position: relative;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 420px;
+            max-height: calc(100dvh - 36px);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            animation: modalScale 0.25s var(--ease-out);
+        }
+
+        .modal-close-icon {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            z-index: 2;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .modal-close-icon:hover, .modal-close-icon:active {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            transform: scale(0.96);
+        }
+
+        .paywall-bank-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .paywall-bank-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        @keyframes modalScale {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-header {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .modal-icon-badge {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 2px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .modal-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .form-input:focus {
+            border-color: var(--border-focus);
+        }
+
+        .form-btn {
+            background: var(--accent-green);
+            color: #0b0b0d;
+            border: none;
+            border-radius: var(--radius-md);
+            padding: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .form-btn:hover {
+            background: #16a34a;
+            color: #ffffff;
+        }
+
+        .form-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Paywall Cards in Modal */
+        .plan-option-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .plan-option-card {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .plan-option-card.selected {
+            border-color: var(--accent-green);
+            background: rgba(34, 197, 94, 0.08);
+        }
+
+        .plan-option-card.pro.selected {
+            border-color: var(--accent-blue);
+            background: rgba(56, 189, 248, 0.08);
+        }
+
+        .plan-option-name {
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .plan-option-price {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--accent-green);
+        }
+
+        .plan-option-card.pro .plan-option-price {
+            color: var(--accent-blue);
+        }
+
+        /* ─── TOAST NOTIFICATION ────────────────────────────────────── */
+        .toast-notify {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(30px);
+            background: #1f1f23;
+            border: 1px solid var(--border);
+            color: #ffffff;
+            padding: 10px 18px;
+            border-radius: var(--radius-full);
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s var(--ease-out);
+            z-index: 999;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        }
+
+        .toast-notify.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @media (max-width: 600px) {
+            /* ── Header Mobile Optimization ── */
+            .chat-header {
+                height: calc(58px + env(safe-area-inset-top, 0px));
+                min-height: calc(58px + env(safe-area-inset-top, 0px));
+                padding-top: env(safe-area-inset-top, 0px);
+                padding-left: 12px;
+                padding-right: 12px;
+                gap: 8px;
+            }
+
+            .header-left {
+                gap: 8px;
+                min-width: 0;
+                flex: 1;
+            }
+
+            .hamburger-btn {
+                width: 36px;
+                height: 36px;
+                border-radius: 9px;
+            }
+
+            .header-logo-box {
+                width: 34px;
+                height: 34px;
+                font-size: 13px;
+                border-radius: 8px;
+            }
+
+            .header-brand-badge {
+                gap: 8px;
+                min-width: 0;
+                flex: 1;
+            }
+
+            .header-user-status {
+                gap: 1px;
+                min-width: 0;
+                flex: 1;
+                overflow: hidden;
+            }
+
+            .header-user-title {
+                font-size: 14.5px;
+                font-weight: 700;
+                gap: 4px;
+                min-width: 0;
+            }
+
+            .header-name-text {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                min-width: 0;
+            }
+
+            .header-subtitle-status {
+                font-size: 11px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                color: var(--text-muted);
+                gap: 4px;
+                min-width: 0;
+            }
+
+            #session-status-text {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                min-width: 0;
+            }
+
+            .header-actions {
+                gap: 6px;
+                flex-shrink: 0;
+            }
+
+            /* Hide redundant secondary icons on mobile; accessible via 3-bar drawer */
+            .header-actions .btn-icon {
+                display: none !important;
+            }
+
+            .badge-pill {
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: 700;
+            }
+
+            /* ── Ticker & Progress Bar ── */
+            .trial-ticker {
+                padding: 6px 12px;
+                font-size: 11px;
+                gap: 8px;
+            }
+
+            .trial-ticker.expired {
+                padding: 7px 12px;
+                font-size: 11.5px;
+            }
+
+            .trial-bar-container {
+                max-width: 140px;
+                height: 5px;
+            }
+
+            /* ── Chat Messages ── */
+            .chat-messages-container {
+                padding: 14px 12px 8px;
+            }
+
+            .msg-bubble {
+                max-width: 90%;
+                font-size: 13.5px;
+                padding: 10px 13px;
+                line-height: 1.45;
+            }
+
+            /* ── Quick Chips & Dock ── */
+            .chips-scroll-area {
+                padding: 2px 12px 6px;
+                gap: 6px;
+            }
+
+            .topic-chip {
+                padding: 5px 10px;
+                font-size: 11.5px;
+                border-radius: 8px;
+            }
+
+            .chat-footer {
+                padding: 8px 12px max(12px, env(safe-area-inset-bottom, 12px));
+            }
+
+            .input-dock-wrapper {
+                gap: 5px;
+            }
+
+            .input-box {
+                padding: 6px 10px 6px 12px;
+                border-radius: 14px;
+                gap: 8px;
+            }
+
+            .chat-textarea {
+                font-size: 16px; /* Essential to prevent iOS Safari auto-zoom on focus */
+                min-height: 22px;
+                padding: 3px 0;
+            }
+
+            .send-button {
+                width: 36px;
+                height: 36px;
+                border-radius: 10px;
+            }
+
+            .input-hints {
+                font-size: 11px;
+                justify-content: center;
+                gap: 4px;
+            }
+
+            .input-hints {
+                justify-content: center !important;
+                text-align: center;
+                padding-top: 4px;
+            }
+
+            .input-hints span:first-child {
+                display: none;
+            }
+
+            #user-phone-tag {
+                font-size: 11px;
+                color: var(--text-muted);
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            /* ── Responsive Mobile Modal Optimization ── */
+            .modal-overlay {
+                padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) 12px;
+            }
+
+            .modal-overlay {
+                padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)) 16px;
+            }
+
+            .modal-card {
+                padding: 16px 14px;
+                gap: 8px;
+                border-radius: 16px;
+                max-width: 380px;
+                max-height: calc(100dvh - 36px);
+            }
+
+            .modal-close-icon {
+                top: 10px;
+                right: 10px;
+                width: 28px;
+                height: 28px;
+                font-size: 12px;
+            }
+
+            .modal-header {
+                gap: 3px;
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .modal-icon-badge {
+                width: 36px;
+                height: 36px;
+                border-radius: 10px;
+                font-size: 18px;
+                margin-bottom: 0px;
+            }
+
+            .modal-title {
+                font-size: 16.5px;
+                font-weight: 700;
+                letter-spacing: -0.2px;
+            }
+
+            .modal-desc {
+                font-size: 11.5px;
+                line-height: 1.35;
+                color: var(--text-muted);
+            }
+
+            .plan-option-row {
+                gap: 8px;
+            }
+
+            .plan-option-card {
+                padding: 8px 10px;
+                gap: 2px;
+                border-radius: 10px;
+            }
+
+            .plan-option-name {
+                font-size: 11.5px;
+            }
+
+            .plan-option-price {
+                font-size: 14px;
+                font-weight: 800;
+            }
+
+            .plan-option-card span:last-child {
+                font-size: 10px !important;
+                line-height: 1.25 !important;
+            }
+
+            .paywall-bank-box {
+                padding: 9px 11px !important;
+                gap: 6px !important;
+                border-radius: 12px !important;
+            }
+
+            .paywall-bank-title {
+                font-size: 10px !important;
+                letter-spacing: 0.2px !important;
+            }
+
+            .quick-pay-item {
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+
+            .quick-pay-item span strong {
+                font-size: 11.5px;
+                color: #ffffff;
+            }
+
+            .quick-pay-item span span {
+                font-size: 10px !important;
+            }
+
+            .copy-pill {
+                padding: 2px 7px;
+                font-size: 10.5px;
+            }
+
+            .form-group {
+                gap: 3px;
+            }
+
+            .form-label {
+                font-size: 11px;
+            }
+
+            .form-input {
+                padding: 9px 12px;
+                font-size: 16px;
+                border-radius: 10px;
+            }
+
+            .form-btn {
+                min-height: 48px;
+                padding: 13px 18px !important;
+                font-size: 14.5px !important;
+                font-weight: 700;
+                border-radius: 12px !important;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                box-shadow: 0 4px 16px rgba(34, 197, 94, 0.28);
+                width: 100%;
+            }
+
+            .google-auth-btn {
+                min-height: 48px;
+                padding: 13px 16px;
+                font-size: 14.5px;
+                border-radius: 12px;
+            }
+
+            .modal-dismiss-link {
+                background: transparent;
+                border: none;
+                color: var(--text-muted);
+                font-size: 12px;
+                cursor: pointer;
+                padding: 4px;
+                text-align: center;
+                width: 100%;
+            }
+        }
+
+        /* ─── VERIFIED AUTH & PHONE PREVIEW STYLES ─────────────────── */
+        .auth-error-banner {
+            display: none;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+            border-radius: var(--radius-sm);
+            padding: 9px 12px;
+            font-size: 12.5px;
+            line-height: 1.4;
+        }
+
+        .auth-error-banner.visible {
+            display: block;
+        }
+
+        .phone-preview-hint {
+            font-size: 11.5px;
+            min-height: 16px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .phone-preview-hint.valid {
+            color: var(--accent-green);
+        }
+
+        .phone-preview-hint.invalid {
+            color: #fca5a5;
+            font-family: var(--font-sans);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container" id="app-root-container">
+
+    <!-- ─── BACKDROP FOR DRAWER ─────────────────────────────────── -->
+    <div class="drawer-backdrop" id="drawer-backdrop" onclick="toggleDrawer(false)"></div>
+
+    <!-- ─── SLIDE-OUT DRAWER PANEL (THE HAMBURGER MENU) ──────────── -->
+    <aside class="sidebar" id="app-slide-drawer">
+        <!-- Dynamic User Drawer Header (Replaced static brand header) -->
+        <div class="drawer-user-header" id="sidebar-user-card">
+            <div class="drawer-user-left">
+                <div class="user-avatar-img" id="sidebar-user-avatar">GU</div>
+                <div class="user-meta-info">
+                    <div class="user-meta-name" id="sidebar-user-name">Guest User</div>
+                    <div class="user-meta-auth" id="sidebar-user-auth">
+                        <span style="color: var(--accent-green);">⚡ Free Trial</span>
+                    </div>
+                </div>
+            </div>
+            <div class="drawer-header-actions">
+                <button class="drawer-close-btn" style="width: 34px; height: 34px;" title="Switch Account / Sign Out" onclick="resetUserSession()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+                <button class="drawer-close-btn" onclick="toggleDrawer(false)" title="Close Menu">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Profile Credentials -->
+        <div class="profile-card">
+            <p class="profile-bio">
+                Trained on <strong>267 authentic video reels, military history, leadership philosophy</strong>, and tactical guidance from Hassan Ali Farrukh.
+            </p>
+            <div class="knowledge-stats">
+                <div class="live-dot"></div>
+                <span>1,011 Knowledge Chunks Active</span>
+            </div>
+        </div>
+
+        <!-- Membership Widget -->
+        <div class="membership-card">
+            <div class="membership-header">
+                <span class="membership-title">Access Plans</span>
+                <span class="membership-price">Starting PKR __BASIC_PRICE__/mo</span>
+            </div>
+            <div class="quick-pay-box">
+                <div class="quick-pay-item">
+                    <span>EasyPaisa: <strong>__EASYPAISA_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                    <span class="copy-pill" onclick="copySnippet('__EASYPAISA_NUMBER__', this)">Copy</span>
+                </div>
+                <div class="quick-pay-item">
+                    <span>Allied Bank: <strong>__ALLIED_BANK_ACCOUNT__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                    <span class="copy-pill" onclick="copySnippet('__ALLIED_BANK_ACCOUNT__', this)">Copy</span>
+                </div>
+                <div class="quick-pay-item">
+                    <span>Raast: <strong>__RAAST_ID_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                    <span class="copy-pill" onclick="copySnippet('__RAAST_ID_NUMBER__', this)">Copy</span>
+                </div>
+            </div>
+            <button class="btn-link btn-primary-action" onclick="toggleDrawer(false); openPaywallModal('basic');">
+                💳 Submit Payment / Activate
+            </button>
+        </div>
+
+        <!-- Coaching Lead Button -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px;">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 4px;">Private 1-on-1 Mentorship</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Direct sessions with Hassan Ali Farrukh for career &amp; high-stakes life direction.</div>
+            <button class="btn-link" style="width: 100%; border-color: rgba(56, 189, 248, 0.3); color: var(--accent-blue);" onclick="toggleDrawer(false); sendCoachingRequest();">
+                📞 Request 1-on-1 Call
+            </button>
+        </div>
+
+        <!-- Sidebar Footer -->
+        <div class="sidebar-footer">
+            <button class="btn-link" onclick="toggleDrawer(false); openReferralModal();" style="width: 100%;">
+                🎁 Referral Program (Get Free Months)
+            </button>
+        </div>
+    </aside>
+
+    <!-- ─── MAIN CHAT AREA (FOCUSED CONVERSATION CANVAS) ─────────── -->
+    <main class="chat-main">
+        <!-- Top Chat Header with 3-Bar Hamburger on Top Left -->
+        <header class="chat-header">
+            <div class="header-left">
+                <!-- ☰ 3-BAR HAMBURGER BUTTON -->
+                <button class="hamburger-btn" id="header-hamburger-trigger" onclick="toggleDrawer(true)" title="Open Menu">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">
+                        <line x1="4" y1="6" x2="20" y2="6"></line>
+                        <line x1="4" y1="12" x2="20" y2="12"></line>
+                        <line x1="4" y1="18" x2="20" y2="18"></line>
+                    </svg>
+                </button>
+
+                <div class="header-brand-badge">
+                    <div class="header-logo-box">HF</div>
+                    <div class="header-user-status">
+                        <div class="header-user-title">
+                            <span class="header-name-text">Hassan Ali Farrukh</span>
+                            <span class="verified-badge">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                            </span>
+                        </div>
+                        <div class="header-subtitle-status">
+                            <span class="live-dot" style="width: 6px; height: 6px;"></span>
+                            <span id="session-status-text">Online • AI Mentor</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <div id="plan-badge-pill" class="badge-pill trial" onclick="openPaywallModal()">
+                    ⚡ Free Trial
+                </div>
+                <button class="btn-icon" title="Invite Friends & Get Free Month" onclick="openReferralModal()">
+                    🎁
+                </button>
+                <button class="btn-icon" title="Switch Account / Sign Out" onclick="resetUserSession()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Trial Questions Ticker -->
+        <div class="trial-ticker" id="trial-ticker-bar">
+            <span id="trial-count-label">Free Trial: <strong>0 of __FREE_TRIAL_QUESTIONS__</strong> questions used</span>
+            <div class="trial-bar-container">
+                <div class="trial-bar-fill" id="trial-progress-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+
+        <!-- Messages Flow Area -->
+        <div class="messages-container" id="chat-messages-flow">
+            <div class="date-divider">Today</div>
+        </div>
+
+        <!-- Typing Animation Row -->
+        <div class="typing-row" id="chat-typing-box">
+            <div class="msg-avatar">HF</div>
+            <div class="typing-box">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+
+        <!-- Quick Topics Horizontal Chips -->
+        <div class="chips-scroll-area" id="quick-topics-row">
+            <button class="topic-chip" onclick="handleChipClick('How do I develop real discipline in life?')">
+                💪 Iron Discipline
+            </button>
+            <button class="topic-chip" onclick="handleChipClick('What business or career strategy works best in Pakistan right now?')">
+                🎯 Business Strategy
+            </button>
+            <button class="topic-chip" onclick="handleChipClick('Tell me about your tactical background and Hataff Security.')">
+                🥊 Tactical &amp; Defense
+            </button>
+            <button class="topic-chip" onclick="handleChipClick('How to stay mentally strong when facing heavy losses or failure?')">
+                🔥 Mental Toughness
+            </button>
+            <button class="topic-chip" onclick="handleChipClick('What are your daily workout, training, and diet principles?')">
+                🏋️ Fitness &amp; Training
+            </button>
+            <button class="topic-chip" onclick="sendCoachingRequest()">
+                📞 Book 1-on-1 Call
+            </button>
+        </div>
+
+        <!-- Footer Input Bar -->
+        <footer class="chat-footer">
+            <div class="input-dock-wrapper">
+                <div class="input-box">
+                    <textarea 
+                        id="user-chat-input" 
+                        class="chat-textarea" 
+                        placeholder="Ask Hassan Bhai anything regarding mindset, fitness, career, or life..." 
+                        rows="1"
+                    ></textarea>
+                    <button id="send-msg-btn" class="send-button" onclick="handleSendAction()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="input-hints">
+                    <span>Press <strong>Enter ↵</strong> to send • <strong>Shift+Enter</strong> for new line</span>
+                    <span id="user-phone-tag">Guest</span>
+                </div>
+            </div>
+        </footer>
+    </main>
+</div>
+
+<!-- ─── GOOGLE SIGN-IN MODAL (VERIFIED 1-TAP OAUTH ONLY) ────── -->
+<div class="modal-overlay" id="onboarding-modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <div class="modal-icon-badge">🎯</div>
+            <h2 class="modal-title">Join Hassan AI</h2>
+            <p class="modal-desc">
+                Direct guidance from Hassan Ali Farrukh. Sign in with Google to protect your chat history, free trial, and membership across devices.
+            </p>
+        </div>
+
+        <div id="ob-auth-error" class="auth-error-banner"></div>
+
+        <div class="form-group">
+            <label class="form-label" for="ob-input-ref">Referral Code (Optional)</label>
+            <input type="text" id="ob-input-ref" class="form-input" placeholder="e.g. HASSAN-XXXX" autocomplete="off">
+        </div>
+
+        <button id="google-login-btn" class="google-auth-btn" onclick="initiateGoogleSignIn()">
+            <svg class="google-icon-svg" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Continue with Google</span>
+            <span class="fast-badge">1-Tap</span>
+        </button>
+
+        <p style="text-align:center; font-size:11.5px; color:var(--text-muted); line-height:1.4;">
+            🔒 Verified securely by Google • No passwords or SMS codes required
+        </p>
+    </div>
+</div>
+
+<!-- ─── PAYWALL & UPGRADE MODAL ─────────────────────────────── -->
+<div class="modal-overlay" id="paywall-modal-overlay">
+    <div class="modal-card">
+        <button class="modal-close-icon" onclick="closePaywallModal()" aria-label="Close modal">✕</button>
+        <div class="modal-header">
+            <div class="modal-icon-badge">👑</div>
+            <h2 class="modal-title">Unlock Full Mentorship</h2>
+            <p class="modal-desc">
+                Choose a plan to continue receiving direct answers and guidance from Hassan Ali Farrukh.
+            </p>
+        </div>
+
+        <div id="paywall-error-box" class="auth-error-banner"></div>
+
+        <div class="plan-option-row">
+            <div class="plan-option-card selected" id="plan-card-basic" onclick="selectPlanCard('basic')">
+                <span class="plan-option-name">⚡ Basic Tier</span>
+                <span class="plan-option-price">PKR __BASIC_PRICE__</span>
+                <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Unlimited AI mentorship &amp; direct advice</span>
+            </div>
+            <div class="plan-option-card pro" id="plan-card-pro" onclick="selectPlanCard('pro')">
+                <span class="plan-option-name">👑 Pro Tier</span>
+                <span class="plan-option-price">PKR __PRO_PRICE__</span>
+                <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Deeper answers + priority retrieval + drops</span>
+            </div>
+        </div>
+
+        <div class="paywall-bank-box">
+            <div class="paywall-bank-title">SEND PAYMENT VIA EASYPAISA / ALLIED BANK / RAAST:</div>
+            
+            <div class="quick-pay-item">
+                <span>EasyPaisa: <strong>__EASYPAISA_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                <span class="copy-pill" onclick="copySnippet('__EASYPAISA_NUMBER__', this)">Copy</span>
+            </div>
+            <div class="quick-pay-item">
+                <span>Allied Bank: <strong>__ALLIED_BANK_ACCOUNT__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                <span class="copy-pill" onclick="copySnippet('__ALLIED_BANK_ACCOUNT__', this)">Copy</span>
+            </div>
+            <div class="quick-pay-item">
+                <span>Raast: <strong>__RAAST_ID_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                <span class="copy-pill" onclick="copySnippet('__RAAST_ID_NUMBER__', this)">Copy</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="paywall-phone-input">Your Pakistani Mobile / EasyPaisa Number</label>
+            <input type="tel" id="paywall-phone-input" class="form-input" placeholder="0300 7560313 or +92 300 7560313" autocomplete="tel" oninput="updatePhonePreview('paywall-phone-input', 'paywall-phone-preview')">
+            <div id="paywall-phone-preview" class="phone-preview-hint"></div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="paywall-trx-input">Transaction ID (TRX ID)</label>
+            <input type="text" id="paywall-trx-input" class="form-input" placeholder="e.g. 202410319874">
+        </div>
+
+        <button id="paywall-submit-btn" class="form-btn" onclick="submitPaywallPayment()">
+            ✓ Submit Payment for Verification
+        </button>
+
+        <button class="modal-dismiss-link" onclick="closePaywallModal()">
+            Continue Browsing
+        </button>
+    </div>
+</div>
+
+<!-- ─── 1-ON-1 COACHING PHONE COLLECTION MODAL ──────────────── -->
+<div class="modal-overlay" id="coaching-phone-modal-overlay">
+    <div class="modal-card">
+        <button class="modal-close-icon" onclick="closeCoachingPhoneModal()" aria-label="Close modal">✕</button>
+        <div class="modal-header">
+            <div class="modal-icon-badge">📞</div>
+            <h2 class="modal-title">Add Your WhatsApp Number</h2>
+            <p class="modal-desc">
+                Enter your Pakistani mobile number so Hassan’s team can reach you on WhatsApp with available 1-on-1 call slots.
+            </p>
+        </div>
+
+        <div id="coaching-phone-error" class="auth-error-banner"></div>
+
+        <div class="form-group">
+            <label class="form-label" for="coaching-phone-input">Pakistani Mobile / WhatsApp Number</label>
+            <input type="tel" id="coaching-phone-input" class="form-input" placeholder="0300 7560313 or +92 300 7560313" autocomplete="tel" oninput="updatePhonePreview('coaching-phone-input', 'coaching-phone-preview')">
+            <div id="coaching-phone-preview" class="phone-preview-hint"></div>
+        </div>
+
+        <button id="coaching-phone-submit-btn" class="form-btn" onclick="submitCoachingWithPhone()">
+            Save Number &amp; Request 1-on-1 Call ✓
+        </button>
+
+        <button class="modal-dismiss-link" onclick="closeCoachingPhoneModal()">
+            Cancel
+        </button>
+    </div>
+</div>
+
+<!-- ─── REFERRAL HUB MODAL ──────────────────────────────────── -->
+<div class="modal-overlay" id="referral-modal-overlay">
+    <div class="modal-card">
+        <button class="modal-close-icon" onclick="closeReferralModal()" aria-label="Close modal">✕</button>
+        <div class="modal-header">
+            <div class="modal-icon-badge">🎁</div>
+            <h2 class="modal-title">Your Referral Hub</h2>
+            <p class="modal-desc">
+                Share your personal invite code. When 3 friends subscribe, you get <strong>1 Month FREE</strong> automatically.
+            </p>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; text-align: center;">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">YOUR INVITE CODE</div>
+            <div id="referral-code-display" style="font-family: var(--font-mono); font-size: 22px; font-weight: 800; color: var(--accent-green); letter-spacing: 1px;">
+                HASSAN-XXXX
+            </div>
+        </div>
+
+        <button class="form-btn" onclick="copyReferralInvite()">
+            📋 Copy Referral Link
+        </button>
+
+        <button style="background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; padding: 4px;" onclick="closeReferralModal()">
+            Close
+        </button>
+    </div>
+</div>
+
+<!-- ─── TOAST NOTIFICATION ──────────────────────────────────── -->
+<div id="app-toast-box" class="toast-notify">Copied to clipboard ✓</div>
+
+<script>
+// ── Application State (Hydrated from Server HttpOnly Session Cookie) ──
+const GOOGLE_OAUTH_ENABLED = __GOOGLE_OAUTH_ENABLED__;
+const GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
+
+const APP_STATE = {
+    authenticated: false,
+    userId: '',
+    userName: '',
+    userPhone: '',
+    displayPhone: '',
+    userEmail: '',
+    avatarUrl: '',
+    authProvider: '',
+    trialQuestionsUsed: 0,
+    maxFreeTrial: __FREE_TRIAL_QUESTIONS__,
+    currentTier: 'trial',
+    referralCode: 'HASSAN-XXXX',
+    selectedPlan: 'basic',
+    isSubscribed: false,
+    drawerOpen: false,
+    googleEnabled: GOOGLE_OAUTH_ENABLED,
+    welcomeInjected: false
+};
+
+// ── Canonical Pakistani Mobile Normalization (Mirrors src/phone_utils.py) ──
+function normalizePkPhoneClient(raw) {
+    if (!raw) return null;
+    const cleaned = String(raw).replace(/[\u200b-\u200f\u202a-\u202e\ufeff\u00a0]/g, '').trim();
+    if (!cleaned || !/^[\d\s\+\-\(\)\.]+$/.test(cleaned)) return null;
+    if (cleaned.slice(1).includes('+')) return null;
+
+    const digits = cleaned.replace(/\D/g, '');
+    let canon = '';
+    if (digits.startsWith('00920') && digits.length === 15) {
+        canon = '92' + digits.slice(5);
+    } else if (digits.startsWith('0092') && digits.length === 14) {
+        canon = digits.slice(2);
+    } else if (digits.startsWith('920') && digits.length === 13) {
+        canon = '92' + digits.slice(3);
+    } else if (digits.startsWith('92') && digits.length === 12) {
+        canon = digits;
+    } else if (digits.startsWith('03') && digits.length === 11) {
+        canon = '92' + digits.slice(1);
+    } else if (digits.startsWith('3') && digits.length === 10) {
+        canon = '92' + digits;
+    } else {
+        return null;
+    }
+    return /^923\d{9}$/.test(canon) ? canon : null;
+}
+
+function formatUserPhoneDisplay(phone) {
+    const canon = normalizePkPhoneClient(phone);
+    if (!canon) return '';
+    return '+92 ' + canon.slice(2, 5) + ' ' + canon.slice(5);
+}
+
+function updatePhonePreview(inputId, previewId) {
+    const inputEl = document.getElementById(inputId);
+    const previewEl = document.getElementById(previewId);
+    if (!inputEl || !previewEl) return;
+    const raw = inputEl.value.trim();
+    if (!raw) {
+        previewEl.textContent = '';
+        previewEl.className = 'phone-preview-hint';
+        return;
+    }
+    const canon = normalizePkPhoneClient(raw);
+    if (canon) {
+        previewEl.textContent = `✓ Saved as ${formatUserPhoneDisplay(canon)}`;
+        previewEl.className = 'phone-preview-hint valid';
+    } else {
+        previewEl.textContent = 'Enter a valid Pakistani mobile number (e.g. 0300 7560313 or +92 300 7560313)';
+        previewEl.className = 'phone-preview-hint invalid';
+    }
+}
+
+function showModalError(boxId, message) {
+    const el = document.getElementById(boxId);
+    if (!el) return;
+    if (message) {
+        el.textContent = message;
+        el.classList.add('visible');
+    } else {
+        el.textContent = '';
+        el.classList.remove('visible');
+    }
+}
+
+// ── Hamburger Drawer Toggle ────────────────────────────────────
+function toggleDrawer(open) {
+    const container = document.getElementById('app-root-container');
+    if (open === undefined) {
+        APP_STATE.drawerOpen = !APP_STATE.drawerOpen;
+    } else {
+        APP_STATE.drawerOpen = !!open;
+    }
+
+    if (APP_STATE.drawerOpen) {
+        container.classList.add('drawer-open');
+    } else {
+        container.classList.remove('drawer-open');
+    }
+}
+
+// Close drawer/modals on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        toggleDrawer(false);
+        closePaywallModal();
+        closeCoachingPhoneModal();
+        closeReferralModal();
+    }
+});
+
+// ── Initialization (Verify Session via /api/auth/me) ───────────
+window.addEventListener('DOMContentLoaded', async () => {
+    setupInputAutoResize();
+    setupModalBackdropDismiss();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const signedInVia = urlParams.get('signed_in');
+    const authErrorParam = urlParams.get('auth_error');
+    if (signedInVia || authErrorParam) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    await hydrateSessionFromServer(signedInVia, authErrorParam);
+});
+
+function setupModalBackdropDismiss() {
+    const paywallOverlay = document.getElementById('paywall-modal-overlay');
+    if (paywallOverlay) {
+        paywallOverlay.addEventListener('click', (e) => {
+            if (e.target === paywallOverlay) closePaywallModal();
+        });
+    }
+    const coachingOverlay = document.getElementById('coaching-phone-modal-overlay');
+    if (coachingOverlay) {
+        coachingOverlay.addEventListener('click', (e) => {
+            if (e.target === coachingOverlay) closeCoachingPhoneModal();
+        });
+    }
+    const refOverlay = document.getElementById('referral-modal-overlay');
+    if (refOverlay) {
+        refOverlay.addEventListener('click', (e) => {
+            if (e.target === refOverlay) closeReferralModal();
+        });
+    }
+}
+
+async function hydrateSessionFromServer(signedInVia = null, authErrorParam = null) {
+    try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        const data = await res.json();
+        APP_STATE.googleEnabled = !!data.google_enabled;
+
+        if (data.authenticated && data.user) {
+            applyAuthenticatedUser(data.user, { showWelcomeToast: !!signedInVia });
+            if (signedInVia === 'google') {
+                showToast(`Welcome ${data.user.name}! Signed in via Google ✓`);
+            }
+            return;
+        }
+    } catch (e) {
+        console.error('Session check failed:', e);
+    }
+
+    // Not authenticated -> show verified Google Sign-In modal
+    openAuthModal();
+    if (!APP_STATE.googleEnabled) {
+        showModalError('ob-auth-error', 'Google Sign-In is not configured on the server yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env to enable sign-in.');
+    } else if (authErrorParam) {
+        const msgMap = {
+            google_not_configured: 'Google Sign-In is not configured on the server yet.',
+            invalid_state: 'Sign-in session expired. Please try again.',
+            cancelled: 'Google Sign-In was cancelled.',
+            verification_failed: 'Google could not verify your email address.'
+        };
+        showModalError('ob-auth-error', msgMap[authErrorParam] || 'Google Sign-In failed. Please try again.');
+    }
+    if (APP_STATE.googleEnabled) {
+        initGoogleOneTap();
+    }
+}
+
+function openAuthModal() {
+    APP_STATE.authenticated = false;
+    document.getElementById('onboarding-modal-overlay').classList.add('active');
+}
+
+// ── Google Authentication (Real OAuth 2.0 & Verified One-Tap Only) ──
+function initGoogleOneTap() {
+    if (APP_STATE.googleEnabled && GOOGLE_CLIENT_ID && window.google && window.google.accounts) {
+        try {
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleGoogleCredentialResponse,
+                auto_select: false
+            });
+            google.accounts.id.prompt();
+        } catch (e) {
+            console.log('Google One Tap init deferred', e);
+        }
+    }
+}
+
+function initiateGoogleSignIn() {
+    if (!APP_STATE.googleEnabled) {
+        showModalError('ob-auth-error', 'Google Sign-In is not configured yet. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.');
+        return;
+    }
+    const refInput = document.getElementById('ob-input-ref');
+    const refCode = refInput ? refInput.value.trim().toUpperCase() : '';
+    const loginUrl = refCode
+        ? `/api/auth/google/login?ref=${encodeURIComponent(refCode)}`
+        : '/api/auth/google/login';
+    window.location.href = loginUrl;
+}
+
+async function handleGoogleCredentialResponse(response) {
+    showModalError('ob-auth-error', '');
+    showToast('Verifying Google credentials...');
+    const refInput = document.getElementById('ob-input-ref');
+    const refCode = refInput ? refInput.value.trim().toUpperCase() : '';
+    try {
+        const res = await fetch('/api/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ credential: response.credential, referral_code: refCode })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'ok' && data.user) {
+            applyAuthenticatedUser(data.user, { showWelcomeToast: true });
+        } else {
+            showModalError('ob-auth-error', data.message || 'Google verification failed. Please try again.');
+        }
+    } catch (e) {
+        showModalError('ob-auth-error', 'Error connecting to server. Please try again.');
+    }
+}
+
+// ── Apply Server-Verified User State ───────────────────────────
+function syncUserState(user) {
+    if (!user) return;
+    APP_STATE.authenticated = true;
+    APP_STATE.userId = user.id || user.phone_number || '';
+    APP_STATE.userName = user.name || 'User';
+    APP_STATE.userPhone = user.contact_phone || '';
+    APP_STATE.displayPhone = user.display_phone || formatUserPhoneDisplay(APP_STATE.userPhone);
+    APP_STATE.userEmail = user.email || '';
+    APP_STATE.avatarUrl = user.avatar_url || '';
+    APP_STATE.authProvider = user.auth_provider || 'google';
+    APP_STATE.referralCode = user.referral_code || 'HASSAN-XXXX';
+    APP_STATE.currentTier = user.is_subscribed ? (user.tier || 'basic') : 'trial';
+    APP_STATE.trialQuestionsUsed = user.trial_questions_used || 0;
+    APP_STATE.maxFreeTrial = user.max_free_trial || APP_STATE.maxFreeTrial;
+    APP_STATE.isSubscribed = !!user.is_subscribed;
+
+    renderUserProfileUI();
+    updateTrialIndicator();
+    updateTierUI(APP_STATE.currentTier);
+}
+
+function applyAuthenticatedUser(user, { showWelcomeToast = false } = {}) {
+    syncUserState(user);
+    document.getElementById('onboarding-modal-overlay').classList.remove('active');
+    if (!APP_STATE.welcomeInjected) {
+        injectInitialWelcome(APP_STATE.userName);
+        APP_STATE.welcomeInjected = true;
+    }
+    if (showWelcomeToast) {
+        showToast(`Verified as ${APP_STATE.userName} (${APP_STATE.userEmail || APP_STATE.displayPhone}) ✓`);
+    }
+}
+
+function renderUserProfileUI() {
+    const tag = document.getElementById('user-phone-tag');
+    if (tag) {
+        if (APP_STATE.displayPhone && APP_STATE.userEmail) {
+            tag.textContent = `${APP_STATE.displayPhone} • ${APP_STATE.userEmail}`;
+        } else if (APP_STATE.userEmail) {
+            tag.textContent = `${APP_STATE.userName} (${APP_STATE.userEmail})`;
+        } else if (APP_STATE.displayPhone) {
+            tag.textContent = `${APP_STATE.displayPhone} • ${APP_STATE.userName}`;
+        } else {
+            tag.textContent = APP_STATE.userName || 'Guest';
+        }
+    }
+
+    const statusSub = document.getElementById('session-status-text');
+    if (statusSub) {
+        const verifiedLabel = APP_STATE.authProvider === 'google' ? 'Google Verified' : 'Email Verified';
+        statusSub.textContent = APP_STATE.authenticated
+            ? `${verifiedLabel} • ${APP_STATE.userName}`
+            : 'Online • AI Mentor';
+    }
+
+    const sbName = document.getElementById('sidebar-user-name');
+    const sbAuth = document.getElementById('sidebar-user-auth');
+    const sbAvatar = document.getElementById('sidebar-user-avatar');
+
+    if (sbName) sbName.textContent = APP_STATE.userName || 'Guest User';
+    if (sbAuth) {
+        if (APP_STATE.authProvider === 'google') {
+            sbAuth.innerHTML = `<span style="color:#38bdf8; font-weight:600;">✓ Google Verified${APP_STATE.displayPhone ? ' • ' + escapeHtml(APP_STATE.displayPhone) : ''}</span>`;
+        } else if (APP_STATE.userEmail) {
+            sbAuth.innerHTML = `<span style="color:var(--accent-green); font-weight:600;">✓ ${escapeHtml(APP_STATE.displayPhone || APP_STATE.userEmail)}</span>`;
+        } else {
+            sbAuth.innerHTML = '<span>⚡ Free Trial</span>';
+        }
+    }
+    if (sbAvatar) {
+        if (APP_STATE.avatarUrl && APP_STATE.avatarUrl.startsWith('http')) {
+            sbAvatar.innerHTML = `<img src="${escapeHtml(APP_STATE.avatarUrl)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt="Avatar">`;
+        } else if (APP_STATE.userName) {
+            sbAvatar.textContent = APP_STATE.userName.substring(0, 2).toUpperCase();
+        } else {
+            sbAvatar.textContent = 'HF';
+        }
+    }
+}
+
+async function resetUserSession() {
+    if (!confirm('Sign out and switch account?')) return;
+    try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    } catch (e) {}
+    localStorage.clear();
+    location.reload();
+}
+
+// ── Welcome Message ────────────────────────────────────────────
+function injectInitialWelcome(name) {
+    const messagesBox = document.getElementById('chat-messages-flow');
+    messagesBox.innerHTML = '<div class="date-divider">Today</div>';
+
+    const trialLine = APP_STATE.isSubscribed
+        ? `Your <strong>${escapeHtml(APP_STATE.currentTier.toUpperCase())}</strong> membership is active. Ask me anything regarding mindset, fitness, business in Pakistan, or life discipline.`
+        : `You have <strong>${APP_STATE.maxFreeTrial} free questions</strong> on your trial. Ask me anything regarding mindset, fitness, business in Pakistan, or life discipline.`;
+
+    const welcomeHtml = `
+        <div class="msg-row ai">
+            <div class="msg-avatar">HF</div>
+            <div class="msg-bubble">
+                <p>Assalamu Alaikum <strong>${escapeHtml(name)}</strong>! 🎯</p>
+                <p>I am Hassan Ali Farrukh's official AI assistant. I have been trained directly on my philosophy, video lessons, tactical defense principles, and military mindset.</p>
+                <p>${trialLine}</p>
+                
+                <div class="audio-playback-pill">
+                    <button class="play-btn-circle" onclick="simulateVoicePlay(this)">▶</button>
+                    <div class="waveform-mock">
+                        <div class="waveform-bar" style="height: 6px;"></div>
+                        <div class="waveform-bar" style="height: 14px;"></div>
+                        <div class="waveform-bar" style="height: 18px;"></div>
+                        <div class="waveform-bar" style="height: 10px;"></div>
+                        <div class="waveform-bar" style="height: 16px;"></div>
+                        <div class="waveform-bar" style="height: 12px;"></div>
+                        <div class="waveform-bar" style="height: 8px;"></div>
+                    </div>
+                    <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">0:42 Spoken Advice</span>
+                </div>
+
+                <div class="msg-meta">
+                    <span>Hassan Ali Farrukh • Official AI</span>
+                    <span>Just now</span>
+                </div>
+            </div>
+        </div>
+    `;
+    messagesBox.insertAdjacentHTML('beforeend', welcomeHtml);
+}
+
+// ── Send & Message Flow (Cookie-Authenticated) ─────────────────
+async function handleSendAction() {
+    const textarea = document.getElementById('user-chat-input');
+    const text = textarea.value.trim();
+
+    if (!text) return;
+    if (!APP_STATE.authenticated) {
+        openAuthModal();
+        return;
+    }
+
+    appendMessageBubble('user', text);
+    textarea.value = '';
+    textarea.style.height = 'auto';
+
+    setTypingState(true);
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ message: text })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        setTypingState(false);
+
+        if (response.status === 401 || data.code === 'unauthenticated') {
+            showToast('Please sign in to continue.');
+            openAuthModal();
+            return;
+        }
+
+        if (data.code === 'phone_required') {
+            appendMessageBubble('ai', data.reply || 'Please add your Pakistani mobile number first.');
+            if (text.toUpperCase() === 'CALL') {
+                openCoachingPhoneModal();
+            } else {
+                openPaywallModal();
+            }
+            return;
+        }
+
+        if (data.user) {
+            syncUserState(data.user);
+        }
+
+        const reply = data.reply || 'No response received. Please try again.';
+        appendMessageBubble('ai', reply);
+
+        if (data.paywalled || reply.includes('free questions are up') || (reply.includes('PKR') && reply.includes('EasyPaisa'))) {
+            APP_STATE.trialQuestionsUsed = APP_STATE.maxFreeTrial;
+            updateTrialIndicator();
+            setTimeout(() => openPaywallModal(), 1200);
+        }
+
+    } catch (err) {
+        setTypingState(false);
+        appendMessageBubble('ai', 'Error connecting to Hassan AI server. Please verify your connection or try again in a moment.');
+    }
+}
+
+function handleChipClick(chipText) {
+    const input = document.getElementById('user-chat-input');
+    input.value = chipText;
+    handleSendAction();
+}
+
+function appendMessageBubble(role, content) {
+    const messagesBox = document.getElementById('chat-messages-flow');
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let formattedContent = formatMarkdown(content);
+
+    let paywallButtonHtml = '';
+    if (role === 'ai' && (content.includes('free questions are up') || content.includes('reply with your Transaction ID') || content.includes('choose a plan:'))) {
+        paywallButtonHtml = `
+            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                <button class="paywall-chat-action-btn" onclick="openPaywallModal('basic')" style="
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    padding: 13px 18px;
+                    font-family: var(--font-sans);
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #0b0b0d;
+                    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                    border: none;
+                    border-radius: var(--radius-md);
+                    cursor: pointer;
+                    box-shadow: 0 4px 18px rgba(34, 197, 94, 0.35);
+                    transition: transform 0.15s ease, box-shadow 0.15s ease;
+                " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
+                    <span style="font-size: 16px;">👑</span>
+                    <span>Submit Transaction ID &amp; Choose Plan</span>
+                </button>
+            </div>
+        `;
+    }
+
+    const bubbleHtml = role === 'user' ? `
+        <div class="msg-row user">
+            <div class="msg-bubble">
+                <div>${formattedContent}</div>
+                <div class="msg-meta">
+                    <span>${timeStr}</span>
+                    <span>✓✓</span>
+                </div>
+            </div>
+        </div>
+    ` : `
+        <div class="msg-row ai">
+            <div class="msg-avatar">HF</div>
+            <div class="msg-bubble">
+                <div>${formattedContent}</div>
+                ${paywallButtonHtml}
+                <div class="msg-meta">
+                    <span>Hassan Ali Farrukh • AI Mentor</span>
+                    <span>${timeStr}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    messagesBox.insertAdjacentHTML('beforeend', bubbleHtml);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+}
+
+function setTypingState(isTyping) {
+    const typingBox = document.getElementById('chat-typing-box');
+    const sendBtn = document.getElementById('send-msg-btn');
+    const messagesBox = document.getElementById('chat-messages-flow');
+
+    if (isTyping) {
+        typingBox.classList.add('visible');
+        sendBtn.disabled = true;
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+    } else {
+        typingBox.classList.remove('visible');
+        sendBtn.disabled = false;
+    }
+}
+
+function updateTrialIndicator() {
+    const used = APP_STATE.trialQuestionsUsed;
+    const max = APP_STATE.maxFreeTrial;
+    const countLabel = document.getElementById('trial-count-label');
+    const fillBar = document.getElementById('trial-progress-bar');
+    const ticker = document.getElementById('trial-ticker-bar');
+
+    if (APP_STATE.isSubscribed) {
+        ticker.style.display = 'none';
+        return;
+    }
+
+    ticker.style.display = 'flex';
+    const pct = Math.min((used / max) * 100, 100);
+    fillBar.style.width = pct + '%';
+
+    if (pct >= 100) {
+        ticker.classList.add('expired');
+        if (fillBar.parentElement) fillBar.parentElement.style.display = 'none';
+        countLabel.innerHTML = `👑 <strong>Free Trial Ended</strong> (${used} of ${max} used) • <span style="text-decoration: underline; cursor: pointer; color: #fbbf24; font-weight: 700;" onclick="openPaywallModal('basic')">Unlock Full Mentorship ➔</span>`;
+        const chatInput = document.getElementById('user-chat-input');
+        if (chatInput) chatInput.placeholder = "Tap Unlock to submit your EasyPaisa / Bank Transaction ID...";
+    } else {
+        ticker.classList.remove('expired');
+        if (fillBar.parentElement) fillBar.parentElement.style.display = 'block';
+        fillBar.style.background = 'var(--accent-green)';
+        countLabel.innerHTML = `Free Trial: <strong>${used} of ${max}</strong> questions used`;
+        const chatInput = document.getElementById('user-chat-input');
+        if (chatInput) chatInput.placeholder = "Ask Hassan Bhai anything regarding mindset, fitness, career, or life...";
+    }
+}
+
+function updateTierUI(tier) {
+    const badge = document.getElementById('plan-badge-pill');
+    badge.className = `badge-pill ${tier}`;
+    if (tier === 'pro') {
+        badge.innerHTML = '👑 Pro Member';
+    } else if (tier === 'basic') {
+        badge.innerHTML = '⚡ Basic Member';
+    } else {
+        badge.innerHTML = '⚡ Free Trial';
+    }
+}
+
+// ── Modals & Actions (Normalized Pakistani Phone Linked on Payment/Call) ──
+function openPaywallModal(tier = 'basic') {
+    if (!APP_STATE.authenticated) {
+        openAuthModal();
+        return;
+    }
+    selectPlanCard(tier);
+    showModalError('paywall-error-box', '');
+    const phoneInput = document.getElementById('paywall-phone-input');
+    if (phoneInput && APP_STATE.displayPhone && !phoneInput.value) {
+        phoneInput.value = APP_STATE.displayPhone;
+        updatePhonePreview('paywall-phone-input', 'paywall-phone-preview');
+    }
+    document.getElementById('paywall-modal-overlay').classList.add('active');
+}
+
+function closePaywallModal() {
+    document.getElementById('paywall-modal-overlay').classList.remove('active');
+}
+
+function selectPlanCard(plan) {
+    APP_STATE.selectedPlan = plan;
+    document.querySelectorAll('.plan-option-card').forEach(c => c.classList.remove('selected'));
+    const target = document.getElementById(`plan-card-${plan}`);
+    if (target) target.classList.add('selected');
+}
+
+async function linkUserPhone(rawPhone) {
+    const res = await fetch('/api/auth/link-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ phone: rawPhone })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.status !== 'ok') {
+        return { ok: false, message: data.message || 'Could not save mobile number.' };
+    }
+    if (data.user) {
+        syncUserState(data.user);
+    } else if (data.contact_phone) {
+        APP_STATE.userPhone = data.contact_phone;
+        APP_STATE.displayPhone = data.display_phone || formatUserPhoneDisplay(data.contact_phone);
+        renderUserProfileUI();
+    }
+    return { ok: true };
+}
+
+async function submitPaywallPayment() {
+    showModalError('paywall-error-box', '');
+    const rawPhone = document.getElementById('paywall-phone-input').value.trim();
+    const trx = document.getElementById('paywall-trx-input').value.trim();
+
+    const canon = normalizePkPhoneClient(rawPhone);
+    if (!canon) {
+        showModalError('paywall-error-box', 'Please enter a valid Pakistani mobile number (e.g. 0300 7560313 or +92 300 7560313).');
+        document.getElementById('paywall-phone-input').focus();
+        return;
+    }
+
+    if (!trx) {
+        showModalError('paywall-error-box', 'Please enter your Transaction ID (TRX ID).');
+        document.getElementById('paywall-trx-input').focus();
+        return;
+    }
+
+    const btn = document.getElementById('paywall-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    try {
+        // 1. Link & normalize Pakistani phone number (rejects duplicates owned by another user)
+        if (APP_STATE.userPhone !== canon) {
+            const linkRes = await linkUserPhone(rawPhone);
+            if (!linkRes.ok) {
+                showModalError('paywall-error-box', linkRes.message);
+                return;
+            }
+        }
+
+        // 2. Submit TRX ID over authenticated cookie session
+        const command = `TRX: ${trx} ${APP_STATE.selectedPlan.toUpperCase()}`;
+        closePaywallModal();
+        appendMessageBubble('user', `Payment submitted: ${trx} (${APP_STATE.selectedPlan.toUpperCase()})`);
+        setTypingState(true);
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ message: command })
+        });
+        const d = await res.json().catch(() => ({}));
+        setTypingState(false);
+
+        if (res.status === 401) {
+            openAuthModal();
+            return;
+        }
+        if (d.user) syncUserState(d.user);
+        appendMessageBubble('ai', d.reply || 'Payment submitted! Admin will verify and activate your pass shortly.');
+        document.getElementById('paywall-trx-input').value = '';
+        showToast('Payment submitted for verification ✓');
+    } catch (e) {
+        setTypingState(false);
+        showModalError('paywall-error-box', 'Error submitting payment. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '✓ Submit Payment for Verification';
+    }
+}
+
+function openCoachingPhoneModal() {
+    showModalError('coaching-phone-error', '');
+    const phoneInput = document.getElementById('coaching-phone-input');
+    if (phoneInput && APP_STATE.displayPhone) {
+        phoneInput.value = APP_STATE.displayPhone;
+        updatePhonePreview('coaching-phone-input', 'coaching-phone-preview');
+    }
+    document.getElementById('coaching-phone-modal-overlay').classList.add('active');
+}
+
+function closeCoachingPhoneModal() {
+    document.getElementById('coaching-phone-modal-overlay').classList.remove('active');
+}
+
+async function submitCoachingWithPhone() {
+    showModalError('coaching-phone-error', '');
+    const rawPhone = document.getElementById('coaching-phone-input').value.trim();
+    const canon = normalizePkPhoneClient(rawPhone);
+    if (!canon) {
+        showModalError('coaching-phone-error', 'Please enter a valid Pakistani mobile number (e.g. 0300 7560313 or +92 300 7560313).');
+        document.getElementById('coaching-phone-input').focus();
+        return;
+    }
+
+    const btn = document.getElementById('coaching-phone-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        const linkRes = await linkUserPhone(rawPhone);
+        if (!linkRes.ok) {
+            showModalError('coaching-phone-error', linkRes.message);
+            return;
+        }
+        closeCoachingPhoneModal();
+        await dispatchCoachingRequest();
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Number & Request 1-on-1 Call ✓';
+    }
+}
+
+function sendCoachingRequest() {
+    if (!APP_STATE.authenticated) {
+        openAuthModal();
+        return;
+    }
+    if (!APP_STATE.userPhone) {
+        openCoachingPhoneModal();
+        return;
+    }
+    dispatchCoachingRequest();
+}
+
+async function dispatchCoachingRequest() {
+    appendMessageBubble('user', 'I would like to request a 1-on-1 private coaching mentorship call with Hassan Ali Farrukh.');
+    setTypingState(true);
+
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ message: 'CALL' })
+        });
+        const d = await res.json().catch(() => ({}));
+        setTypingState(false);
+
+        if (res.status === 401) {
+            openAuthModal();
+            return;
+        }
+        if (d.code === 'phone_required') {
+            openCoachingPhoneModal();
+            return;
+        }
+        if (d.user) syncUserState(d.user);
+        appendMessageBubble('ai', d.reply || 'Your mentorship request has been forwarded to the team.');
+    } catch (e) {
+        setTypingState(false);
+        appendMessageBubble('ai', 'Error submitting coaching request. Please try again.');
+    }
+}
+
+function openReferralModal() {
+    if (!APP_STATE.authenticated) {
+        openAuthModal();
+        return;
+    }
+    document.getElementById('referral-code-display').textContent = APP_STATE.referralCode || 'HASSAN-XXXX';
+    fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ message: 'CODE' })
+    })
+    .then(r => r.json())
+    .then(d => {
+        const text = d.reply || '';
+        const match = text.match(/`([^`]+)`/);
+        if (match) {
+            APP_STATE.referralCode = match[1];
+            document.getElementById('referral-code-display').textContent = match[1];
+        }
+    })
+    .catch(() => {});
+
+    document.getElementById('referral-modal-overlay').classList.add('active');
+}
+
+function closeReferralModal() {
+    document.getElementById('referral-modal-overlay').classList.remove('active');
+}
+
+function copySnippet(text, el) {
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => onCopyDone()).catch(() => fallbackCopy(text));
+            return;
+        }
+    } catch (e) {}
+
+    fallbackCopy(text);
+
+    function fallbackCopy(str) {
+        const temp = document.createElement('textarea');
+        temp.value = str;
+        temp.style.position = 'fixed';
+        temp.style.left = '-9999px';
+        temp.style.top = '0';
+        document.body.appendChild(temp);
+        temp.focus();
+        temp.select();
+        try {
+            document.execCommand('copy');
+            onCopyDone();
+        } catch (err) {
+            prompt('Copy payment number (Ctrl+C / Cmd+C):', str);
+        }
+        document.body.removeChild(temp);
+    }
+
+    function onCopyDone() {
+        if (el) {
+            const orig = el.textContent;
+            el.textContent = 'Copied!';
+            setTimeout(() => { el.textContent = orig; }, 1800);
+        }
+        showToast(`Copied ${text} ✓`);
+    }
+}
+
+function copyReferralInvite() {
+    const inviteText = `Talk to Hassan Ali Farrukh's AI Clone! Use my invite code ${APP_STATE.referralCode} to get started: ${window.location.origin}/`;
+    copySnippet(inviteText);
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('app-toast-box');
+    toast.textContent = msg;
+    toast.classList.add('visible');
+    setTimeout(() => toast.classList.remove('visible'), 2800);
+}
+
+function simulateVoicePlay(btn) {
+    if (btn.textContent === '▶') {
+        btn.textContent = '⏸';
+        showToast('Playing voice sample audio...');
+        setTimeout(() => { btn.textContent = '▶'; }, 3000);
+    } else {
+        btn.textContent = '▶';
+    }
+}
+
+function setupInputAutoResize() {
+    const textarea = document.getElementById('user-chat-input');
+    textarea.addEventListener('input', () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
+    });
+
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendAction();
+        }
+    });
+}
+
+function formatMarkdown(text) {
+    if (!text) return '';
+    let out = escapeHtml(text);
+    out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+    out = out.replace(/\n/g, '<br>');
+    return out;
+}
+
+function escapeHtml(string) {
+    const entityMap = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    };
+    return String(string).replace(/[&<>"']/g, s => entityMap[s]);
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "reel_id": "3997788354628047403",
+  "caption": "Try doing it at age 45 on knuckles",
+  "date": "2026-09-30 18:39:25",
+  "words_count": 17,
+  "full_text": " IMPORTANT! EAT WITH ME! EAT WITH ME! Is there salt? Yes! Is there salt? Yes! Yes! Come!",
+  "segments": [
+    {
+      "start": 0,
+      "end": 0.45999998,
+      "text": " IMPORTANT!"
+    },
+    {
+      "start": 0.45999998,
+      "end": 1.4599999,
+      "text": " EAT WITH ME!"
+    },
+    {
+      "start": 1.4599999,
+      "end": 2.46,
+      "text": " EAT WITH ME!"
+    },
+    {
+      "start": 7.96,
+      "end": 9.08,
+      "text": " Is there salt?"
+    },
+    {
+      "start": 9.08,
+      "end": 9.58,
+      "text": " Yes!"
+    },
+    {
+      "start": 9.58,
+      "end": 10.58,
+      "text": " Is there salt?"
+    },
+    {
+      "start": 10.58,
+      "end": 11.58,
+      "text": " Yes!"
+    },
+    {
+      "start": 11.58,
+      "end": 12.66,
+      "text": " Yes!"
+    },
+    {
+      "start": 12.66,
+      "end": 13.66,
+      "text": " Come!"
+    }
+  ]
+}

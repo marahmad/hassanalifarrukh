@@ -1,0 +1,24 @@
+{
+  "reel_id": "3986068732395122330",
+  "caption": "Never forget to laugh and smile in life ....",
+  "date": "2026-09-14 14:34:29",
+  "words_count": 4,
+  "full_text": " . Last magazine. Ready?",
+  "segments": [
+    {
+      "start": 0,
+      "end": 1,
+      "text": " ."
+    },
+    {
+      "start": 1,
+      "end": 15.62,
+      "text": " Last magazine."
+    },
+    {
+      "start": 15.62,
+      "end": 19.58,
+      "text": " Ready?"
+    }
+  ]
+}

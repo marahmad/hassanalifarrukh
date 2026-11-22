@@ -1,0 +1,19 @@
+{
+  "reel_id": "3995325216693682889",
+  "caption": "",
+  "date": "2026-09-27 09:05:26",
+  "words_count": 4,
+  "full_text": " Are you ready? Ready.",
+  "segments": [
+    {
+      "start": 0,
+      "end": 1,
+      "text": " Are you ready?"
+    },
+    {
+      "start": 1,
+      "end": 2,
+      "text": " Ready."
+    }
+  ]
+}

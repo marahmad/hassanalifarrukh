@@ -1,0 +1,39 @@
+{
+  "reel_id": "3999829685733205523",
+  "caption": "Using all plates since I was 19",
+  "date": "2026-10-03 14:15:27",
+  "words_count": 8,
+  "full_text": " . । Tāpit kilau Tāpit . Terima kasih.",
+  "segments": [
+    {
+      "start": 0,
+      "end": 10,
+      "text": " ."
+    },
+    {
+      "start": 10.48,
+      "end": 10.96,
+      "text": " ।"
+    },
+    {
+      "start": 11.38,
+      "end": 13.5199995,
+      "text": " Tāpit kilau"
+    },
+    {
+      "start": 13.5199995,
+      "end": 16.24,
+      "text": " Tāpit"
+    },
+    {
+      "start": 24.58,
+      "end": 26.019999,
+      "text": " ."
+    },
+    {
+      "start": 26.019999,
+      "end": 30.239998,
+      "text": " Terima kasih."
+    }
+  ]
+}

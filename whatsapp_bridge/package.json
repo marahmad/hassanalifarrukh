@@ -1,0 +1,16 @@
+{
+  "name": "hassan-whatsapp-qr-bridge",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "WhatsApp QR Code Bridge for Hassan Ali Farrukh AI Assistant",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

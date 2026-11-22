@@ -1,0 +1,24 @@
+{
+  "reel_id": "4002087924181087176",
+  "caption": "",
+  "date": "2026-10-06 17:01:59",
+  "words_count": 9,
+  "full_text": " Intro 5, 4, 3, 2, 1, 0 Terima kasih.",
+  "segments": [
+    {
+      "start": 0,
+      "end": 2,
+      "text": " Intro"
+    },
+    {
+      "start": 30,
+      "end": 43.66,
+      "text": " 5, 4, 3, 2, 1, 0"
+    },
+    {
+      "start": 60,
+      "end": 89.979996,
+      "text": " Terima kasih."
+    }
+  ]
+}

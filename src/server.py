@@ -1,0 +1,1163 @@
+import json
+import urllib.parse
+
+import requests
+from fastapi import FastAPI, Query, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from groq import Groq
+
+from src.admin_auth import (
+    generate_admin_session_token,
+    is_admin_authenticated,
+    render_admin_login_html,
+)
+from src.chat_frontend import render_chat_html
+from src.config import (
+    ACCOUNT_TITLE,
+    ADMIN_PASSWORD,
+    ADMIN_PHONE,
+    ALLIED_BANK,
+    ALLIED_BANK_ACCOUNT,
+    BASIC_PRICE_PKR,
+    EASYPAISA,
+    EASYPAISA_NUMBER,
+    FREE_TRIAL_QUESTIONS,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GROQ_API_KEY,
+    JAZZCASH,
+    PRO_PRICE_PKR,
+    RAAST_ID,
+    RAAST_ID_NUMBER,
+    VERIFY_TOKEN,
+)
+from src.dashboard import render_dashboard_html
+from src.database import (
+    activate_user,
+    apply_referral_code,
+    can_user_chat,
+    get_or_create_google_user,
+    get_or_create_user,
+    get_recent_chat_history,
+    get_referral_stats,
+    get_subscriber_phones,
+    get_system_metrics,
+    get_user_by_identifier,
+    init_db,
+    link_phone_to_user,
+    mark_coaching_pitch_sent,
+    mark_welcome_sent,
+    record_coaching_lead,
+    record_user_query,
+    save_chat_message,
+    submit_trx_id,
+)
+from src.knowledge_base import search_knowledge
+from src.persona import build_hassan_chat_messages, build_hassan_prompt
+from src.phone_utils import (
+    format_pk_phone_display,
+    is_canonical_pk_phone,
+    is_synthetic_user_id,
+    is_valid_email,
+    normalize_email,
+    normalize_pk_phone,
+    normalize_pk_phone_or_none,
+)
+from src.user_auth import (
+    OAUTH_STATE_COOKIE,
+    clear_user_session_cookie,
+    generate_oauth_state,
+    get_authenticated_user_id,
+    is_https_request,
+    is_valid_bridge_request,
+    set_oauth_state_cookie,
+    set_user_session_cookie,
+    verify_google_id_token,
+    verify_oauth_state,
+)
+from src.whatsapp_client import send_whatsapp_text
+
+app = FastAPI(title="Hassan Ali Farrukh AI Assistant")
+init_db()
+
+# Initialize Groq Client
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+
+PENDING_REF_COOKIE = "pending_ref"
+
+
+def _public_user_payload(user: dict) -> dict:
+    contact_phone = user.get("contact_phone") or (
+        user["phone_number"] if is_canonical_pk_phone(user.get("phone_number")) else ""
+    )
+    return {
+        "id": user.get("phone_number", ""),
+        "name": user.get("name") or "User",
+        "email": user.get("email") or "",
+        "avatar_url": user.get("avatar_url") or "",
+        "auth_provider": user.get("auth_provider") or "google",
+        "contact_phone": contact_phone,
+        "display_phone": format_pk_phone_display(contact_phone) if contact_phone else "",
+        "tier": user.get("tier") or "basic",
+        "is_subscribed": bool(user.get("is_subscribed", False)),
+        "subscription_expiry": user.get("subscription_expiry"),
+        "trial_questions_used": user.get("trial_questions_used") or 0,
+        "max_free_trial": FREE_TRIAL_QUESTIONS,
+        "referral_code": user.get("referral_code") or "",
+        "referral_count": user.get("referral_count") or 0,
+    }
+
+
+def _is_google_oauth_enabled() -> bool:
+    return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+
+
+PAYWALL_TEXT = f"""Your {FREE_TRIAL_QUESTIONS} free questions are up! 🎯
+
+To continue chatting with Hassan's AI, choose a plan:
+
+1️⃣ BASIC — PKR {BASIC_PRICE_PKR}/month
+   Standard mentorship access & direct guidance
+
+2️⃣ PRO — PKR {PRO_PRICE_PKR}/month
+   Deeper answers + priority knowledge retrieval + monthly exclusive drops
+
+━━━━━━━━━━━━━━━━
+Send payment to:
+• EasyPaisa: {EASYPAISA}
+• Allied Bank: {ALLIED_BANK}
+• Raast: {RAAST_ID}
+
+After paying, reply with your Transaction ID:"""
+
+HIGH_INTENT_KEYWORDS = [
+    "career", "job", "naukri", "business", "startup", "money",
+    "paise", "kamana", "loss", "future", "problem", "stuck",
+    "direction", "guidance", "mentorship", "personally",
+]
+
+
+def build_welcome_message(tier: str, referral_code: str) -> str:
+    """Builds the first-time welcome message with referral incentives."""
+    return f"""Welcome to Hassan AI! 🎉
+
+You now have full {tier.upper()} access. Ask me anything Hassan has ever talked about — mindset, life, career, relationships, and more.
+
+━━━━━━━━━━━━━━━━
+🎁 Your personal referral code: {referral_code}
+
+Share it with 3 friends. When they subscribe using your code, you get 1 month FREE — automatically, no questions asked."""
+
+
+def format_stats_summary(metrics: dict) -> str:
+    """Formats executive analytics for WhatsApp and admin chat commands."""
+    return (
+        f"📊 *Hassan AI Live Business & Conversion Stats*\n\n"
+        f"👥 *Audience Reach:*\n"
+        f"• Total Inbound Users: {metrics['total_users']}\n"
+        f"• Total Queries Handled: {metrics['total_queries']}\n\n"
+        f"💳 *Subscribers & Conversion:*\n"
+        f"• Active Paid Members: {metrics['active_subscribers']}\n"
+        f"• Conversion Rate: {metrics['conversion_rate']}%\n"
+        f"• Basic Tier (PKR {BASIC_PRICE_PKR}): {metrics['basic_subscribers']}\n"
+        f"• Pro Tier (PKR {PRO_PRICE_PKR}): {metrics['pro_subscribers']}\n"
+        f"• Estimated MRR: PKR {metrics['estimated_mrr_pkr']:,} / month\n\n"
+        f"🆓 *Trial Funnel:*\n"
+        f"• Active Free Trials: {metrics['active_trials']}\n"
+        f"• Paywall Reached: {metrics['paywalled_trials']}\n\n"
+        f"🔗 *Viral Loop:*\n"
+        f"• Total Referrals Generated: {metrics['total_referrals']}\n\n"
+        f"📞 *Coaching Leads:* {metrics['new_coaching_leads']} pending\n"
+        f"⏳ *Pending Payments:* {metrics['pending_payments']}\n\n"
+        f"🌐 Web Dashboard: http://localhost:8080/admin/dashboard"
+    )
+
+
+def should_trigger_coaching_upsell(user_info: dict, user_text: str) -> bool:
+    """Checks if a paid subscriber qualifies for the high-intent coaching pitch."""
+    queries = user_info.get("total_queries", 0)
+    tier = user_info.get("tier", "basic")
+    already_sent = user_info.get("coaching_pitch_sent", 0)
+
+    if already_sent:
+        return False
+
+    threshold = 5 if tier == "pro" else 7
+    if queries < threshold:
+        return False
+
+    text_lower = user_text.lower()
+    return any(kw in text_lower for kw in HIGH_INTENT_KEYWORDS)
+
+
+def parse_activate_args(parts: list[str]) -> tuple[str | None, str, int, str]:
+    """
+    Parses `/activate <phone_or_email_or_id> [plan] [days]`.
+    Accepts any Pakistani mobile format (normalized to 923XXXXXXXXX), an email address,
+    or an internal user ID (u_.../google_...).
+    Returns: (target_identifier_or_None, tier, days, error_message)
+    """
+    raw_target = parts[1].strip()
+    tier = "basic"
+    days = 30
+    for p in parts[2:]:
+        p_clean = p.strip().lower()
+        if p_clean in ["basic", "pro"]:
+            tier = p_clean
+        elif p_clean.isdigit():
+            days = int(p_clean)
+
+    if "@" in raw_target:
+        if not is_valid_email(raw_target):
+            return None, tier, days, "Invalid email address provided for activation."
+        return normalize_email(raw_target), tier, days, ""
+
+    if is_synthetic_user_id(raw_target):
+        return raw_target, tier, days, ""
+
+    ok, canon, err = normalize_pk_phone(raw_target)
+    if not ok:
+        return None, tier, days, f"Invalid target '{raw_target}'. {err} Or pass the user's email address."
+    return canon, tier, days, ""
+
+
+def parse_trx_text(text: str) -> tuple[str, str, str]:
+    """
+    Extracts TRX ID, optional selected plan (basic or pro),
+    and optional friend referral code (e.g. HASSAN-XXXX).
+    """
+    cleaned = text.replace("TRX ID:", " ").replace("TRX:", " ").replace("TRX", " ")
+    tokens = cleaned.split()
+    trx_id = tokens[0] if tokens else ""
+    plan = "basic"
+    referral_code = ""
+
+    for tok in tokens[1:]:
+        t_clean = tok.strip()
+        t_upper = t_clean.upper()
+        if t_upper in ["BASIC", "PRO"]:
+            plan = t_upper.lower()
+        elif t_upper.startswith("REF:") or t_upper.startswith("CODE:"):
+            referral_code = t_upper.split(":")[-1].strip()
+        elif t_upper.startswith("HASSAN-"):
+            referral_code = t_upper
+
+    return trx_id, plan, referral_code
+
+
+def is_trx_message(text: str, user_status: str = "free_trial") -> bool:
+    """
+    Checks if a message is a payment Transaction ID submission,
+    either explicitly formatted (TRX: ...) or a direct raw transaction ID.
+    """
+    t = text.strip()
+    u = t.upper()
+    if u.startswith("TRX:") or u.startswith("TRX ID:") or u.startswith("TRX ") or u == "TRX":
+        return True
+
+    if user_status != "subscribed":
+        tokens = t.split()
+        if 1 <= len(tokens) <= 2:
+            candidate = tokens[0].replace("-", "").replace("_", "")
+            if 6 <= len(candidate) <= 32 and any(c.isdigit() for c in candidate) and candidate.isalnum():
+                return True
+    return False
+
+
+# ── User Authentication Endpoints (Google Sign-In Only) ────────────────────
+
+@app.get("/api/auth/me")
+async def api_auth_me(request: Request):
+    """Returns server-verified session state and Google Sign-In status."""
+    auth_config = {"google_enabled": _is_google_oauth_enabled()}
+    user_id = get_authenticated_user_id(request)
+    if not user_id:
+        return {"authenticated": False, "user": None, **auth_config}
+
+    user = get_user_by_identifier(user_id)
+    if not user:
+        resp = JSONResponse({"authenticated": False, "user": None, **auth_config})
+        clear_user_session_cookie(resp)
+        return resp
+
+    return {
+        "authenticated": True,
+        "user": _public_user_payload(user),
+        **auth_config,
+    }
+
+
+@app.post("/api/auth/logout")
+async def api_auth_logout():
+    """Clears the signed user_session HttpOnly cookie."""
+    resp = JSONResponse({"status": "ok", "message": "Signed out"})
+    clear_user_session_cookie(resp)
+    return resp
+
+
+@app.get("/api/auth/google/login")
+async def google_login(request: Request, ref: str = Query(None)):
+    """Redirects user to Google's official OAuth 2.0 screen with CSRF state protection."""
+    if not _is_google_oauth_enabled():
+        return RedirectResponse(url="/?auth_error=google_not_configured")
+
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or "localhost:8080"
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    redirect_uri = f"{proto}://{host}/api/auth/google/callback"
+    state = generate_oauth_state()
+
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "online",
+        "prompt": "select_account",
+        "state": state,
+    }
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    resp = RedirectResponse(url=auth_url)
+    set_oauth_state_cookie(resp, state, request)
+    if ref and ref.strip():
+        resp.set_cookie(
+            key=PENDING_REF_COOKIE,
+            value=ref.strip().upper()[:32],
+            max_age=600,
+            httponly=True,
+            samesite="lax",
+            secure=is_https_request(request),
+            path="/",
+        )
+    return resp
+
+
+@app.get("/api/auth/google/callback")
+async def google_callback(
+    request: Request,
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+):
+    """Validates OAuth state, exchanges authorization code, verifies Google identity, sets HttpOnly cookie."""
+    if error or not code:
+        return RedirectResponse(url=f"/?auth_error={urllib.parse.quote(error or 'cancelled')}")
+
+    if not _is_google_oauth_enabled():
+        return RedirectResponse(url="/?auth_error=google_not_configured")
+
+    if not verify_oauth_state(request, state):
+        return RedirectResponse(url="/?auth_error=invalid_state")
+
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or "localhost:8080"
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    redirect_uri = f"{proto}://{host}/api/auth/google/callback"
+
+    token_url = "https://oauth2.googleapis.com/token"
+    payload = {
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+
+    try:
+        token_resp = requests.post(token_url, data=payload, timeout=10)
+        if token_resp.status_code != 200:
+            return RedirectResponse(url="/?auth_error=exchange_failed")
+
+        token_data = token_resp.json()
+        id_token_str = token_data.get("id_token")
+        claims = verify_google_id_token(id_token_str) if id_token_str else None
+
+        if not claims:
+            access_token = token_data.get("access_token")
+            if access_token:
+                u_resp = requests.get(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=10,
+                )
+                if u_resp.status_code == 200:
+                    u_json = u_resp.json()
+                    if u_json.get("email") and u_json.get("email_verified", False):
+                        claims = {
+                            "sub": u_json.get("sub", ""),
+                            "email": normalize_email(u_json.get("email")),
+                            "name": u_json.get("name") or u_json.get("email", "User").split("@")[0],
+                            "picture": u_json.get("picture", ""),
+                        }
+
+        if not claims or not claims.get("email"):
+            return RedirectResponse(url="/?auth_error=verification_failed")
+
+        user = get_or_create_google_user(
+            google_id=claims["sub"],
+            email=claims["email"],
+            name=claims["name"],
+            avatar_url=claims["picture"],
+        )
+
+        pending_ref = (request.cookies.get(PENDING_REF_COOKIE) or "").strip().upper()
+        if pending_ref:
+            apply_referral_code(user["phone_number"], pending_ref)
+
+        resp = RedirectResponse(url="/?signed_in=google")
+        resp.delete_cookie(key=OAUTH_STATE_COOKIE, path="/")
+        resp.delete_cookie(key=PENDING_REF_COOKIE, path="/")
+        set_user_session_cookie(resp, user["phone_number"], request)
+        return resp
+
+    except Exception as e:
+        print(f"Error in Google OAuth callback: {e}")
+        return RedirectResponse(url="/?auth_error=exception")
+
+
+@app.post("/api/auth/google")
+async def api_auth_google(request: Request):
+    """Authenticates user via cryptographically verified Google One-Tap ID token."""
+    if not GOOGLE_CLIENT_ID:
+        return JSONResponse(
+            {"status": "error", "message": "Google Sign-In is not configured on the server."},
+            status_code=503,
+        )
+
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid request payload."}, status_code=400)
+
+    credential = str(data.get("credential") or "").strip()
+    ref_code = str(data.get("referral_code") or "").strip().upper()
+    if not credential:
+        return JSONResponse(
+            {"status": "error", "message": "Missing verified Google ID token credential."},
+            status_code=401,
+        )
+
+    claims = verify_google_id_token(credential)
+    if not claims:
+        return JSONResponse(
+            {"status": "error", "message": "Google credential verification failed."},
+            status_code=401,
+        )
+
+    user = get_or_create_google_user(
+        google_id=claims["sub"],
+        email=claims["email"],
+        name=claims["name"],
+        avatar_url=claims["picture"],
+    )
+    if ref_code:
+        apply_referral_code(user["phone_number"], ref_code)
+        user = get_user_by_identifier(user["phone_number"]) or user
+
+    resp = JSONResponse({"status": "ok", "user": _public_user_payload(user)})
+    set_user_session_cookie(resp, user["phone_number"], request)
+    return resp
+
+
+@app.post("/api/auth/link-phone")
+async def api_link_phone(request: Request):
+    """Links and normalizes a Pakistani mobile number (923XXXXXXXXX) to the signed-in user."""
+    user_id = get_authenticated_user_id(request)
+    if not user_id:
+        return JSONResponse(
+            {"status": "error", "message": "Please sign in first to save your mobile number."},
+            status_code=401,
+        )
+
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid request payload."}, status_code=400)
+
+    raw_phone = str(data.get("phone") or "").strip()
+    ok, canon, msg = link_phone_to_user(user_id, raw_phone)
+    if not ok:
+        status_code = 409 if "already linked" in msg.lower() else 400
+        return JSONResponse({"status": "error", "message": msg}, status_code=status_code)
+
+    updated = get_user_by_identifier(user_id)
+    return {
+        "status": "ok",
+        "contact_phone": canon,
+        "display_phone": format_pk_phone_display(canon),
+        "user": _public_user_payload(updated) if updated else None,
+    }
+
+
+# ── Admin Endpoints ────────────────────────────────────────────────────────
+
+@app.get("/api/admin/metrics")
+async def get_metrics(request: Request):
+    """Returns JSON metrics of users, revenue, trials, and conversion rate. Requires passkey."""
+    if not is_admin_authenticated(request):
+        return JSONResponse(
+            {"status": "error", "message": "Unauthorized. Executive passkey required."},
+            status_code=401,
+        )
+    return get_system_metrics()
+
+
+@app.post("/api/admin/login")
+async def api_admin_login(request: Request):
+    """Validates the Executive Passkey and sets a 7-day signed session cookie."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid request payload"}, status_code=400)
+
+    passkey = str(data.get("passkey") or "").strip()
+    if ADMIN_PASSWORD and passkey == ADMIN_PASSWORD:
+        token = generate_admin_session_token()
+        resp = JSONResponse({"status": "ok", "message": "Access granted"})
+        resp.set_cookie(
+            key="admin_session",
+            value=token,
+            max_age=7 * 24 * 3600,
+            httponly=True,
+            samesite="lax",
+            secure=is_https_request(request),
+            path="/",
+        )
+        return resp
+    return JSONResponse({"status": "error", "message": "Incorrect Executive Passkey"}, status_code=401)
+
+
+@app.post("/api/admin/logout")
+async def api_admin_logout():
+    """Logs out executive admin by clearing the admin_session cookie."""
+    resp = JSONResponse({"status": "ok", "message": "Logged out"})
+    resp.delete_cookie(key="admin_session", path="/")
+    return resp
+
+
+@app.get("/", response_class=HTMLResponse)
+async def customer_chat():
+    """Customer-facing mobile chat UI — the public product."""
+    return render_chat_html()
+
+
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    """Live web analytics dashboard protected by Executive Passkey gate."""
+    if not is_admin_authenticated(request):
+        return HTMLResponse(content=render_admin_login_html(), status_code=200)
+    m = get_system_metrics()
+    return HTMLResponse(content=render_dashboard_html(m), status_code=200)
+
+
+@app.post("/api/admin/activate")
+async def api_admin_activate(request: Request):
+    """Activates or extends a user subscription by Pakistani phone (any format), email, or ID."""
+    if not is_admin_authenticated(request):
+        return JSONResponse(
+            {"status": "error", "message": "Unauthorized. Executive passkey required."},
+            status_code=401,
+        )
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid request payload."}, status_code=400)
+
+    raw_target = str(data.get("identifier") or data.get("phone") or "").strip()
+    tier = str(data.get("tier") or "basic").strip().lower()
+    days_raw = data.get("days", 30)
+    try:
+        days = max(1, int(days_raw))
+    except Exception:
+        days = 30
+
+    if not raw_target:
+        return JSONResponse({"status": "error", "message": "Please enter a phone number or email."}, status_code=400)
+
+    target_id, tier_parsed, days_parsed, err = parse_activate_args(["/activate", raw_target, tier, str(days)])
+    if not target_id:
+        return JSONResponse({"status": "error", "message": err}, status_code=400)
+
+    new_exp, tier_activated, ref_code, referrer_reward = activate_user(target_id, days=days_parsed, tier=tier_parsed)
+    return {
+        "status": "ok",
+        "target": target_id,
+        "tier": tier_activated,
+        "expiry": new_exp.strftime("%Y-%m-%d"),
+        "referral_code": ref_code,
+        "referrer_reward": {
+            "referrer_phone": referrer_reward["referrer_phone"],
+            "new_expiry": referrer_reward["new_expiry"].strftime("%Y-%m-%d"),
+        } if referrer_reward else None,
+    }
+
+
+@app.post("/api/admin/broadcast")
+async def api_admin_broadcast(request: Request):
+    """Dispatches a broadcast message to active Basic, Pro, or all subscribers. Requires passkey."""
+    if not is_admin_authenticated(request):
+        return JSONResponse(
+            {"status": "error", "message": "Unauthorized. Executive passkey required."},
+            status_code=401,
+        )
+    data = await request.json()
+    tier = data.get("tier", "all")
+    msg = str(data.get("message") or "").strip()
+    if not msg:
+        return {"status": "error", "message": "Empty message"}
+
+    phones = get_subscriber_phones(tier)
+    formatted_msg = f"[Hassan AI] 💬 Message from Hassan:\n\n\"{msg}\"\n\n— Hassan Ali Farrukh"
+    for p in phones:
+        try:
+            send_whatsapp_text(p, formatted_msg)
+        except Exception:
+            pass
+
+    return {"status": "ok", "count": len(phones), "tier": tier}
+
+
+# ── Meta WhatsApp Cloud API Webhook ────────────────────────────────────────
+
+@app.get("/webhook")
+async def verify_webhook(
+    hub_mode: str = Query(None, alias="hub.mode"),
+    hub_verify_token: str = Query(None, alias="hub.verify_token"),
+    hub_challenge: str = Query(None, alias="hub.challenge"),
+):
+    """Meta Webhook Verification endpoint."""
+    if VERIFY_TOKEN and hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+        return Response(content=hub_challenge, media_type="text/plain")
+    return Response(content="Verification failed", status_code=403)
+
+
+@app.post("/webhook")
+async def receive_whatsapp(request: Request):
+    """Handles incoming WhatsApp messages from Meta Cloud API."""
+    data = await request.json()
+
+    try:
+        entry = data.get("entry", [])[0]
+        changes = entry.get("changes", [])[0]
+        value = changes.get("value", {})
+        messages = value.get("messages", [])
+
+        if not messages:
+            return {"status": "ok"}
+
+        message = messages[0]
+        raw_sender = str(message.get("from") or "").strip()
+        sender_phone = normalize_pk_phone_or_none(raw_sender) or raw_sender.replace("+", "").strip()
+        msg_type = message.get("type")
+
+        if msg_type != "text":
+            send_whatsapp_text(sender_phone, "Please send a text message. Voice notes and media messages are not supported yet.")
+            return {"status": "ok"}
+
+        user_text = message.get("text", {}).get("body", "").strip()
+        print(f"Incoming from +{sender_phone}: {user_text}")
+
+        norm_admin_phone = normalize_pk_phone_or_none(ADMIN_PHONE) if ADMIN_PHONE else None
+        is_wa_admin = bool(norm_admin_phone and sender_phone == norm_admin_phone)
+
+        # 1. Admin Commands Handler (/activate, /stats, /broadcast) — STRICT admin check
+        is_admin_cmd = (
+            user_text.startswith("/activate")
+            or user_text in ["/stats", "/metrics"]
+            or user_text.startswith("/broadcast")
+        )
+        if is_admin_cmd:
+            if not is_wa_admin:
+                send_whatsapp_text(sender_phone, "⛔ Unauthorized: Admin access required to run executive commands.")
+                return {"status": "ok"}
+
+            if user_text in ["/stats", "/metrics"]:
+                stats_msg = format_stats_summary(get_system_metrics())
+                send_whatsapp_text(sender_phone, stats_msg)
+                return {"status": "ok"}
+
+            if user_text.startswith("/broadcast"):
+                target_tier = "all"
+                msg_body = ""
+                if user_text.startswith("/broadcast-basic "):
+                    target_tier = "basic"
+                    msg_body = user_text[len("/broadcast-basic "):].strip()
+                elif user_text.startswith("/broadcast-pro "):
+                    target_tier = "pro"
+                    msg_body = user_text[len("/broadcast-pro "):].strip()
+                elif user_text.startswith("/broadcast "):
+                    target_tier = "all"
+                    msg_body = user_text[len("/broadcast "):].strip()
+
+                if msg_body:
+                    phones = get_subscriber_phones(target_tier)
+                    formatted_msg = f"[Hassan AI] 💬 Message from Hassan:\n\n\"{msg_body}\"\n\n— Hassan Ali Farrukh"
+                    for p in phones:
+                        try:
+                            send_whatsapp_text(p, formatted_msg)
+                        except Exception:
+                            pass
+                    send_whatsapp_text(sender_phone, f"📢 Broadcast successfully delivered to {len(phones)} {target_tier.upper()} subscribers!")
+                    return {"status": "ok"}
+
+            if user_text.startswith("/activate"):
+                parts = user_text.split()
+                if len(parts) >= 2:
+                    target_id, tier, days, err = parse_activate_args(parts)
+                    if not target_id:
+                        send_whatsapp_text(sender_phone, f"❌ {err}")
+                        return {"status": "ok"}
+
+                    new_exp, tier_activated, ref_code, referrer_reward = activate_user(target_id, days=days, tier=tier)
+                    activated_user = get_user_by_identifier(target_id) or {}
+                    target_wa = activated_user.get("contact_phone") or (
+                        target_id if is_canonical_pk_phone(target_id) else ""
+                    )
+
+                    label = f"+{target_wa}" if target_wa else target_id
+                    send_whatsapp_text(
+                        sender_phone,
+                        f"✅ User {label} activated on {tier_activated.upper()} tier for {days} days until {new_exp.strftime('%Y-%m-%d')}!\nReferral Code: {ref_code}",
+                    )
+
+                    if target_wa:
+                        welcome_msg = build_welcome_message(tier_activated, ref_code)
+                        send_whatsapp_text(target_wa, welcome_msg)
+                        mark_welcome_sent(target_id)
+
+                    if referrer_reward and is_canonical_pk_phone(referrer_reward.get("referrer_phone")):
+                        ref_phone = referrer_reward["referrer_phone"]
+                        ref_exp_fmt = referrer_reward["new_expiry"].strftime("%Y-%m-%d")
+                        ref_reward_msg = (
+                            f"🎉 Congratulations!\n\n"
+                            f"3 friends subscribed using your code.\n"
+                            f"Your account has been extended by 30 days — FREE.\n\n"
+                            f"Current expiry: {ref_exp_fmt}\n\n"
+                            f"Thank you for spreading the word! 🙌"
+                        )
+                        send_whatsapp_text(ref_phone, ref_reward_msg)
+
+                    return {"status": "ok"}
+
+        # 2. Check for Coaching Request (CALL)
+        if user_text.upper() in ["CALL", "BOOK CALL", "1 ON 1", "COACHING"]:
+            can_chat, status, tier = can_user_chat(sender_phone)
+            if status != "subscribed":
+                send_whatsapp_text(sender_phone, "1-on-1 coaching requests are available for active Hassan AI members. Please subscribe to a plan first or ask any question to continue.")
+                return {"status": "ok"}
+
+            ok, lead_msg = record_coaching_lead(sender_phone)
+            send_whatsapp_text(sender_phone, lead_msg)
+            if ok and norm_admin_phone:
+                u_info = get_or_create_user(sender_phone)
+                alert_text = (
+                    f"🔔 *New 1-on-1 Coaching Lead!*\n\n"
+                    f"User: +{sender_phone}\n"
+                    f"Tier: {tier.upper()}\n"
+                    f"Interactions: {u_info.get('total_queries', 0)}\n\n"
+                    f"Contact directly: https://wa.me/{sender_phone}"
+                )
+                send_whatsapp_text(norm_admin_phone, alert_text)
+            return {"status": "ok"}
+
+        # 3. Check for Referral Stats Command (REFERRAL / CODE)
+        if user_text.upper() in ["REFERRAL", "CODE", "MY CODE", "REF"]:
+            stats = get_referral_stats(sender_phone)
+            reply = (
+                f"🎁 *Your Hassan AI Referral Hub*\n\n"
+                f"Your Referral Code: `{stats['code']}`\n"
+                f"Friends Subscribed: {stats['count']}\n"
+                f"Remaining for Next Free Month: {stats['needed']}\n\n"
+                f"Share your code with friends. When 3 friends subscribe with it, your account automatically gets 30 days added for FREE!"
+            )
+            send_whatsapp_text(sender_phone, reply)
+            return {"status": "ok"}
+
+        # 4. Check for standalone Referral Code application (e.g. REF: HASSAN-XXXX)
+        if user_text.upper().startswith("REF:") or user_text.upper().startswith("CODE:") or user_text.upper().startswith("REFERRAL:"):
+            code_input = user_text.split(":")[-1].strip()
+            ok, ref_msg = apply_referral_code(sender_phone, code_input)
+            send_whatsapp_text(sender_phone, ref_msg)
+            return {"status": "ok"}
+
+        # 5. Check for Payment Submission
+        can_chat, status, tier = can_user_chat(sender_phone)
+        if is_trx_message(user_text, status):
+            trx_clean, plan_chosen, ref_code_in_trx = parse_trx_text(user_text)
+            if not trx_clean:
+                send_whatsapp_text(sender_phone, "Please provide a valid Transaction ID.")
+                return {"status": "ok"}
+
+            ref_note = ""
+            if ref_code_in_trx:
+                ok_ref, ref_msg = apply_referral_code(sender_phone, ref_code_in_trx)
+                if ok_ref:
+                    ref_note = f"\n(Referral code {ref_code_in_trx} recorded!)"
+
+            saved = submit_trx_id(sender_phone, trx_clean, plan_selected=plan_chosen)
+            if saved:
+                ack_msg = (
+                    f"Thank you! Your payment verification request for {plan_chosen.upper()} tier has been received.{ref_note}\n"
+                    "Admin will verify and activate your pass within 10-15 minutes."
+                )
+                send_whatsapp_text(sender_phone, ack_msg)
+                if norm_admin_phone:
+                    admin_alert = (
+                        f"🔔 *New Payment Alert!*\n"
+                        f"User: +{sender_phone}\n"
+                        f"Plan: {plan_chosen.upper()}\n"
+                        f"TRX: `{trx_clean}`\n\n"
+                        f"To activate, reply with:\n"
+                        f"`/activate {sender_phone} {plan_chosen} 30`"
+                    )
+                    send_whatsapp_text(norm_admin_phone, admin_alert)
+            else:
+                send_whatsapp_text(sender_phone, "This Transaction ID has already been registered or submitted.")
+            return {"status": "ok"}
+
+        # 6. Check Subscription & Trial Status
+        can_chat, status, tier = can_user_chat(sender_phone)
+        if not can_chat:
+            send_whatsapp_text(sender_phone, PAYWALL_TEXT)
+            return {"status": "ok"}
+
+        # 7. Search Knowledge Base
+        retrieval_count = 6 if tier == "pro" else 3
+        matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
+
+        # 8. Retrieve Conversation History
+        history = get_recent_chat_history(sender_phone, limit=6)
+
+        # 9. Generate AI Response via Groq
+        if groq_client:
+            messages = build_hassan_chat_messages(user_text, matching_chunks, tier=tier, history=history)
+            max_tokens = 700 if tier == "pro" else 450
+            chat = groq_client.chat.completions.create(
+                messages=messages,
+                model="openai/gpt-oss-120b",
+                temperature=0.75,
+                max_tokens=max_tokens,
+            )
+            ai_reply = chat.choices[0].message.content
+        else:
+            ai_reply = f"[Demo Mode] Hassan Ali Farrukh: I received your question: '{user_text}'."
+
+        save_chat_message(sender_phone, "user", user_text)
+        save_chat_message(sender_phone, "assistant", ai_reply)
+        record_user_query(sender_phone)
+        u_info = get_or_create_user(sender_phone)
+
+        if status == "free_trial":
+            remaining = FREE_TRIAL_QUESTIONS - u_info["trial_questions_used"]
+            if remaining > 0:
+                ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
+            else:
+                ai_reply += "\n\n_(You have used your last free question. Please subscribe to continue receiving guidance.)_"
+
+        elif status == "subscribed" and should_trigger_coaching_upsell(u_info, user_text):
+            upsell_box = (
+                f"\n\n━━━━━━━━━━━━━━━━\n"
+                f"💡 It looks like you're serious about making real changes in your life.\n"
+                f"Hassan offers limited 1-on-1 private mentorship sessions where he works through your specific situation directly.\n\n"
+                f"Interested? Reply with: CALL\n"
+                f"(We'll follow up with available slots and booking details)"
+            )
+            ai_reply += upsell_box
+            mark_coaching_pitch_sent(sender_phone)
+
+        elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
+            stats = get_referral_stats(sender_phone)
+            reminder = (
+                f"\n\n━━━━━━━━━━━━━━━━\n"
+                f"Quick reminder 👋\n"
+                f"Your referral code is: `{stats['code']}`\n"
+                f"You've referred {stats['count']} friend{'s' if stats['count'] != 1 else ''} so far.\n"
+                f"Share it and get 1 month FREE when you hit 3!"
+            )
+            ai_reply += reminder
+
+        send_whatsapp_text(sender_phone, ai_reply)
+
+    except Exception as e:
+        print(f"Error processing webhook: {e}")
+
+    return {"status": "ok"}
+
+
+# ── Authenticated Chat Endpoint (Web Session Cookie / Secret Bridge / Admin) ─
+
+@app.post("/api/chat")
+async def process_chat(request: Request):
+    """
+    Authenticated chat endpoint:
+      - Web users: identified STRICTLY via signed HttpOnly `user_session` cookie (never body `sender`).
+      - WhatsApp QR bridge: authenticated via `X-Bridge-Secret` header + canonical PK phone normalization.
+      - Admin dashboard commands: authenticated via signed HttpOnly `admin_session` cookie.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "reply": "Invalid request payload."}, status_code=400)
+
+    user_text = str(data.get("message") or "").strip()
+    if not user_text:
+        return {"reply": "Please send a text message with your question."}
+
+    is_bridge = is_valid_bridge_request(request)
+    is_web_admin = is_admin_authenticated(request)
+    session_user_id = get_authenticated_user_id(request)
+    norm_admin_phone = normalize_pk_phone_or_none(ADMIN_PHONE) if ADMIN_PHONE else None
+
+    # 1. Admin Commands Handler (/activate, /stats, /broadcast)
+    is_admin_cmd = (
+        user_text.startswith("/activate")
+        or user_text in ["/stats", "/metrics"]
+        or user_text.startswith("/broadcast")
+    )
+    if is_admin_cmd:
+        bridge_sender = normalize_pk_phone_or_none(data.get("sender")) if is_bridge else None
+        is_bridge_admin = bool(is_bridge and norm_admin_phone and bridge_sender == norm_admin_phone)
+        if not (is_web_admin or is_bridge_admin):
+            return JSONResponse(
+                {"status": "error", "reply": "⛔ Unauthorized: Admin authentication required to run executive commands."},
+                status_code=403,
+            )
+
+        if user_text in ["/stats", "/metrics"]:
+            return {"reply": format_stats_summary(get_system_metrics())}
+
+        if user_text.startswith("/broadcast"):
+            target_tier = "all"
+            msg_body = ""
+            if user_text.startswith("/broadcast-basic "):
+                target_tier = "basic"
+                msg_body = user_text[len("/broadcast-basic "):].strip()
+            elif user_text.startswith("/broadcast-pro "):
+                target_tier = "pro"
+                msg_body = user_text[len("/broadcast-pro "):].strip()
+            elif user_text.startswith("/broadcast "):
+                target_tier = "all"
+                msg_body = user_text[len("/broadcast "):].strip()
+
+            if msg_body:
+                phones = get_subscriber_phones(target_tier)
+                formatted_msg = f"[Hassan AI] 💬 Message from Hassan:\n\n\"{msg_body}\"\n\n— Hassan Ali Farrukh"
+                for p in phones:
+                    try:
+                        send_whatsapp_text(p, formatted_msg)
+                    except Exception:
+                        pass
+                return {"reply": f"📢 Broadcast successfully delivered to {len(phones)} {target_tier.upper()} subscribers!"}
+
+        if user_text.startswith("/activate"):
+            parts = user_text.split()
+            if len(parts) < 2:
+                return JSONResponse(
+                    {"status": "error", "reply": "Usage: /activate <phone_or_email> [basic|pro] [days]"},
+                    status_code=400,
+                )
+            target_id, tier, days, err = parse_activate_args(parts)
+            if not target_id:
+                return JSONResponse({"status": "error", "reply": err}, status_code=400)
+
+            new_exp, tier_activated, ref_code, referrer_reward = activate_user(target_id, days=days, tier=tier)
+            label = f"+{target_id}" if is_canonical_pk_phone(target_id) else target_id
+            reply = (
+                f"✅ User {label} activated on {tier_activated.upper()} tier for {days} days until {new_exp.strftime('%Y-%m-%d')}!\n"
+                f"Referral Code: {ref_code}"
+            )
+            if referrer_reward:
+                ref_label = (
+                    f"+{referrer_reward['referrer_phone']}"
+                    if is_canonical_pk_phone(referrer_reward["referrer_phone"])
+                    else referrer_reward["referrer_phone"]
+                )
+                reply += f"\n🎉 Referrer {ref_label} unlocked 30 FREE DAYS! New expiry: {referrer_reward['new_expiry'].strftime('%Y-%m-%d')}"
+            return {"status": "ok", "reply": reply}
+
+    # 2. Authenticate Caller Identity (NEVER trust raw `sender` from unauthenticated browsers)
+    if is_bridge:
+        ok_p, canon_sender, err_p = normalize_pk_phone(data.get("sender"))
+        if not ok_p:
+            return JSONResponse({"status": "error", "reply": err_p}, status_code=400)
+        sender_id = canon_sender
+    elif session_user_id:
+        existing = get_user_by_identifier(session_user_id)
+        if not existing:
+            resp = JSONResponse(
+                {
+                    "status": "error",
+                    "code": "unauthenticated",
+                    "reply": "Your session has expired. Please sign in again.",
+                },
+                status_code=401,
+            )
+            clear_user_session_cookie(resp)
+            return resp
+        sender_id = existing["phone_number"]
+    else:
+        return JSONResponse(
+            {
+                "status": "error",
+                "code": "unauthenticated",
+                "reply": "Please sign in with Google to start chatting.",
+            },
+            status_code=401,
+        )
+
+    # Optional atomic phone link if supplied alongside TRX or CALL from web UI
+    supplied_phone = str(data.get("phone") or "").strip()
+    if supplied_phone and not is_bridge:
+        ok_link, _, link_err = link_phone_to_user(sender_id, supplied_phone)
+        if not ok_link:
+            status_code = 409 if "already linked" in link_err.lower() else 400
+            return JSONResponse({"status": "error", "reply": link_err}, status_code=status_code)
+
+    # 3. Check for Coaching Request (CALL)
+    if user_text.upper() in ["CALL", "BOOK CALL", "1 ON 1", "COACHING"]:
+        can_chat, status, tier = can_user_chat(sender_id)
+        if status != "subscribed":
+            return {"reply": "1-on-1 coaching requests are available for active Hassan AI members. Please subscribe to a plan first or ask any question to continue."}
+
+        u_curr = get_or_create_user(sender_id)
+        if not is_bridge and not u_curr.get("contact_phone"):
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "code": "phone_required",
+                    "reply": "Please add your Pakistani mobile number first so our team can contact you on WhatsApp.",
+                },
+                status_code=400,
+            )
+
+        ok, lead_msg = record_coaching_lead(sender_id)
+        return {"reply": lead_msg, "user": _public_user_payload(u_curr)}
+
+    # 4. Check for Referral Stats Command (REFERRAL / CODE)
+    if user_text.upper() in ["REFERRAL", "CODE", "MY CODE", "REF"]:
+        stats = get_referral_stats(sender_id)
+        return {
+            "reply": (
+                f"🎁 *Your Hassan AI Referral Hub*\n\n"
+                f"Your Referral Code: `{stats['code']}`\n"
+                f"Friends Subscribed: {stats['count']}\n"
+                f"Remaining for Next Free Month: {stats['needed']}\n\n"
+                f"Share your code with friends. When 3 friends subscribe with it, your account automatically gets 30 days added for FREE!"
+            )
+        }
+
+    # 5. Check for standalone Referral Code application (e.g. REF: HASSAN-XXXX)
+    if user_text.upper().startswith("REF:") or user_text.upper().startswith("CODE:") or user_text.upper().startswith("REFERRAL:"):
+        code_input = user_text.split(":")[-1].strip()
+        ok, ref_msg = apply_referral_code(sender_id, code_input)
+        return {"reply": ref_msg}
+
+    # Check status early for payment routing & access check
+    can_chat, status, tier = can_user_chat(sender_id)
+
+    # 6. Check for Payment Submission
+    if is_trx_message(user_text, status):
+        trx_clean, plan_chosen, ref_code_in_trx = parse_trx_text(user_text)
+        if not trx_clean:
+            return {"reply": "Please provide a valid Transaction ID."}
+
+        u_curr = get_or_create_user(sender_id)
+        if not is_bridge and not u_curr.get("contact_phone"):
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "code": "phone_required",
+                    "reply": "Please enter your Pakistani mobile / EasyPaisa number so we can verify your payment.",
+                },
+                status_code=400,
+            )
+
+        ref_note = ""
+        if ref_code_in_trx:
+            ok_ref, ref_msg = apply_referral_code(sender_id, ref_code_in_trx)
+            if ok_ref:
+                ref_note = f"\n(Referral code {ref_code_in_trx} recorded!)"
+
+        saved = submit_trx_id(sender_id, trx_clean, plan_selected=plan_chosen)
+        if saved:
+            return {
+                "reply": (
+                    f"✅ Thank you! Your payment verification request for {plan_chosen.upper()} tier has been received (TRX: {trx_clean}).{ref_note}\n\n"
+                    "Admin will verify and activate your pass within 10-15 minutes."
+                ),
+                "user": _public_user_payload(u_curr),
+            }
+        return {"reply": "This Transaction ID has already been registered or submitted for review."}
+
+    # 7. Check Subscription & Trial Status
+    if not can_chat:
+        u_info = get_or_create_user(sender_id)
+        return {"reply": PAYWALL_TEXT, "paywalled": True, "user": _public_user_payload(u_info)}
+
+    # 8. Search Knowledge Base (Dynamic depth by tier)
+    retrieval_count = 6 if tier == "pro" else 3
+    matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
+
+    # 9. Retrieve Conversation History for Multi-Turn Context
+    history = get_recent_chat_history(sender_id, limit=6)
+
+    # 10. Generate AI Response
+    if groq_client:
+        messages = build_hassan_chat_messages(user_text, matching_chunks, tier=tier, history=history)
+        max_tokens = 700 if tier == "pro" else 450
+        chat = groq_client.chat.completions.create(
+            messages=messages,
+            model="openai/gpt-oss-120b",
+            temperature=0.75,
+            max_tokens=max_tokens,
+        )
+        ai_reply = chat.choices[0].message.content
+    else:
+        ai_reply = f"[Demo Mode] Hassan Ali Farrukh: I received your question: '{user_text}'."
+
+    save_chat_message(sender_id, "user", user_text)
+    save_chat_message(sender_id, "assistant", ai_reply)
+    record_user_query(sender_id)
+    u_info = get_or_create_user(sender_id)
+
+    welcome_prefix = ""
+    if status == "subscribed" and not u_info.get("welcome_sent"):
+        welcome_prefix = build_welcome_message(tier, u_info.get("referral_code", "")) + "\n\n━━━━━━━━━━━━━━━━\n\n"
+        mark_welcome_sent(sender_id)
+
+    if status == "free_trial":
+        remaining = FREE_TRIAL_QUESTIONS - u_info["trial_questions_used"]
+        if remaining > 0:
+            ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
+        else:
+            ai_reply += "\n\n_(You have used your last free question. Please subscribe to continue receiving guidance.)_"
+
+    elif status == "subscribed" and should_trigger_coaching_upsell(u_info, user_text):
+        upsell_box = (
+            f"\n\n━━━━━━━━━━━━━━━━\n"
+            f"💡 It looks like you're serious about making real changes in your life.\n"
+            f"Hassan offers limited 1-on-1 private mentorship sessions where he works through your specific situation directly.\n\n"
+            f"Interested? Reply with: CALL\n"
+            f"(We'll follow up with available slots and booking details)"
+        )
+        ai_reply += upsell_box
+        mark_coaching_pitch_sent(sender_id)
+
+    elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
+        stats = get_referral_stats(sender_id)
+        reminder = (
+            f"\n\n━━━━━━━━━━━━━━━━\n"
+            f"Quick reminder 👋\n"
+            f"Your referral code is: `{stats['code']}`\n"
+            f"You've referred {stats['count']} friend{'s' if stats['count'] != 1 else ''} so far.\n"
+            f"Share it and get 1 month FREE when you hit 3!"
+        )
+        ai_reply += reminder
+
+    return {
+        "reply": welcome_prefix + ai_reply,
+        "user": _public_user_payload(u_info),
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("src.server:app", host="0.0.0.0", port=8080, reload=True)
