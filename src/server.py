@@ -130,15 +130,14 @@ After paying, reply with your Transaction ID:"""
 
 
 def build_welcome_message(tier: str, referral_code: str) -> str:
-    """Builds the first-time welcome message with referral incentives."""
-    return f"""Welcome to Hassan AI! 🎉
+    """Builds the first-time paid welcome message with referral incentives."""
+    return f"""You're in! 🎉
 
-Your Full Access monthly pass is now active. Ask me anything from Hassan's reels and philosophy — mindset, discipline, career, fitness, relationships, and more.
+Your Full Access pass is active — koi limit nahi, jab dil kare seedha message kar do.
 
 ━━━━━━━━━━━━━━━━
-🎁 Your personal referral code: {referral_code}
-
-Share it with 3 friends. When they subscribe using your code, you get 1 month FREE — automatically, no questions asked."""
+🎁 Your invite code: {referral_code}
+Share it with 3 friends — jab woh subscribe karein ge, tumhe 1 month FREE mil jayega."""
 
 
 def format_stats_summary(metrics: dict) -> str:
@@ -785,8 +784,15 @@ async def receive_whatsapp(request: Request):
         history = get_recent_chat_history(sender_phone, limit=6)
 
         # 8. Generate AI Response via Groq
+        u_pre = get_or_create_user(sender_phone)
         if groq_client:
-            messages = build_hassan_chat_messages(user_text, matching_chunks, tier=tier, history=history)
+            messages = build_hassan_chat_messages(
+                user_text,
+                matching_chunks,
+                tier=tier,
+                history=history,
+                user_name=u_pre.get("name", ""),
+            )
             max_tokens = 700 if status == "subscribed" else 450
             chat = groq_client.chat.completions.create(
                 messages=messages,
@@ -1021,8 +1027,15 @@ async def process_chat(request: Request):
     history = get_recent_chat_history(sender_id, limit=6)
 
     # 9. Generate AI Response
+    u_pre = get_or_create_user(sender_id)
     if groq_client:
-        messages = build_hassan_chat_messages(user_text, matching_chunks, tier=tier, history=history)
+        messages = build_hassan_chat_messages(
+            user_text,
+            matching_chunks,
+            tier=tier,
+            history=history,
+            user_name=u_pre.get("name", ""),
+        )
         max_tokens = 700 if status == "subscribed" else 450
         chat = groq_client.chat.completions.create(
             messages=messages,

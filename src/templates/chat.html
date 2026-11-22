@@ -1797,20 +1797,20 @@
 
         <!-- Quick Topics Horizontal Chips -->
         <div class="chips-scroll-area" id="quick-topics-row">
-            <button class="topic-chip" onclick="handleChipClick('How do I develop real discipline in life?')">
-                💪 Iron Discipline
+            <button class="topic-chip" onclick="handleChipClick('Yar main discipline nahi bana pa raha, har baar 2-3 din baad routine toot jati hai.')">
+                💪 Can't stay disciplined
             </button>
-            <button class="topic-chip" onclick="handleChipClick('What business or career strategy works best in Pakistan right now?')">
-                🎯 Business Strategy
+            <button class="topic-chip" onclick="handleChipClick('Career aur paise ko le kar bohot confused hoon Pakistan mein, samajh nahi aa raha kya karun.')">
+                🎯 Stuck in career
             </button>
-            <button class="topic-chip" onclick="handleChipClick('Tell me about your tactical background and Hataff Security.')">
-                🥊 Tactical &amp; Defense
+            <button class="topic-chip" onclick="handleChipClick('Bohot zyada overthinking hoti hai aaj kal, dimagh sukoon mein nahi rehta.')">
+                🧠 Overthinking a lot
             </button>
-            <button class="topic-chip" onclick="handleChipClick('How to stay mentally strong when facing heavy losses or failure?')">
-                🔥 Mental Toughness
+            <button class="topic-chip" onclick="handleChipClick('Kuch log meri energy aur waqt bohot zaya karte hain, unse kaise deal karun?')">
+                🔥 Toxic people
             </button>
-            <button class="topic-chip" onclick="handleChipClick('What are your daily workout, training, and diet principles?')">
-                🏋️ Fitness &amp; Training
+            <button class="topic-chip" onclick="handleChipClick('Fitness aur daily workout routine dobara shuru karni hai, kahan se start karun?')">
+                🏋️ Getting back in shape
             </button>
         </div>
 
@@ -1821,7 +1821,7 @@
                     <textarea 
                         id="user-chat-input" 
                         class="chat-textarea" 
-                        placeholder="Ask Hassan Bhai anything regarding mindset, fitness, career, or life..." 
+                        placeholder="Write whatever's on your mind..." 
                         rows="1"
                     ></textarea>
                     <button id="send-msg-btn" class="send-button" onclick="handleSendAction()">
@@ -2288,26 +2288,27 @@ async function resetUserSession() {
     location.reload();
 }
 
-// ── Welcome Message ────────────────────────────────────────────
+// ── Welcome Message (Natural, Human & Personal) ────────────────
 function injectInitialWelcome(name) {
     const messagesBox = document.getElementById('chat-messages-flow');
     messagesBox.innerHTML = '<div class="date-divider">Today</div>';
 
-    const trialLine = APP_STATE.isSubscribed
-        ? `Your <strong>Full Access</strong> pass is active — ask as much as you want.`
-        : `You have <strong>${APP_STATE.maxFreeTrial} free questions</strong> to test it out — unlimited Full Access is <strong>PKR __MONTHLY_PRICE__/month</strong>.`;
+    const displayName = (name || '').trim() || 'friend';
+    const trialNote = APP_STATE.isSubscribed
+        ? ''
+        : `<p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">You have <strong>${APP_STATE.maxFreeTrial} free messages</strong> to try it out — unlimited access is PKR __MONTHLY_PRICE__/month.</p>`;
 
     const welcomeHtml = `
         <div class="msg-row ai">
             <div class="msg-avatar">HF</div>
             <div class="msg-bubble">
-                <p>Assalamu Alaikum <strong>${escapeHtml(name)}</strong>! 👋</p>
-                <p>Welcome to <strong>Hassan AI</strong> — an unofficial AI mentor trained on 267 of Hassan Ali Farrukh's public reels on discipline, mindset, fitness, and building a stronger life in Pakistan.</p>
-                <p>No fluff, no sugar-coating. Tell me what you're stuck on right now — career, routine, overthinking, fitness, or dealing with people — and let's break it down.</p>
-                <p style="font-size: 12.5px; color: var(--text-secondary);">${trialLine}</p>
+                <p>Assalamu Alaikum <strong>${escapeHtml(displayName)}</strong>!</p>
+                <p>Good to have you here. Seedhi baat karte hain — aaj kal kya chal raha hai? Career, routine, fitness, ya koi cheez dimagh mein atki hui hai?</p>
+                <p>Bina hesitate kiye jo dil mein hai likh do — bilkul aise jaise kisi bare bhai ya close mentor se baat kar rahe ho.</p>
+                ${trialNote}
 
                 <div class="msg-meta">
-                    <span>Hassan AI • Unofficial AI Mentor</span>
+                    <span>Hassan AI • Unofficial AI</span>
                     <span>Just now</span>
                 </div>
             </div>
@@ -2487,7 +2488,7 @@ function updateTrialIndicator() {
         fillBar.style.background = 'var(--accent-green)';
         countLabel.innerHTML = `Free Trial: <strong>${used} of ${max}</strong> questions used`;
         const chatInput = document.getElementById('user-chat-input');
-        if (chatInput) chatInput.placeholder = "Ask anything regarding mindset, fitness, career, or life...";
+        if (chatInput) chatInput.placeholder = "Write whatever's on your mind...";
     }
 }
 
