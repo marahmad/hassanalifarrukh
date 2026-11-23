@@ -1,9 +1,10 @@
 import json
 import urllib.parse
+from pathlib import Path
 
 import requests
 from fastapi import FastAPI, Query, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from groq import Groq
 
 from src.admin_auth import (
@@ -37,6 +38,8 @@ from src.database import (
     activate_user,
     apply_referral_code,
     can_user_chat,
+    complete_chat_turn,
+    evaluate_user_access,
     get_or_create_google_user,
     get_or_create_user,
     get_recent_chat_history,
@@ -507,11 +510,76 @@ NO_CACHE_HEADERS = {
     "Pragma": "no-cache",
 }
 
+PAGE_CACHE_HEADERS = {
+    "Cache-Control": "private, no-cache, must-revalidate",
+    "Vary": "Cookie",
+}
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+ALLOWED_STATIC_FILES = {
+    "demo_preview.mp4": "video/mp4",
+    "demo_poster.jpg": "image/jpeg",
+}
+
+FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<rect width="64" height="64" rx="16" fill="#0b0b0d"/>'
+    '<rect x="4" y="4" width="56" height="56" rx="13" fill="#ffffff"/>'
+    '<text x="32" y="42" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,sans-serif" '
+    'font-size="28" font-weight="800" fill="#0b0b0d">HF</text></svg>'
+)
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Serves lightweight SVG favicon to eliminate iOS/Safari 404 requests."""
+    return Response(
+        content=FAVICON_SVG,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=604800, immutable"},
+    )
+
+
+@app.get("/static/{filename}")
+async def serve_static_asset(filename: str):
+    """Fallback static asset handler for web demo media (served directly by Nginx in production)."""
+    media_type = ALLOWED_STATIC_FILES.get(filename)
+    if not media_type:
+        return Response(status_code=404)
+    file_path = STATIC_DIR / filename
+    if not file_path.is_file():
+        return Response(status_code=404)
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
+
 
 @app.get("/", response_class=HTMLResponse)
-async def customer_chat():
-    """Customer-facing mobile chat UI — the public product."""
-    return HTMLResponse(content=render_chat_html(), status_code=200, headers=NO_CACHE_HEADERS)
+async def customer_chat(request: Request):
+    """Customer-facing mobile chat UI — server-hydrates auth state to eliminate /api/auth/me waterfall."""
+    auth_config = {"google_enabled": _is_google_oauth_enabled()}
+    user_id = get_authenticated_user_id(request)
+    clear_stale = False
+    if user_id:
+        user = get_user_by_identifier(user_id)
+        if user:
+            initial_auth = {"authenticated": True, "user": _public_user_payload(user), **auth_config}
+        else:
+            initial_auth = {"authenticated": False, "user": None, **auth_config}
+            clear_stale = True
+    else:
+        initial_auth = {"authenticated": False, "user": None, **auth_config}
+
+    resp = HTMLResponse(
+        content=render_chat_html(initial_auth=initial_auth),
+        status_code=200,
+        headers=PAGE_CACHE_HEADERS,
+    )
+    if clear_stale:
+        clear_user_session_cookie(resp)
+    return resp
 
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
@@ -921,11 +989,14 @@ async def process_chat(request: Request):
             return {"status": "ok", "reply": reply}
 
     # 2. Authenticate Caller Identity (NEVER trust raw `sender` from unauthenticated browsers)
+    current_user = None
     if is_bridge:
         ok_p, canon_sender, err_p = normalize_pk_phone(data.get("sender"))
         if not ok_p:
             return JSONResponse({"status": "error", "reply": err_p}, status_code=400)
         sender_id = canon_sender
+        current_user = get_or_create_user(sender_id)
+        sender_id = current_user["phone_number"]
     elif session_user_id:
         existing = get_user_by_identifier(session_user_id)
         if not existing:
@@ -939,6 +1010,7 @@ async def process_chat(request: Request):
             )
             clear_user_session_cookie(resp)
             return resp
+        current_user = existing
         sender_id = existing["phone_number"]
     else:
         return JSONResponse(
@@ -953,10 +1025,11 @@ async def process_chat(request: Request):
     # Optional atomic phone link if supplied alongside TRX from web UI
     supplied_phone = str(data.get("phone") or "").strip()
     if supplied_phone and not is_bridge:
-        ok_link, _, link_err = link_phone_to_user(sender_id, supplied_phone)
+        ok_link, canon_linked, link_err = link_phone_to_user(sender_id, supplied_phone)
         if not ok_link:
             status_code = 409 if "already linked" in link_err.lower() else 400
             return JSONResponse({"status": "error", "reply": link_err}, status_code=status_code)
+        current_user["contact_phone"] = canon_linked
 
     # 3. Check for Referral Stats Command (REFERRAL / CODE)
     if user_text.upper() in ["REFERRAL", "CODE", "MY CODE", "REF"]:
@@ -977,8 +1050,8 @@ async def process_chat(request: Request):
         ok, ref_msg = apply_referral_code(sender_id, code_input)
         return {"reply": ref_msg}
 
-    # Check status early for payment routing & access check
-    can_chat, status, tier = can_user_chat(sender_id)
+    # Evaluate access in-memory from already-fetched user row (zero redundant DB round trip)
+    can_chat, status, tier = evaluate_user_access(current_user)
 
     # 5. Check for Payment Submission
     if is_trx_message(user_text, status):
@@ -986,7 +1059,7 @@ async def process_chat(request: Request):
         if not trx_clean:
             return {"reply": "Please provide a valid Transaction ID."}
 
-        u_curr = get_or_create_user(sender_id)
+        u_curr = current_user
         if not is_bridge and not u_curr.get("contact_phone"):
             return JSONResponse(
                 {
@@ -1016,8 +1089,7 @@ async def process_chat(request: Request):
 
     # 6. Check Subscription & Trial Status
     if not can_chat:
-        u_info = get_or_create_user(sender_id)
-        return {"reply": PAYWALL_TEXT, "paywalled": True, "user": _public_user_payload(u_info)}
+        return {"reply": PAYWALL_TEXT, "paywalled": True, "user": _public_user_payload(current_user)}
 
     # 7. Search Knowledge Base (Full 6-chunk archive for all paid subscribers)
     retrieval_count = 6 if status == "subscribed" else 3
@@ -1027,14 +1099,13 @@ async def process_chat(request: Request):
     history = get_recent_chat_history(sender_id, limit=6)
 
     # 9. Generate AI Response
-    u_pre = get_or_create_user(sender_id)
     if groq_client:
         messages = build_hassan_chat_messages(
             user_text,
             matching_chunks,
             tier=tier,
             history=history,
-            user_name=u_pre.get("name", ""),
+            user_name=current_user.get("name", ""),
         )
         max_tokens = 700 if status == "subscribed" else 450
         chat = groq_client.chat.completions.create(
@@ -1047,10 +1118,8 @@ async def process_chat(request: Request):
     else:
         ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
 
-    save_chat_message(sender_id, "user", user_text)
-    save_chat_message(sender_id, "assistant", ai_reply)
-    record_user_query(sender_id)
-    u_info = get_or_create_user(sender_id)
+    # Single pooled DB round trip: save user + assistant messages, increment usage, return updated user
+    u_info = complete_chat_turn(sender_id, user_text, ai_reply)
 
     welcome_prefix = ""
     if status == "subscribed" and not u_info.get("welcome_sent"):

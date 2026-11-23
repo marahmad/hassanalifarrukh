@@ -2,6 +2,7 @@ import hashlib
 import random
 import sqlite3
 import string
+import threading
 from datetime import datetime, timedelta
 
 from src.config import DB_PATH, FREE_TRIAL_QUESTIONS, DATABASE_URL
@@ -16,28 +17,75 @@ from src.phone_utils import (
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
+    from psycopg2.pool import ThreadedConnectionPool
     HAS_PSYCOPG2 = True
 except ImportError:
     HAS_PSYCOPG2 = False
+    ThreadedConnectionPool = None
+
+_PG_POOL_LOCK = threading.Lock()
+_PG_POOLS: dict[str, "ThreadedConnectionPool"] = {}
+
+
+def _get_pg_pool(dsn: str):
+    """Returns a thread-safe warm PostgreSQL connection pool for the given DSN."""
+    pool = _PG_POOLS.get(dsn)
+    if pool is not None and not pool.closed:
+        return pool
+    with _PG_POOL_LOCK:
+        pool = _PG_POOLS.get(dsn)
+        if pool is not None and not pool.closed:
+            return pool
+        pool = ThreadedConnectionPool(
+            minconn=1,
+            maxconn=8,
+            dsn=dsn,
+            cursor_factory=RealDictCursor,
+            connect_timeout=10,
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5,
+        )
+        _PG_POOLS[dsn] = pool
+        return pool
+
+
+def _acquire_pg_conn(dsn: str):
+    pool = _get_pg_pool(dsn)
+    conn = pool.getconn()
+    if conn.closed != 0:
+        try:
+            pool.putconn(conn, close=True)
+        except Exception:
+            pass
+        conn = pool.getconn()
+    conn.autocommit = True
+    return pool, conn
 
 
 class DBContext:
-    """Universal connection manager supporting both Supabase PostgreSQL and SQLite."""
+    """Universal connection manager supporting pooled Supabase PostgreSQL and SQLite."""
     def __init__(self):
         self.conn = None
         self.cursor = None
         self.is_pg = False
+        self._pg_pool = None
+        self._pg_dsn = None
+        self._conn_broken = False
 
     def __enter__(self):
         if DATABASE_URL and HAS_PSYCOPG2:
             try:
-                self.conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, connect_timeout=10)
-                self.conn.autocommit = True
+                self._pg_dsn = DATABASE_URL
+                self._pg_pool, self.conn = _acquire_pg_conn(DATABASE_URL)
                 self.is_pg = True
                 self.cursor = self.conn.cursor()
                 return self
             except Exception as e:
                 print(f"[DB Warning] Could not connect to Supabase PostgreSQL: {e}. Falling back to SQLite.")
+                self._pg_pool = None
+                self.conn = None
 
         self.conn = sqlite3.connect(str(DB_PATH))
         self.conn.row_factory = sqlite3.Row
@@ -54,16 +102,45 @@ class DBContext:
                     self.conn.close()
             else:
                 if self.cursor:
-                    self.cursor.close()
+                    try:
+                        self.cursor.close()
+                    except Exception:
+                        pass
                 if self.conn:
-                    self.conn.close()
+                    discard = self._conn_broken or exc_type is not None or self.conn.closed != 0
+                    if self._pg_pool is not None and not self._pg_pool.closed:
+                        self._pg_pool.putconn(self.conn, close=discard)
+                    else:
+                        self.conn.close()
         except Exception:
             pass
 
+    def _reconnect_pg(self):
+        """Discards a stale pooled connection (e.g. idle timeout) and acquires a fresh one."""
+        if self.cursor:
+            try:
+                self.cursor.close()
+            except Exception:
+                pass
+        if self.conn and self._pg_pool is not None and not self._pg_pool.closed:
+            try:
+                self._pg_pool.putconn(self.conn, close=True)
+            except Exception:
+                pass
+        self._pg_pool, self.conn = _acquire_pg_conn(self._pg_dsn)
+        self.cursor = self.conn.cursor()
+        self._conn_broken = False
+
     def execute(self, query: str, params: tuple = ()):
         if self.is_pg:
-            query = query.replace("?", "%s")
-            self.cursor.execute(query, params)
+            pg_query = query.replace("?", "%s")
+            try:
+                self.cursor.execute(pg_query, params)
+            except (psycopg2.OperationalError, psycopg2.InterfaceError):
+                # Transparent single retry on stale pooled connection
+                self._conn_broken = True
+                self._reconnect_pg()
+                self.cursor.execute(pg_query, params)
         else:
             self.cursor.execute(query, params)
         return self.cursor
@@ -504,8 +581,8 @@ def get_referral_stats(phone_number: str) -> dict:
     }
 
 
-def can_user_chat(phone_number: str) -> tuple[bool, str, str]:
-    user = get_or_create_user(phone_number)
+def evaluate_user_access(user: dict) -> tuple[bool, str, str]:
+    """Pure in-memory access evaluation from an already-fetched user dict (zero DB round trips)."""
     expiry = _parse_dt(user.get("subscription_expiry"))
     if expiry and expiry > datetime.now():
         return True, "subscribed", "pro"
@@ -517,10 +594,28 @@ def can_user_chat(phone_number: str) -> tuple[bool, str, str]:
     return False, "paywall_required", "trial"
 
 
+def can_user_chat(phone_number: str) -> tuple[bool, str, str]:
+    user = get_or_create_user(phone_number)
+    return evaluate_user_access(user)
+
+
 def record_user_query(phone_number: str):
+    now = datetime.now()
+    with DBContext() as db:
+        row = _find_user_row(db, phone_number)
+        if row:
+            user_id = row["phone_number"]
+            db.execute("""
+                UPDATE users SET
+                trial_questions_used = trial_questions_used + 1,
+                total_queries = total_queries + 1,
+                last_active = ?
+                WHERE phone_number = ?
+            """, (_db_ts(db, now), user_id))
+            return
+
     user = get_or_create_user(phone_number)
     user_id = user["phone_number"]
-    now = datetime.now()
     with DBContext() as db:
         db.execute("""
             UPDATE users SET
@@ -811,25 +906,75 @@ def get_subscriber_phones(tier: str = "all") -> list[str]:
 def save_chat_message(phone_number: str, role: str, content: str):
     """Saves a message turn (user or assistant) for contextual memory under canonical user_id."""
     try:
+        now = datetime.now()
+        with DBContext() as db:
+            row = _find_user_row(db, phone_number)
+            if row:
+                user_id = row["phone_number"]
+                db.execute("""
+                    INSERT INTO chat_history (phone_number, role, content, created_at)
+                    VALUES (?, ?, ?, ?)
+                """, (user_id, role, content, _db_ts(db, now)))
+                return
         user = get_or_create_user(phone_number)
         user_id = user["phone_number"]
         with DBContext() as db:
             db.execute("""
                 INSERT INTO chat_history (phone_number, role, content, created_at)
                 VALUES (?, ?, ?, ?)
-            """, (user_id, role, content, _db_ts(db, datetime.now())))
+            """, (user_id, role, content, _db_ts(db, now)))
     except Exception as e:
         print(f"[Warning] Failed to save chat message: {e}")
 
 
+def complete_chat_turn(user_id: str, user_text: str, ai_reply: str) -> dict:
+    """
+    Saves both user + assistant messages, increments usage counters, and returns the updated
+    serialized user row in a SINGLE pooled database connection (eliminates 4 separate round trips).
+    """
+    now = datetime.now()
+    with DBContext() as db:
+        ts = _db_ts(db, now)
+        row = _find_user_row(db, user_id)
+        if not row:
+            # Rare fallback: ensure user exists first
+            pass
+        else:
+            canonical_uid = row["phone_number"]
+            db.execute("""
+                INSERT INTO chat_history (phone_number, role, content, created_at)
+                VALUES (?, 'user', ?, ?)
+            """, (canonical_uid, user_text, ts))
+            db.execute("""
+                INSERT INTO chat_history (phone_number, role, content, created_at)
+                VALUES (?, 'assistant', ?, ?)
+            """, (canonical_uid, ai_reply, ts))
+            db.execute("""
+                UPDATE users SET
+                trial_questions_used = trial_questions_used + 1,
+                total_queries = total_queries + 1,
+                last_active = ?
+                WHERE phone_number = ?
+            """, (ts, canonical_uid))
+            db.execute("SELECT * FROM users WHERE phone_number = ?", (canonical_uid,))
+            updated = db.fetchone()
+            if updated:
+                return _serialize_user_row(updated)
+
+    save_chat_message(user_id, "user", user_text)
+    save_chat_message(user_id, "assistant", ai_reply)
+    record_user_query(user_id)
+    return get_or_create_user(user_id)
+
+
 def get_recent_chat_history(phone_number: str, limit: int = 6) -> list[dict]:
-    """Retrieves the recent conversation turns in chronological order."""
+    """Retrieves the recent conversation turns in chronological order in a single DB round trip."""
     try:
-        user = get_user_by_identifier(phone_number)
-        if not user:
-            return []
-        user_id = user["phone_number"]
         with DBContext() as db:
+            row = _find_user_row(db, phone_number)
+            if not row:
+                return []
+            user_id = row["phone_number"]
             db.execute("""
                 SELECT role, content FROM chat_history
                 WHERE phone_number = ?

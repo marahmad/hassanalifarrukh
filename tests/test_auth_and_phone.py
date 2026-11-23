@@ -199,11 +199,16 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
             self.assertIn("user_session", r_ok.cookies)
             user_id = r_ok.json()["user"]["id"]
 
-        # /api/auth/me confirms verified Google session
+        # /api/auth/me confirms verified Google session & GET / hydrates auth server-side
         r_me = self.client.get("/api/auth/me")
         self.assertTrue(r_me.json()["authenticated"])
         self.assertEqual(r_me.json()["user"]["email"], "ali.khan@gmail.com")
         self.assertTrue(r_me.json()["google_enabled"])
+
+        r_home_authed = self.client.get("/")
+        self.assertEqual(r_home_authed.status_code, 200)
+        self.assertIn('"authenticated":true', r_home_authed.text)
+        self.assertIn('class="modal-overlay" id="onboarding-modal-overlay"', r_home_authed.text)
 
         # Chatting uses cookie identity even if caller tries to spoof `sender` of a paid user
         database.activate_user("923007560313", days=30, tier="pro")
@@ -305,6 +310,11 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
         r_home = self.client.get("/")
         self.assertEqual(r_home.status_code, 200)
         self.assertIn("Continue with Google", r_home.text)
+        self.assertIn("Watch Real Demo", r_home.text)
+        self.assertIn("Opened in TikTok / Instagram?", r_home.text)
+        self.assertIn('class="modal-overlay active" id="onboarding-modal-overlay"', r_home.text)
+        self.assertIn('media="print" onload="this.media=\'all\'"', r_home.text)
+        self.assertNotIn('<script src="https://accounts.google.com/gsi/client" async defer></script>', r_home.text)
         self.assertIn("PKR 1,000", r_home.text)
         self.assertIn("Full Access", r_home.text)
         self.assertNotIn("Starting PKR 500", r_home.text)
@@ -315,6 +325,13 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
         self.assertNotIn("promptGoogleUserEmail", r_home.text)
         self.assertNotIn("submitOnboarding", r_home.text)
         self.assertNotIn("sendEmailOtp", r_home.text)
+
+        # Favicon returns 200 SVG (zero iOS 404s) and static allowlist blocks arbitrary files
+        r_fav = self.client.get("/favicon.ico")
+        self.assertEqual(r_fav.status_code, 200)
+        self.assertIn("image/svg+xml", r_fav.headers.get("content-type", ""))
+        self.assertEqual(self.client.get("/static/..%2F.env").status_code, 404)
+        self.assertEqual(self.client.get("/static/secret.txt").status_code, 404)
 
     def test_single_1000_pkr_plan_dashboard_mrr_and_paywall(self):
         # Activate 2 users (one via API without tier arg, one via DB helper) -> MRR must be 2 * 1000 = 2000

@@ -8,11 +8,10 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Hassan AI — Unofficial AI Mentor</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b0b0d'/%3E%3Crect x='4' y='4' width='56' height='56' rx='13' fill='%23ffffff'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='-apple-system,sans-serif' font-size='28' font-weight='800' fill='%230b0b0d'%3EHF%3C/text%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Google Identity Services -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <style>
         :root {
             --bg-base: #0b0b0d;
@@ -34,8 +33,8 @@
             --radius-md: 12px;
             --radius-lg: 16px;
             --radius-full: 9999px;
-            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Plus Jakarta Sans', sans-serif;
+            --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
             --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
             --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -1463,8 +1462,11 @@
             }
 
             /* ── Responsive Mobile Modal Optimization ── */
-            .modal-overlay {
-                padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) 12px;
+            .modal-overlay,
+            .drawer-backdrop {
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+                background: rgba(8, 9, 13, 0.9);
             }
 
             .modal-overlay {
@@ -1649,6 +1651,144 @@
         .hidden {
             display: none !important;
         }
+
+        /* ─── IN-APP BROWSER RESCUE BANNER (TIKTOK / IG WKWEBVIEW) ─── */
+        .inapp-banner {
+            display: none;
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            border-radius: var(--radius-md);
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #fde68a;
+            gap: 8px;
+            flex-direction: column;
+        }
+
+        .inapp-banner.visible {
+            display: flex;
+        }
+
+        .inapp-banner-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .inapp-copy-btn {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.45);
+            color: #fef3c7;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* ─── ZERO-OVERHEAD DEMO VIDEO TRIGGER & LIGHTBOX ──────────── */
+        .demo-trigger-card {
+            width: 100%;
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(24, 24, 27, 0.95) 100%);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: var(--radius-md);
+            padding: 11px 13px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            cursor: pointer;
+            text-align: left;
+            color: var(--text-primary);
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .demo-trigger-card:hover {
+            border-color: rgba(34, 197, 94, 0.55);
+        }
+
+        .demo-trigger-card:active {
+            transform: scale(0.985);
+        }
+
+        .demo-trigger-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .demo-play-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            color: #0b0b0d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 14px rgba(34, 197, 94, 0.35);
+        }
+
+        .demo-trigger-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .demo-trigger-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .demo-trigger-sub {
+            font-size: 11.5px;
+            color: var(--text-secondary);
+        }
+
+        .demo-duration-pill {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent-green);
+            background: rgba(34, 197, 94, 0.14);
+            border: 1px solid rgba(34, 197, 94, 0.28);
+            padding: 3px 8px;
+            border-radius: 999px;
+            flex-shrink: 0;
+        }
+
+        .video-modal-card {
+            max-width: 360px;
+            padding: 14px;
+            gap: 10px;
+        }
+
+        .demo-video-frame {
+            width: 100%;
+            aspect-ratio: 9 / 16;
+            max-height: 68dvh;
+            background: #050507;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .demo-video-frame video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #050507;
+        }
     </style>
 </head>
 <body>
@@ -1725,6 +1865,9 @@
 
         <!-- Sidebar Footer -->
         <div class="sidebar-footer">
+            <button class="btn-link" onclick="toggleDrawer(false); openDemoVideoModal();" style="width: 100%;">
+                ▶ Watch 35s Real Demo
+            </button>
             <button class="btn-link" onclick="toggleDrawer(false); openReferralModal();" style="width: 100%;">
                 🎁 Referral Program (Get Free Months)
             </button>
@@ -1840,7 +1983,7 @@
 </div>
 
 <!-- ─── GOOGLE SIGN-IN MODAL (VERIFIED 1-TAP OAUTH ONLY) ────── -->
-<div class="modal-overlay" id="onboarding-modal-overlay">
+<div class="modal-overlay__ONBOARDING_MODAL_CLASS__" id="onboarding-modal-overlay">
     <div class="modal-card">
         <div class="modal-header">
             <div class="modal-icon-badge">🎯</div>
@@ -1849,6 +1992,26 @@
                 Unofficial AI mentor trained on Hassan Ali Farrukh's public reels &amp; talks. Sign in with Google to save your chat history, free trial, and membership across devices.
             </p>
         </div>
+
+        <div id="inapp-browser-banner" class="inapp-banner">
+            <div class="inapp-banner-row">
+                <div><strong>Opened in TikTok / Instagram?</strong><br>Tap <strong>⋯</strong> (top right) → <strong>Open in Safari</strong> (or Chrome) so Google Sign-In works smoothly.</div>
+                <button type="button" class="inapp-copy-btn" onclick="copySnippet(window.location.origin + '/', this)">Copy Link</button>
+            </div>
+        </div>
+
+        <button type="button" class="demo-trigger-card" onclick="openDemoVideoModal()">
+            <div class="demo-trigger-left">
+                <div class="demo-play-circle">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
+                </div>
+                <div class="demo-trigger-text">
+                    <span class="demo-trigger-title">Watch Real Demo</span>
+                    <span class="demo-trigger-sub">Hassan's clip + live mentor reply</span>
+                </div>
+            </div>
+            <span class="demo-duration-pill">0:35</span>
+        </button>
 
         <div id="ob-auth-error" class="auth-error-banner"></div>
 
@@ -1959,13 +2122,28 @@
     </div>
 </div>
 
+<!-- ─── LAZY DEMO VIDEO MODAL (0 KB LOADED UNTIL TAPPED) ─────── -->
+<div class="modal-overlay" id="demo-video-modal-overlay">
+    <div class="modal-card video-modal-card">
+        <button class="modal-close-icon" onclick="closeDemoVideoModal()" aria-label="Close demo video">✕</button>
+        <div class="modal-header" style="padding-top: 2px;">
+            <h2 class="modal-title" style="font-size: 16px;">Hassan AI — Real Demo</h2>
+        </div>
+        <div class="demo-video-frame" id="demo-video-slot"></div>
+        <button id="demo-modal-cta-btn" class="form-btn" onclick="closeDemoVideoModal(); if (!APP_STATE.authenticated) initiateGoogleSignIn();">
+            Try __FREE_TRIAL_QUESTIONS__ Free Messages →
+        </button>
+    </div>
+</div>
+
 <!-- ─── TOAST NOTIFICATION ──────────────────────────────────── -->
 <div id="app-toast-box" class="toast-notify">Copied to clipboard ✓</div>
 
 <script>
-// ── Application State (Hydrated from Server HttpOnly Session Cookie) ──
+// ── Application State (Server-Hydrated for Zero-Waterfall First Paint) ──
 const GOOGLE_OAUTH_ENABLED = __GOOGLE_OAUTH_ENABLED__;
 const GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
+const INITIAL_AUTH = __INITIAL_AUTH_JSON__;
 
 const APP_STATE = {
     authenticated: false,
@@ -2073,13 +2251,69 @@ document.addEventListener('keydown', (e) => {
         toggleDrawer(false);
         closePaywallModal();
         closeReferralModal();
+        closeDemoVideoModal();
     }
 });
 
-// ── Initialization (Verify Session via /api/auth/me) ───────────
+// ── In-App Browser Detection (TikTok / Instagram / FB WKWebView) ──
+function isInAppBrowser() {
+    const ua = navigator.userAgent || '';
+    return /BytedanceWebview|musical_ly|TikTok|Instagram|FBAN|FBAV|Snapchat|Line\//i.test(ua);
+}
+
+function checkInAppBrowserBanner() {
+    const banner = document.getElementById('inapp-browser-banner');
+    if (banner && isInAppBrowser()) {
+        banner.classList.add('visible');
+    }
+}
+
+// ── Lazy Demo Video Modal (Zero Network Bytes on Initial Load) ──
+function openDemoVideoModal() {
+    const overlay = document.getElementById('demo-video-modal-overlay');
+    const slot = document.getElementById('demo-video-slot');
+    const ctaBtn = document.getElementById('demo-modal-cta-btn');
+    if (!overlay || !slot) return;
+
+    if (ctaBtn) {
+        ctaBtn.style.display = APP_STATE.authenticated ? 'none' : 'flex';
+    }
+
+    let vid = document.getElementById('demo-video-player');
+    if (!vid) {
+        vid = document.createElement('video');
+        vid.id = 'demo-video-player';
+        vid.src = '/static/demo_preview.mp4';
+        vid.poster = '/static/demo_poster.jpg';
+        vid.controls = true;
+        vid.playsInline = true;
+        vid.setAttribute('playsinline', '');
+        vid.setAttribute('webkit-playsinline', '');
+        vid.preload = 'metadata';
+        slot.appendChild(vid);
+    }
+
+    overlay.classList.add('active');
+    const playPromise = vid.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {});
+    }
+}
+
+function closeDemoVideoModal() {
+    const overlay = document.getElementById('demo-video-modal-overlay');
+    if (overlay) overlay.classList.remove('active');
+    const vid = document.getElementById('demo-video-player');
+    if (vid && !vid.paused) {
+        try { vid.pause(); } catch (e) {}
+    }
+}
+
+// ── Initialization (Instant Synchronous Hydration — Zero Waterfall) ──
 window.addEventListener('DOMContentLoaded', async () => {
     setupInputAutoResize();
     setupModalBackdropDismiss();
+    checkInAppBrowserBanner();
 
     const urlParams = new URLSearchParams(window.location.search);
     const signedInVia = urlParams.get('signed_in');
@@ -2088,7 +2322,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    await hydrateSessionFromServer(signedInVia, authErrorParam);
+    if (typeof INITIAL_AUTH === 'object' && INITIAL_AUTH !== null) {
+        applyInitialAuthPayload(INITIAL_AUTH, signedInVia, authErrorParam);
+    } else {
+        await hydrateSessionFromServer(signedInVia, authErrorParam);
+    }
 });
 
 function setupModalBackdropDismiss() {
@@ -2104,26 +2342,25 @@ function setupModalBackdropDismiss() {
             if (e.target === refOverlay) closeReferralModal();
         });
     }
+    const demoOverlay = document.getElementById('demo-video-modal-overlay');
+    if (demoOverlay) {
+        demoOverlay.addEventListener('click', (e) => {
+            if (e.target === demoOverlay) closeDemoVideoModal();
+        });
+    }
 }
 
-async function hydrateSessionFromServer(signedInVia = null, authErrorParam = null) {
-    try {
-        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
-        const data = await res.json();
-        APP_STATE.googleEnabled = !!data.google_enabled;
+function applyInitialAuthPayload(data, signedInVia = null, authErrorParam = null) {
+    APP_STATE.googleEnabled = !!data.google_enabled;
 
-        if (data.authenticated && data.user) {
-            applyAuthenticatedUser(data.user, { showWelcomeToast: !!signedInVia });
-            if (signedInVia === 'google') {
-                showToast(`Welcome ${data.user.name}! Signed in via Google ✓`);
-            }
-            return;
+    if (data.authenticated && data.user) {
+        applyAuthenticatedUser(data.user, { showWelcomeToast: !!signedInVia });
+        if (signedInVia === 'google') {
+            showToast(`Welcome ${data.user.name}! Signed in via Google ✓`);
         }
-    } catch (e) {
-        console.error('Session check failed:', e);
+        return;
     }
 
-    // Not authenticated -> show verified Google Sign-In modal
     openAuthModal();
     if (!APP_STATE.googleEnabled) {
         showModalError('ob-auth-error', 'Google Sign-In is not configured on the server yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env to enable sign-in.');
@@ -2136,9 +2373,21 @@ async function hydrateSessionFromServer(signedInVia = null, authErrorParam = nul
         };
         showModalError('ob-auth-error', msgMap[authErrorParam] || 'Google Sign-In failed. Please try again.');
     }
-    if (APP_STATE.googleEnabled) {
-        initGoogleOneTap();
+    if (APP_STATE.googleEnabled && !isInAppBrowser()) {
+        scheduleGoogleOneTapLazyLoad();
     }
+}
+
+async function hydrateSessionFromServer(signedInVia = null, authErrorParam = null) {
+    try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        const data = await res.json();
+        applyInitialAuthPayload(data, signedInVia, authErrorParam);
+        return;
+    } catch (e) {
+        console.error('Session check failed:', e);
+    }
+    applyInitialAuthPayload({ authenticated: false, user: null, google_enabled: APP_STATE.googleEnabled }, signedInVia, authErrorParam);
 }
 
 function openAuthModal() {
@@ -2146,9 +2395,34 @@ function openAuthModal() {
     document.getElementById('onboarding-modal-overlay').classList.add('active');
 }
 
-// ── Google Authentication (Real OAuth 2.0 & Verified One-Tap Only) ──
+// ── Google Authentication (Lazy One-Tap After Paint; 1-Tap OAuth Always Ready) ──
+let _gsiScriptRequested = false;
+
+function scheduleGoogleOneTapLazyLoad() {
+    // Skip heavy 103 KB GSI script on iOS Safari/WebKit where ITP suppresses One-Tap anyway
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+    if (isIOS || _gsiScriptRequested || !GOOGLE_CLIENT_ID) return;
+
+    const trigger = () => {
+        if (APP_STATE.authenticated || _gsiScriptRequested) return;
+        _gsiScriptRequested = true;
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.defer = true;
+        s.onload = initGoogleOneTap;
+        document.head.appendChild(s);
+    };
+
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => setTimeout(trigger, 800), { timeout: 2500 });
+    } else {
+        setTimeout(trigger, 1200);
+    }
+}
+
 function initGoogleOneTap() {
-    if (APP_STATE.googleEnabled && GOOGLE_CLIENT_ID && window.google && window.google.accounts) {
+    if (!APP_STATE.authenticated && APP_STATE.googleEnabled && GOOGLE_CLIENT_ID && window.google && window.google.accounts) {
         try {
             google.accounts.id.initialize({
                 client_id: GOOGLE_CLIENT_ID,
