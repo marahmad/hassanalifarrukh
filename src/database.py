@@ -3,7 +3,7 @@ import random
 import sqlite3
 import string
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.config import (
     DATABASE_URL,
@@ -158,15 +158,41 @@ class DBContext:
         return self.cursor.fetchall()
 
 
+PKT_TZ = timezone(timedelta(hours=5))
+
+
+def _utc_now() -> datetime:
+    """Returns current UTC time as a naive datetime matching DB TIMESTAMP storage."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def _parse_dt(val) -> datetime | None:
     if val is None or val == "":
         return None
     if isinstance(val, datetime):
+        if val.tzinfo is not None:
+            return val.astimezone(timezone.utc).replace(tzinfo=None)
         return val
     try:
-        return datetime.fromisoformat(str(val))
+        s = str(val).strip()
+        if s.endswith("Z") or s.endswith("z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
     except Exception:
         return None
+
+
+def _to_utc_iso(val) -> str:
+    """Serializes a naive-UTC datetime or ISO string with an explicit 'Z' UTC marker."""
+    if val is None or val == "":
+        return ""
+    dt = _parse_dt(val)
+    if dt is None:
+        return str(val)
+    return dt.isoformat() + "Z"
 
 
 def _db_ts(db: DBContext, dt: datetime):
@@ -213,11 +239,12 @@ def _serialize_user_row(row) -> dict:
         user_dict["contact_phone"] = ""
 
     expiry_dt = _parse_dt(user_dict.get("subscription_expiry"))
-    user_dict["is_subscribed"] = bool(expiry_dt and expiry_dt > datetime.now())
+    user_dict["is_subscribed"] = bool(expiry_dt and expiry_dt > _utc_now())
 
     for ts_key in ["subscription_expiry", "created_at", "last_active"]:
-        if isinstance(user_dict.get(ts_key), datetime):
-            user_dict[ts_key] = user_dict[ts_key].isoformat()
+        val = user_dict.get(ts_key)
+        if val is not None and val != "":
+            user_dict[ts_key] = _to_utc_iso(val)
 
     return user_dict
 
@@ -416,7 +443,7 @@ def get_user_by_identifier(identifier: str) -> dict | None:
 
 def get_or_create_user(phone_number: str) -> dict:
     """Finds or creates a user, always normalizing Pakistani mobile numbers to 923XXXXXXXXX."""
-    now = datetime.now()
+    now = _utc_now()
     ident = str(phone_number or "").strip()
 
     with DBContext() as db:
@@ -467,7 +494,7 @@ def get_or_create_google_user(google_id: str, email: str, name: str = "User", av
     """Gets or registers a user via cryptographically verified Google OAuth."""
     norm_email = normalize_email(email)
     clean_name = (name or "").strip() or (norm_email.split("@")[0] if norm_email else "User")
-    now = datetime.now()
+    now = _utc_now()
 
     with DBContext() as db:
         ts = _db_ts(db, now)
@@ -521,7 +548,7 @@ def link_phone_to_user(user_id: str, raw_phone: str) -> tuple[bool, str, str]:
     if not ok:
         return False, "", err
 
-    now = datetime.now()
+    now = _utc_now()
     with DBContext() as db:
         row = _find_user_row(db, user_id)
         if not row:
@@ -631,7 +658,7 @@ def get_referral_stats(phone_number: str) -> dict:
 def evaluate_user_access(user: dict) -> tuple[bool, str, str]:
     """Pure in-memory access evaluation from an already-fetched user dict (zero DB round trips)."""
     expiry = _parse_dt(user.get("subscription_expiry"))
-    if expiry and expiry > datetime.now():
+    if expiry and expiry > _utc_now():
         return True, "subscribed", "pro"
 
     used = user.get("trial_questions_used", 0) or 0
@@ -647,7 +674,7 @@ def can_user_chat(phone_number: str) -> tuple[bool, str, str]:
 
 
 def record_user_query(phone_number: str):
-    now = datetime.now()
+    now = _utc_now()
     with DBContext() as db:
         row = _find_user_row(db, phone_number)
         if row:
@@ -683,7 +710,7 @@ def mark_welcome_sent(phone_number: str):
 def submit_trx_id(phone_number: str, trx_id: str, plan_selected: str = "pro") -> bool:
     user = get_or_create_user(phone_number)
     user_id = user["phone_number"]
-    now = datetime.now()
+    now = _utc_now()
     # Single unified all-access monthly plan
     plan_clean = "pro"
 
@@ -704,7 +731,7 @@ def activate_user(phone_number: str, days: int = 30, tier: str = "pro") -> tuple
 
     user = get_or_create_user(phone_number)
     user_id = user["phone_number"]
-    now = datetime.now()
+    now = _utc_now()
     curr_exp = _parse_dt(user.get("subscription_expiry"))
     base_time = max(curr_exp, now) if curr_exp else now
     new_expiry = base_time + timedelta(days=days)
@@ -772,7 +799,7 @@ def record_coaching_lead(phone_number: str) -> tuple[bool, str]:
     user_id = user["phone_number"]
     tier = user.get("tier", "basic")
     queries = user.get("total_queries", 0)
-    now = datetime.now()
+    now = _utc_now()
 
     with DBContext() as db:
         db.execute("""
@@ -792,7 +819,7 @@ def record_coaching_lead(phone_number: str) -> tuple[bool, str]:
 
 def get_system_metrics() -> dict:
     from src.config import MONTHLY_PRICE_PKR
-    now = datetime.now()
+    now = _utc_now()
 
     with DBContext() as db:
         now_ts = _db_ts(db, now)
@@ -851,8 +878,8 @@ def get_system_metrics() -> dict:
         recent_payments = []
         for r in db.fetchall():
             d = dict(r)
-            if isinstance(d.get("created_at"), datetime):
-                d["created_at"] = d["created_at"].isoformat()
+            if d.get("created_at") is not None and d.get("created_at") != "":
+                d["created_at"] = _to_utc_iso(d["created_at"])
             meta = user_lookup.get(d["phone_number"], {})
             d["contact_phone"] = meta.get("contact_phone") or (
                 d["phone_number"] if is_canonical_pk_phone(d["phone_number"]) else ""
@@ -879,11 +906,14 @@ def get_system_metrics() -> dict:
         """)
         all_users = [_serialize_user_row(r) for r in db.fetchall()]
 
-        # 10. Real 14-day daily activity series from database timestamps (zero mock points)
-        day_keys = [(now.date() - timedelta(days=13 - i)) for i in range(14)]
+        # 10. Real 14-day daily activity series in PKT (UTC+5) from UTC database timestamps (zero mock points)
+        now_pkt = now.replace(tzinfo=timezone.utc).astimezone(PKT_TZ)
+        today_pkt = now_pkt.date()
+        day_keys = [(today_pkt - timedelta(days=13 - i)) for i in range(14)]
         chart_dates = [d.strftime("%b %d") for d in day_keys[:-1]] + ["Today"]
         day_index = {d.isoformat(): idx for idx, d in enumerate(day_keys)}
-        window_start = datetime.combine(day_keys[0], datetime.min.time())
+        window_start_pkt = datetime.combine(day_keys[0], datetime.min.time(), tzinfo=PKT_TZ)
+        window_start = window_start_pkt.astimezone(timezone.utc).replace(tzinfo=None)
 
         chart_queries = [0] * 14
         db.execute(
@@ -893,7 +923,8 @@ def get_system_metrics() -> dict:
         for row in db.fetchall():
             dt = _parse_dt(row["created_at"])
             if dt:
-                idx = day_index.get(dt.date().isoformat())
+                pkt_date = (dt + timedelta(hours=5)).date()
+                idx = day_index.get(pkt_date.isoformat())
                 if idx is not None:
                     chart_queries[idx] += 1
 
@@ -905,7 +936,8 @@ def get_system_metrics() -> dict:
         for row in db.fetchall():
             dt = _parse_dt(row["created_at"])
             if dt:
-                idx = day_index.get(dt.date().isoformat())
+                pkt_date = (dt + timedelta(hours=5)).date()
+                idx = day_index.get(pkt_date.isoformat())
                 if idx is not None:
                     chart_new_users[idx] += 1
 
@@ -933,7 +965,7 @@ def get_system_metrics() -> dict:
 
 def get_subscriber_phones(tier: str = "all") -> list[str]:
     """Returns canonical 923XXXXXXXXX numbers for all active subscribers (skips unlinked synthetic IDs)."""
-    now = datetime.now()
+    now = _utc_now()
     with DBContext() as db:
         now_ts = _db_ts(db, now)
         db.execute(
@@ -955,7 +987,7 @@ def get_subscriber_phones(tier: str = "all") -> list[str]:
 def save_chat_message(phone_number: str, role: str, content: str):
     """Saves a message turn (user or assistant) for contextual memory under canonical user_id."""
     try:
-        now = datetime.now()
+        now = _utc_now()
         with DBContext() as db:
             row = _find_user_row(db, phone_number)
             if row:
@@ -981,7 +1013,7 @@ def complete_chat_turn(user_id: str, user_text: str, ai_reply: str) -> dict:
     Saves both user + assistant messages, increments usage counters, and returns the updated
     serialized user row in a SINGLE pooled database connection (eliminates 4 separate round trips).
     """
-    now = datetime.now()
+    now = _utc_now()
     with DBContext() as db:
         ts = _db_ts(db, now)
         row = _find_user_row(db, user_id)
@@ -1092,16 +1124,13 @@ def get_chat_conversations(limit_users: int = 100, messages_per_user: int = 100)
             msgs_by_user: dict[str, list[dict]] = {uid: [] for uid in user_ids}
             for mr in db.fetchall():
                 md = dict(mr)
-                if isinstance(md.get("created_at"), datetime):
-                    md["created_at"] = md["created_at"].isoformat()
-                else:
-                    md["created_at"] = str(md.get("created_at") or "")
+                created_iso = _to_utc_iso(md.get("created_at"))
                 msgs_by_user.setdefault(md["phone_number"], []).append(
                     {
                         "id": md["id"],
                         "role": md.get("role") or "user",
                         "content": md.get("content") or "",
-                        "created_at": md["created_at"],
+                        "created_at": created_iso,
                     }
                 )
 

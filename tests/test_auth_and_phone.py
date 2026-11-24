@@ -656,6 +656,54 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
             config.MAX_REFERRAL_BONUS_QUESTIONS,
         )
 
+    def test_dashboard_and_conversations_utc_to_pkt_timings(self):
+        from datetime import timezone
+        from src.dashboard import PKT_TZ, _format_pkt_date, _format_pkt_datetime, render_dashboard_html
+
+        # 1. Verify exact UTC -> PKT (+5h) formatting including midnight rollover
+        ref_pkt = datetime(2026, 11, 24, 15, 15, 0, tzinfo=PKT_TZ)
+        self.assertEqual(_format_pkt_datetime("2026-11-24T07:09:47.741912Z", ref_pkt), "Today, 12:09 PM")
+        self.assertEqual(_format_pkt_datetime("2026-11-24T10:08:54.326730", ref_pkt), "Today, 3:08 PM")
+        self.assertEqual(_format_pkt_datetime("2026-11-23T20:30:00Z", ref_pkt), "Today, 1:30 AM")
+        self.assertEqual(_format_pkt_datetime("2026-11-23T17:16:31.080626Z", ref_pkt), "Yesterday, 10:16 PM")
+        self.assertEqual(_format_pkt_datetime("2026-11-22T13:56:21Z", ref_pkt), "Nov 22, 6:56 PM")
+        self.assertEqual(_format_pkt_date("2026-11-26T10:13:04Z"), "Nov 26, 2026")
+        self.assertEqual(_format_pkt_date("2026-11-26T21:00:00Z"), "Nov 27, 2026")
+
+        # 2. Verify DB writes UTC and API serializes explicit 'Z' suffix on conversations & users
+        u = database.get_or_create_google_user("g_tz_1", "tzuser@example.com", "TZ Tester")
+        uid = u["phone_number"]
+        self.assertTrue(u["created_at"].endswith("Z"))
+        self.assertTrue(u["last_active"].endswith("Z"))
+        database.complete_chat_turn(uid, "Ping", "Pong")
+        database.submit_trx_id(uid, "TRX-PKT-01")
+
+        convs = database.get_chat_conversations()
+        self.assertEqual(len(convs), 1)
+        self.assertTrue(convs[0]["last_message_at"].endswith("Z"))
+        for msg in convs[0]["messages"]:
+            self.assertTrue(msg["created_at"].endswith("Z"))
+
+        # 3. Verify 14-day chart buckets a 00:30 AM PKT message (= previous UTC day 19:30) under "Today"
+        now_pkt = datetime.now(timezone.utc).astimezone(PKT_TZ)
+        early_pkt_today = datetime(now_pkt.year, now_pkt.month, now_pkt.day, 0, 30, 0, tzinfo=PKT_TZ)
+        early_utc = early_pkt_today.astimezone(timezone.utc).replace(tzinfo=None)
+        with database.DBContext() as db:
+            db.execute(
+                "INSERT INTO chat_history (phone_number, role, content, created_at) VALUES (?, 'assistant', 'Early PKT reply', ?)",
+                (uid, database._db_ts(db, early_utc)),
+            )
+        metrics = database.get_system_metrics()
+        self.assertEqual(metrics["chart_dates"][-1], "Today")
+        self.assertGreaterEqual(metrics["chart_queries"][-1], 2)
+        self.assertTrue(metrics["recent_payments"][0]["created_at"].endswith("Z"))
+
+        # 4. Rendered dashboard HTML contains Asia/Karachi PKT formatter and Today, ... time
+        html = render_dashboard_html(metrics, convs)
+        self.assertIn("const PKT_TZ = 'Asia/Karachi';", html)
+        self.assertIn("PKT (UTC+5)", html)
+        self.assertIn("Today, ", html)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -4,7 +4,7 @@ Displays exclusively real database metrics, 14-day database activity telemetry,
 user/payment/lead tables, and subscription activation controls (zero mock data).
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import html as html_lib
 import json
 
@@ -16,7 +16,68 @@ from src.config import (
 )
 from src.phone_utils import format_pk_phone_display, normalize_pk_phone_or_none
 
+PKT_TZ = timezone(timedelta(hours=5))
+
+
+def _parse_utc_dt(val) -> datetime | None:
+    """Parses a UTC datetime or ISO string (naive or offset-aware) into aware UTC datetime."""
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        if val.tzinfo is not None:
+            return val.astimezone(timezone.utc)
+        return val.replace(tzinfo=timezone.utc)
+    try:
+        s = str(val).strip()
+        if s.endswith("Z") or s.endswith("z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
+def _format_pkt_datetime(val, now_pkt: datetime | None = None) -> str:
+    """Formats a UTC timestamp into readable Pakistan Standard Time (Asia/Karachi, UTC+5)."""
+    if not val:
+        return ""
+    dt_utc = _parse_utc_dt(val)
+    if dt_utc is None:
+        return str(val).replace("T", " ")[:16]
+    dt_pkt = dt_utc.astimezone(PKT_TZ)
+    ref_pkt = now_pkt or datetime.now(timezone.utc).astimezone(PKT_TZ)
+    hour12 = dt_pkt.hour % 12 or 12
+    ampm = "AM" if dt_pkt.hour < 12 else "PM"
+    time_part = f"{hour12}:{dt_pkt.minute:02d} {ampm}"
+
+    if dt_pkt.date() == ref_pkt.date():
+        return f"Today, {time_part}"
+    if dt_pkt.date() == (ref_pkt.date() - timedelta(days=1)):
+        return f"Yesterday, {time_part}"
+    if dt_pkt.year == ref_pkt.year:
+        return f"{dt_pkt.strftime('%b')} {dt_pkt.day}, {time_part}"
+    return f"{dt_pkt.strftime('%b')} {dt_pkt.day}, {dt_pkt.year}, {time_part}"
+
+
+def _format_pkt_date(val) -> str:
+    """Formats a UTC timestamp as a PKT calendar date (e.g. Nov 26, 2026)."""
+    if not val:
+        return ""
+    dt_utc = _parse_utc_dt(val)
+    if dt_utc is None:
+        return str(val)[:10]
+    dt_pkt = dt_utc.astimezone(PKT_TZ)
+    return f"{dt_pkt.strftime('%b')} {dt_pkt.day}, {dt_pkt.year}"
+
+
 def render_dashboard_html(metrics: dict, conversations: list | None = None) -> str:
+    now_utc = datetime.now(timezone.utc)
+    now_pkt = now_utc.astimezone(PKT_TZ)
+
     def _escape(val: str) -> str:
         return html_lib.escape(str(val or ""), quote=True)
 
@@ -84,7 +145,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 <td class="td-trx" data-label="TRX ID"><code class="code-pill">{_escape(p['trx_id'])}</code></td>
                 <td class="td-plan" data-label="Plan"><span class="plan-pill">PKR {MONTHLY_PRICE_PKR:,} / MO</span></td>
                 <td class="td-status" data-label="Status"><span class="status-pill" style="color: {status_color}; background: {status_bg};">● {_escape(p['status'].upper())}</span></td>
-                <td class="td-time" data-label="Time" style="color: #71717a; font-size: 13px;">{_escape((p.get('created_at') or '').replace('T', ' ')[:16])}</td>
+                <td class="td-time" data-label="Time (PKT)" style="color: #71717a; font-size: 13px;">{_escape(_format_pkt_datetime(p.get('created_at'), now_pkt))}</td>
                 <td class="td-actions" style="text-align: right;">{action_btn}</td>
             </tr>
             """
@@ -98,18 +159,15 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             has_sub = False
             expiry_raw = u.get("subscription_expiry")
             if expiry_raw:
-                try:
-                    exp_dt = datetime.fromisoformat(expiry_raw)
-                    if exp_dt > now:
-                        has_sub = True
-                except Exception:
+                exp_dt = _parse_utc_dt(expiry_raw)
+                if exp_dt and exp_dt > now_utc:
                     has_sub = True
 
             if has_sub:
                 plan_label = "FULL ACCESS"
                 plan_style = "#34d399"
                 status_html = """<span class="status-pill" style="color: #34d399; background: rgba(52, 211, 153, 0.1);">● ACTIVE</span>"""
-                expiry_fmt = f"""<span style="color: #ffffff; font-weight: 500;">{_escape((expiry_raw or '')[:10])}</span>"""
+                expiry_fmt = f"""<span style="color: #ffffff; font-weight: 500;">{_escape(_format_pkt_date(expiry_raw))}</span>"""
             else:
                 plan_label = "FREE TRIAL"
                 plan_style = "#a1a1aa"
@@ -135,7 +193,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 <td class="td-status" data-label="Status">{status_html}</td>
                 <td class="td-expiry" data-label="Expiry">{expiry_fmt}</td>
                 <td class="td-ref" data-label="Referral"><code class="code-pill">{_escape(u.get('referral_code', 'N/A'))}</code> <span class="ref-count">({u.get('referral_count', 0)} refs)</span></td>
-                <td class="td-time" data-label="Last Active" style="color: #71717a; font-size: 12px;">{_escape((u.get('last_active') or '').replace('T', ' ')[:16])}</td>
+                <td class="td-time" data-label="Last Active (PKT)" style="color: #71717a; font-size: 12px;">{_escape(_format_pkt_datetime(u.get('last_active'), now_pkt))}</td>
                 <td class="td-actions" style="text-align: right; white-space: nowrap;">
                     <div class="row-actions-wrap">{chats_btn}<button type="button" data-target="{_escape(activate_target)}" onclick="openActivateModal(this.dataset.target)" class="btn-sm-action btn-manage-action">Manage</button></div>
                 </td>
@@ -145,9 +203,8 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             rows = "<tr class='empty-row'><td colspan='7' class='empty-cell'>No users recorded yet</td></tr>"
         return rows
 
-    # 3. Compile 100% Real Production Data & 14-Day Activity Series
-    now = datetime.now()
-    default_dates = [(now - timedelta(days=13 - i)).strftime("%b %d") for i in range(13)] + ["Today"]
+    # 3. Compile 100% Real Production Data & 14-Day Activity Series (PKT)
+    default_dates = [(now_pkt.date() - timedelta(days=13 - i)).strftime("%b %d") for i in range(13)] + ["Today"]
 
     real_payments = metrics.get("recent_payments", [])
     real_users = metrics.get("all_users", [])
@@ -1821,7 +1878,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                     <div class="chart-title-box">
                         <h3>14-Day Live Activity</h3>
                         <p style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
-                            Actual daily AI responses logged in chat history vs. new user registrations over the past 14 days.
+                            Actual daily AI responses logged in chat history vs. new user registrations over the past 14 days (PKT).
                         </p>
                     </div>
                     <div class="chart-legend-row">
@@ -1871,7 +1928,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                                 <th>TRX ID</th>
                                 <th>Plan</th>
                                 <th>Status</th>
-                                <th>Time</th>
+                                <th>Time (PKT)</th>
                                 <th style="text-align: right;">Action</th>
                             </tr>
                         </thead>
@@ -1909,7 +1966,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                                 <th>Status</th>
                                 <th>Expiry Date</th>
                                 <th>Referral Code</th>
-                                <th>Last Active</th>
+                                <th>Last Active (PKT)</th>
                                 <th style="text-align: right;">Action</th>
                             </tr>
                         </thead>
@@ -1928,8 +1985,9 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         <h1>User Conversations</h1>
                         <span class="code-pill" id="badge-conv-summary">{total_conv_users} Users · {total_logged_msgs} Messages</span>
+                        <span class="code-pill" style="color: #a1a1aa;">PKT (UTC+5)</span>
                     </div>
-                    <p>Inspect real messages people sent to Hassan AI and verify response quality live.</p>
+                    <p>Inspect real messages people sent to Hassan AI and verify response quality live (all times in Pakistan Standard Time).</p>
                 </div>
                 <div class="header-actions">
                     <button onclick="refreshConversations()" id="btn-refresh-chats" class="btn-refresh">↻ Refresh Chats</button>
@@ -1976,7 +2034,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                                 <th>TRX ID</th>
                                 <th>Plan</th>
                                 <th>Status</th>
-                                <th>Date / Time</th>
+                                <th>Date / Time (PKT)</th>
                                 <th style="text-align: right;">Action</th>
                             </tr>
                         </thead>
@@ -2072,9 +2130,80 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 .replace(/'/g, '&#39;');
         }}
 
+        const PKT_TZ = 'Asia/Karachi';
+
+        function parseUtcTimestamp(iso) {{
+            if (!iso) return null;
+            let s = String(iso).trim();
+            if (!s) return null;
+            if (/^\\d{{4}}-\\d{{2}}-\\d{{2}} \\d{{2}}:\\d{{2}}/.test(s)) {{
+                s = s.replace(' ', 'T');
+            }}
+            s = s.replace(/(\\.\\d{{3}})\\d+/, '$1');
+            if (!/(Z|[+-]\\d{{2}}:?\\d{{2}})$/i.test(s)) {{
+                s += 'Z';
+            }}
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+        }}
+
+        function getPktDateKey(dateObj) {{
+            try {{
+                const parts = new Intl.DateTimeFormat('en-CA', {{
+                    timeZone: PKT_TZ,
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }}).formatToParts(dateObj);
+                const map = {{}};
+                parts.forEach(p => {{ map[p.type] = p.value; }});
+                return map.year + '-' + map.month + '-' + map.day;
+            }} catch (e) {{
+                const shifted = new Date(dateObj.getTime() + 5 * 3600 * 1000);
+                return shifted.toISOString().slice(0, 10);
+            }}
+        }}
+
         function formatChatTime(iso) {{
             if (!iso) return '';
-            return String(iso).replace('T', ' ').slice(0, 16);
+            const d = parseUtcTimestamp(iso);
+            if (!d) return String(iso).replace('T', ' ').slice(0, 16);
+
+            const now = new Date();
+            const todayKey = getPktDateKey(now);
+            const yesterdayKey = getPktDateKey(new Date(now.getTime() - 86400000));
+            const msgKey = getPktDateKey(d);
+
+            let timeStr = '';
+            let dateStr = '';
+            try {{
+                timeStr = new Intl.DateTimeFormat('en-US', {{
+                    timeZone: PKT_TZ,
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                }}).format(d);
+                const sameYear = msgKey.slice(0, 4) === todayKey.slice(0, 4);
+                dateStr = new Intl.DateTimeFormat('en-US', {{
+                    timeZone: PKT_TZ,
+                    month: 'short',
+                    day: 'numeric',
+                    ...(sameYear ? {{}} : {{ year: 'numeric' }})
+                }}).format(d);
+            }} catch (e) {{
+                const shifted = new Date(d.getTime() + 5 * 3600 * 1000);
+                const h = shifted.getUTCHours();
+                const m = String(shifted.getUTCMinutes()).padStart(2, '0');
+                const h12 = (h % 12) || 12;
+                const ampm = h < 12 ? 'AM' : 'PM';
+                timeStr = h12 + ':' + m + ' ' + ampm;
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                dateStr = months[shifted.getUTCMonth()] + ' ' + shifted.getUTCDate();
+            }}
+
+            if (msgKey === todayKey) return 'Today, ' + timeStr;
+            if (msgKey === yesterdayKey) return 'Yesterday, ' + timeStr;
+            return dateStr + ', ' + timeStr;
         }}
 
         function renderConversationList() {{
@@ -2495,7 +2624,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                                 ticks: {{ color: '#71717a', font: {{ size: 11 }} }},
                                 title: {{
                                     display: true,
-                                    text: '14-Day Calendar Timeline (Live DB)',
+                                    text: '14-Day Calendar Timeline (PKT)',
                                     color: '#52525b',
                                     font: {{ size: 11, weight: '500' }},
                                     padding: {{ top: 8 }}
