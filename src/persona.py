@@ -128,10 +128,11 @@ def build_hassan_chat_messages(user_query: str,
                                retrieved_context: list[str] = None,
                                tier: str = "pro",
                                history: list[dict] = None,
-                               user_name: str = "") -> list[dict]:
+                               user_name: str = "",
+                               user_memory: str = "") -> list[dict]:
     """
     Constructs a modern multi-turn chat messages payload for Groq / OpenAI API.
-    Integrates system persona, user personalization, context grounding, and conversation history.
+    Integrates system persona, user personalization, long-term memory, context grounding, and conversation history.
     """
     context_text = "\n---\n".join(retrieved_context) if retrieved_context else "No specific past reel clip found. Rely on natural conversational style and core principles."
 
@@ -141,6 +142,13 @@ def build_hassan_chat_messages(user_query: str,
     else:
         first_name = clean_name.split()[0]
         user_context = f"\n### WHO YOU ARE TALKING TO:\nThe person messaging you is named {clean_name} (you can naturally call them {first_name} occasionally, like a real human — don't repeat their name in every single message).\n"
+
+    clean_memory = (user_memory or "").strip()
+    if clean_memory:
+        user_context += (
+            f"\n### LONG-TERM MEMORY ABOUT THIS USER (Verified facts from earlier conversations — remember these naturally and NEVER contradict or re-ask them):\n"
+            f"{clean_memory}\n"
+        )
 
     if tier.lower() == "trial":
         tier_instructions = """
@@ -217,12 +225,13 @@ def build_hassan_prompt(user_query: str,
                         retrieved_context: list[str] = None,
                         tier: str = "pro",
                         history: list[dict] = None,
-                        user_name: str = "") -> str:
+                        user_name: str = "",
+                        user_memory: str = "") -> str:
     """
     Backward-compatible single-prompt builder for environments that do not support multi-role messages.
     """
     messages = build_hassan_chat_messages(
-        user_query, retrieved_context, tier=tier, history=history, user_name=user_name
+        user_query, retrieved_context, tier=tier, history=history, user_name=user_name, user_memory=user_memory
     )
     combined = []
     for m in messages:

@@ -1,19 +1,28 @@
 import hmac
 import json
 import re
+import threading
+import time
 import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 from fastapi import FastAPI, Query, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from groq import Groq
 
 from src.admin_auth import (
     generate_admin_session_token,
     is_admin_authenticated,
     render_admin_login_html,
+)
+from src.alerts import (
+    is_telegram_alerts_enabled,
+    notify_new_signup,
+    notify_payment_submitted,
+    notify_paywall_hit,
+    send_telegram_alert,
 )
 from src.chat_frontend import render_chat_html
 from src.config import (
@@ -58,12 +67,14 @@ from src.database import (
     get_user_by_identifier,
     get_user_trial_limit,
     grant_bonus_messages,
+    import_guest_preview_turn,
     init_db,
     link_phone_to_user,
     mark_welcome_sent,
     record_user_query,
     save_chat_message,
     submit_trx_id,
+    update_user_memory_summary,
 )
 from src.knowledge_base import search_knowledge
 from src.persona import build_hassan_chat_messages, build_hassan_prompt
@@ -81,8 +92,10 @@ from src.user_auth import (
     clear_user_session_cookie,
     generate_oauth_state,
     get_authenticated_user_id,
+    has_used_guest_preview,
     is_https_request,
     is_valid_bridge_request,
+    set_guest_preview_cookie,
     set_oauth_state_cookie,
     set_user_session_cookie,
     verify_google_id_token,
@@ -104,6 +117,157 @@ GROQ_FALLBACK_MODELS = [
     ("openai/gpt-oss-20b", True),
     ("qwen/qwen3.8-27b", False),
 ]
+
+GROQ_WHISPER_MODELS = [
+    "whisper-large-v3-turbo",
+    "whisper-large-v3",
+]
+
+GROQ_MEMORY_MODELS = [
+    "openai/gpt-oss-20b",
+    "llama-3.1-8b-instant",
+]
+
+_RATE_LIMIT_LOCK = threading.Lock()
+_GUEST_PREVIEW_HITS: dict[str, list[float]] = {}
+_TRANSCRIBE_HITS: dict[str, list[float]] = {}
+GUEST_PREVIEW_MAX_PER_IP_24H = 2
+TRANSCRIBE_MAX_PER_IP_1H = 20
+MAX_AUDIO_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB (~3+ min compressed mobile voice)
+
+
+def _client_ip(request: Request) -> str:
+    fwd = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    real_ip = (request.headers.get("x-real-ip") or "").strip()
+    if real_ip:
+        return real_ip
+    if fwd:
+        return fwd
+    return request.client.host if request.client else "unknown"
+
+
+def _allow_rate_limited(bucket: dict[str, list[float]], key: str, max_hits: int, window_sec: int) -> bool:
+    now = time.time()
+    cutoff = now - window_sec
+    with _RATE_LIMIT_LOCK:
+        # Keep memory bounded if scanned by many IPs
+        if len(bucket) > 2000:
+            stale = [k for k, ts_list in bucket.items() if not ts_list or ts_list[-1] < cutoff]
+            for k in stale:
+                bucket.pop(k, None)
+        hits = [t for t in bucket.get(key, []) if t >= cutoff]
+        if len(hits) >= max_hits:
+            bucket[key] = hits
+            return False
+        hits.append(now)
+        bucket[key] = hits
+        return True
+
+
+def _schedule_memory_update(
+    user_id: str,
+    existing_memory: str,
+    history: list[dict],
+    user_text: str,
+    ai_reply: str,
+    total_queries: int,
+) -> None:
+    """
+    Refreshes a user's compact long-term memory card asynchronously on a daemon thread
+    on query 1 and every 3rd query thereafter — adds 0ms to user response latency.
+    """
+    if not groq_client or not user_id:
+        return
+    if total_queries != 1 and (total_queries % 3 != 0):
+        return
+
+    recent_snippet_lines = []
+    for turn in (history or [])[-8:]:
+        r = "User" if turn.get("role") == "user" else "Assistant"
+        recent_snippet_lines.append(f"{r}: {(turn.get('content') or '')[:260]}")
+    recent_snippet_lines.append(f"User: {(user_text or '')[:300]}")
+    recent_snippet_lines.append(f"Assistant: {(ai_reply or '')[:300]}")
+    transcript_block = "\n".join(recent_snippet_lines)
+
+    def _worker():
+        prompt = (
+            "Update this user's compact long-term profile memory card based ONLY on verified facts they shared.\n"
+            "Rules:\n"
+            "- Output 3 to 5 short plain-text bullet facts (max 380 characters total, NO markdown bolding or headers).\n"
+            "- Capture only concrete personal facts: gender (if clear), age, city/living setup, job/studies, skills, core goals, and hard constraints (e.g. lives with mother, cannot relocate).\n"
+            "- Preserve still-valid facts from Existing Memory and add new ones. Never guess or invent facts.\n\n"
+            f"Existing Memory:\n{existing_memory or '(none yet)'}\n\n"
+            f"Recent Conversation:\n{transcript_block}\n\n"
+            "Updated Memory Card:"
+        )
+        for model_id in GROQ_MEMORY_MODELS:
+            try:
+                resp = groq_client.chat.completions.create(
+                    model=model_id,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_completion_tokens=220,
+                )
+                summary = _sanitize_ai_reply((resp.choices[0].message.content or "").strip())
+                if summary and len(summary) >= 12:
+                    update_user_memory_summary(user_id, summary[:480])
+                    return
+            except Exception as e:
+                print(f"[Memory Summary Warning] {model_id} failed for {user_id}: {e}")
+                continue
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def _stream_ai_reply(messages: list[dict], status: str):
+    """
+    Yields visible text deltas from Groq with multi-model failover before the first token.
+    Falls back seamlessly across GROQ_FALLBACK_MODELS if a model hits 429 before emitting tokens.
+    """
+    max_completion = 1000 if status == "subscribed" else 750
+    last_err = None
+
+    for model_id, supports_effort in GROQ_FALLBACK_MODELS:
+        emitted_any = False
+        try:
+            kwargs = {
+                "messages": messages,
+                "model": model_id,
+                "temperature": 0.75,
+                "max_completion_tokens": max_completion,
+                "stream": True,
+            }
+            if supports_effort:
+                kwargs["reasoning_effort"] = "low"
+            try:
+                stream = groq_client.chat.completions.create(**kwargs)
+            except TypeError:
+                kwargs.pop("reasoning_effort", None)
+                kwargs["max_tokens"] = kwargs.pop("max_completion_tokens")
+                stream = groq_client.chat.completions.create(**kwargs)
+
+            for chunk in stream:
+                if not getattr(chunk, "choices", None):
+                    continue
+                delta = getattr(chunk.choices[0].delta, "content", None)
+                if delta:
+                    emitted_any = True
+                    yield delta
+            if emitted_any:
+                return
+        except Exception as e:
+            last_err = e
+            print(f"[AI Stream Failover] Model {model_id} failed ({type(e).__name__}): {e}")
+            if emitted_any:
+                return
+            continue
+
+    if last_err is not None:
+        raise last_err
+
+
+def _sse_event(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 def _call_groq_model(messages: list[dict], model_id: str, max_completion: int, use_reasoning_effort: bool, temperature: float):
@@ -339,7 +503,10 @@ def is_trx_message(text: str, user_status: str = "free_trial") -> bool:
 @app.get("/api/auth/me")
 async def api_auth_me(request: Request):
     """Returns server-verified session state and Google Sign-In status."""
-    auth_config = {"google_enabled": _is_google_oauth_enabled()}
+    auth_config = {
+        "google_enabled": _is_google_oauth_enabled(),
+        "guest_preview_used": has_used_guest_preview(request),
+    }
     user_id = get_authenticated_user_id(request)
     if not user_id:
         return {"authenticated": False, "user": None, **auth_config}
@@ -472,6 +639,9 @@ async def google_callback(
         if pending_ref:
             apply_referral_code(user["phone_number"], pending_ref)
 
+        if user.get("_is_new_user"):
+            notify_new_signup(user, ref_code_used=pending_ref)
+
         resp = RedirectResponse(url="/?signed_in=google")
         resp.delete_cookie(key=OAUTH_STATE_COOKIE, path="/")
         resp.delete_cookie(key=PENDING_REF_COOKIE, path="/")
@@ -518,9 +688,13 @@ async def api_auth_google(request: Request):
         name=claims["name"],
         avatar_url=claims["picture"],
     )
+    is_new_google_user = bool(user.get("_is_new_user"))
     if ref_code:
         apply_referral_code(user["phone_number"], ref_code)
         user = get_user_by_identifier(user["phone_number"]) or user
+
+    if is_new_google_user:
+        notify_new_signup(user, ref_code_used=ref_code)
 
     resp = JSONResponse({"status": "ok", "user": _public_user_payload(user)})
     set_user_session_cookie(resp, user["phone_number"], request)
@@ -731,7 +905,10 @@ async def serve_static_asset(filename: str):
 @app.get("/", response_class=HTMLResponse)
 async def customer_chat(request: Request):
     """Customer-facing mobile chat UI — server-hydrates auth & recent chat history on first paint."""
-    auth_config = {"google_enabled": _is_google_oauth_enabled()}
+    auth_config = {
+        "google_enabled": _is_google_oauth_enabled(),
+        "guest_preview_used": has_used_guest_preview(request),
+    }
     user_id = get_authenticated_user_id(request)
     clear_stale = False
     initial_history: list[dict] = []
@@ -886,6 +1063,29 @@ async def api_admin_delete_user(request: Request):
         return JSONResponse({"status": "error", "message": str(result)}, status_code=404)
 
     return JSONResponse({"status": "ok", "deleted": result}, headers=NO_CACHE_HEADERS)
+
+
+@app.post("/api/admin/test-alert")
+async def api_admin_test_alert(request: Request):
+    """Sends a live test Telegram notification to verify admin phone alerts."""
+    if not is_admin_authenticated(request):
+        return JSONResponse(
+            {"status": "error", "message": "Unauthorized. Executive passkey required."},
+            status_code=401,
+        )
+    if not is_telegram_alerts_enabled():
+        return JSONResponse(
+            {"status": "error", "message": "Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env to enable phone alerts."},
+            status_code=503,
+        )
+    ok, msg = send_telegram_alert(
+        "✅ <b>Hassan AI Telegram Alerts Connected!</b>\n\n"
+        "You will now get instant pings for new signups, paywall hits, and TRX payment submissions.",
+        sync=True,
+    )
+    if ok:
+        return JSONResponse({"status": "ok", "message": "Test alert sent to your Telegram ✓"}, headers=NO_CACHE_HEADERS)
+    return JSONResponse({"status": "error", "message": f"Telegram delivery failed: {msg}"}, status_code=502)
 
 
 @app.post("/api/admin/broadcast")
@@ -1075,6 +1275,7 @@ async def receive_whatsapp(request: Request):
 
             saved = submit_trx_id(sender_phone, trx_clean, plan_selected=plan_chosen)
             if saved:
+                notify_payment_submitted(get_or_create_user(sender_phone), trx_clean, ref_code=ref_code_in_trx)
                 ack_msg = (
                     f"Thank you! Your payment verification request for Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) has been received.{ref_note}\n"
                     "Admin will verify and activate your pass within 10-15 minutes."
@@ -1116,6 +1317,7 @@ async def receive_whatsapp(request: Request):
                 tier=tier,
                 history=history,
                 user_name=u_pre.get("name", ""),
+                user_memory=u_pre.get("memory_summary", ""),
             )
             ai_reply = _generate_ai_reply(messages, status)
         else:
@@ -1125,12 +1327,21 @@ async def receive_whatsapp(request: Request):
         save_chat_message(sender_phone, "assistant", ai_reply)
         record_user_query(sender_phone)
         u_info = get_or_create_user(sender_phone)
+        _schedule_memory_update(
+            u_info["phone_number"],
+            u_pre.get("memory_summary", ""),
+            history,
+            user_text,
+            ai_reply,
+            int(u_info.get("total_queries") or 0),
+        )
 
         if status == "free_trial":
             remaining = get_user_trial_limit(u_info) - (u_info.get("trial_questions_used") or 0)
             if remaining > 0:
                 ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
             else:
+                notify_paywall_hit(u_info, user_text)
                 ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
 
         elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
@@ -1329,6 +1540,7 @@ async def process_chat(request: Request):
 
         saved = submit_trx_id(sender_id, trx_clean, plan_selected=plan_chosen)
         if saved:
+            notify_payment_submitted(u_curr, trx_clean, ref_code=ref_code_in_trx)
             return {
                 "reply": (
                     f"✅ Thank you! Your payment verification request for Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) has been received (TRX: {trx_clean}).{ref_note}\n\n"
@@ -1357,6 +1569,7 @@ async def process_chat(request: Request):
             tier=tier,
             history=history,
             user_name=current_user.get("name", ""),
+            user_memory=current_user.get("memory_summary", ""),
         )
         try:
             ai_reply = _generate_ai_reply(messages, status)
@@ -1375,6 +1588,14 @@ async def process_chat(request: Request):
 
     # Single pooled DB round trip: save user + assistant messages, increment usage, return updated user
     u_info = complete_chat_turn(sender_id, user_text, ai_reply)
+    _schedule_memory_update(
+        sender_id,
+        current_user.get("memory_summary", ""),
+        history,
+        user_text,
+        ai_reply,
+        int(u_info.get("total_queries") or 0),
+    )
 
     welcome_prefix = ""
     if status == "subscribed" and not u_info.get("welcome_sent"):
@@ -1386,6 +1607,7 @@ async def process_chat(request: Request):
         if remaining > 0:
             ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
         else:
+            notify_paywall_hit(u_info, user_text)
             ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
 
     elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
@@ -1403,6 +1625,459 @@ async def process_chat(request: Request):
         "reply": welcome_prefix + ai_reply,
         "user": _public_user_payload(u_info),
     }
+
+
+# ── Voice-to-Text (Groq Whisper — Zero Extra RAM, Raw Audio Body) ──────────
+
+@app.post("/api/chat/transcribe")
+async def api_chat_transcribe(request: Request):
+    """
+    Transcribes a mobile/desktop voice note (Urdu / Roman Urdu / English) via Groq Whisper.
+    Accepts raw binary audio bytes (audio/webm, audio/mp4, audio/ogg, audio/wav, audio/mpeg)
+    so no python-multipart dependency is required.
+    """
+    session_user_id = get_authenticated_user_id(request)
+    if not session_user_id and has_used_guest_preview(request):
+        return JSONResponse(
+            {"status": "error", "code": "unauthenticated", "message": "Please sign in with Google to use voice messages."},
+            status_code=401,
+        )
+
+    ip = _client_ip(request)
+    if not _allow_rate_limited(_TRANSCRIBE_HITS, ip, TRANSCRIBE_MAX_PER_IP_1H, 3600):
+        return JSONResponse(
+            {"status": "error", "message": "Too many voice recordings in a short time. Please try again shortly."},
+            status_code=429,
+        )
+
+    if not groq_client:
+        return JSONResponse(
+            {"status": "error", "message": "Voice transcription is not configured on this server."},
+            status_code=503,
+        )
+
+    audio_bytes = await request.body()
+    if not audio_bytes or len(audio_bytes) < 200:
+        return JSONResponse(
+            {"status": "error", "message": "Voice clip was too short or silent. Hold or tap to speak clearly."},
+            status_code=400,
+        )
+    if len(audio_bytes) > MAX_AUDIO_UPLOAD_BYTES:
+        return JSONResponse(
+            {"status": "error", "message": "Voice clip is too long (max 5 MB). Keep voice notes under 2 minutes."},
+            status_code=413,
+        )
+
+    raw_ct = (request.headers.get("content-type") or "audio/webm").split(";")[0].strip().lower()
+    ext_map = {
+        "audio/webm": ("voice.webm", "audio/webm"),
+        "audio/mp4": ("voice.m4a", "audio/mp4"),
+        "audio/x-m4a": ("voice.m4a", "audio/mp4"),
+        "audio/m4a": ("voice.m4a", "audio/mp4"),
+        "audio/aac": ("voice.m4a", "audio/mp4"),
+        "audio/ogg": ("voice.ogg", "audio/ogg"),
+        "audio/wav": ("voice.wav", "audio/wav"),
+        "audio/mpeg": ("voice.mp3", "audio/mpeg"),
+    }
+    filename, clean_mime = ext_map.get(raw_ct, ("voice.webm", "audio/webm"))
+
+    whisper_prompt = (
+        "Pakistani Urdu, Roman Urdu, and English personal mentorship question about "
+        "career, discipline, mindset, gym, fitness, family, business, shadi, paisa."
+    )
+    last_err = None
+    for model_id in GROQ_WHISPER_MODELS:
+        try:
+            tr = groq_client.audio.transcriptions.create(
+                file=(filename, audio_bytes, clean_mime),
+                model=model_id,
+                prompt=whisper_prompt,
+                response_format="json",
+                temperature=0.0,
+            )
+            text = (getattr(tr, "text", None) or (tr.get("text") if isinstance(tr, dict) else "") or "").strip()
+            if text:
+                return JSONResponse({"status": "ok", "text": text}, headers=NO_CACHE_HEADERS)
+        except Exception as e:
+            last_err = e
+            print(f"[Voice Transcribe Warning] {model_id} failed ({type(e).__name__}): {e}")
+            continue
+
+    if last_err is not None:
+        return JSONResponse(
+            {"status": "error", "message": "Could not transcribe voice note right now. Please try again or type your message."},
+            status_code=503,
+        )
+    return JSONResponse(
+        {"status": "error", "message": "No clear speech detected in the recording. Please speak closer to the mic."},
+        status_code=400,
+    )
+
+
+# ── 1-Message Guest Preview (Try Before Signing In) ────────────────────────
+
+def _validate_guest_preview_request(request: Request, user_text: str):
+    """Returns (error_response_or_None)."""
+    if not user_text:
+        return JSONResponse({"status": "error", "reply": "Please write a message first."}, status_code=400)
+    if len(user_text) > 600:
+        return JSONResponse(
+            {"status": "error", "reply": "Preview messages are limited to 600 characters. Sign in with Google for longer chats!"},
+            status_code=400,
+        )
+    if (
+        user_text.startswith("/activate")
+        or user_text in ["/stats", "/metrics"]
+        or user_text.startswith("/broadcast")
+    ):
+        return JSONResponse(
+            {"status": "error", "reply": "⛔ Unauthorized: Admin authentication required."},
+            status_code=403,
+        )
+    if has_used_guest_preview(request):
+        return JSONResponse(
+            {
+                "status": "error",
+                "code": "signup_required",
+                "reply": f"You've used your free preview! Sign in with Google to unlock {FREE_TRIAL_QUESTIONS} free messages and save your conversation.",
+            },
+            status_code=403,
+        )
+    ip = _client_ip(request)
+    if not _allow_rate_limited(_GUEST_PREVIEW_HITS, ip, GUEST_PREVIEW_MAX_PER_IP_24H, 86400):
+        return JSONResponse(
+            {
+                "status": "error",
+                "code": "signup_required",
+                "reply": f"Sign in with Google to get {FREE_TRIAL_QUESTIONS} free messages and continue chatting!",
+            },
+            status_code=403,
+        )
+    return None
+
+
+@app.post("/api/chat/guest-preview")
+async def api_chat_guest_preview(request: Request):
+    """Allows 1 genuine trial question before Google Sign-In (signed cookie + IP rate-limited)."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "reply": "Invalid request payload."}, status_code=400)
+
+    user_text = str(data.get("message") or "").strip()
+    err_resp = _validate_guest_preview_request(request, user_text)
+    if err_resp is not None:
+        return err_resp
+
+    matching_chunks = search_knowledge(user_text, n_results=3)
+    if groq_client:
+        messages = build_hassan_chat_messages(user_text, matching_chunks, tier="trial", history=[], user_name="")
+        try:
+            ai_reply = _generate_ai_reply(messages, "free_trial")
+        except Exception as e:
+            print(f"[Guest Preview Error] Groq failed: {e}")
+            return JSONResponse(
+                {"status": "error", "reply": "Server is momentarily busy — please try again in a few seconds."},
+                status_code=503,
+            )
+    else:
+        ai_reply = f"[Demo Mode] Hassan AI: I received your preview question: '{user_text}'."
+
+    resp = JSONResponse(
+        {"status": "ok", "reply": ai_reply, "guest_preview_used": True},
+        headers=NO_CACHE_HEADERS,
+    )
+    set_guest_preview_cookie(resp, request)
+    return resp
+
+
+@app.post("/api/chat/guest-preview/stream")
+async def api_chat_guest_preview_stream(request: Request):
+    """Streaming SSE version of the 1-message guest preview (zero Nginx buffering)."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "reply": "Invalid request payload."}, status_code=400)
+
+    user_text = str(data.get("message") or "").strip()
+    err_resp = _validate_guest_preview_request(request, user_text)
+    if err_resp is not None:
+        return err_resp
+
+    matching_chunks = search_knowledge(user_text, n_results=3)
+    messages = build_hassan_chat_messages(user_text, matching_chunks, tier="trial", history=[], user_name="")
+
+    def event_stream():
+        if not groq_client:
+            demo = f"[Demo Mode] Hassan AI: I received your preview question: '{user_text}'."
+            yield _sse_event({"type": "token", "delta": demo})
+            yield _sse_event({"type": "done", "reply": demo, "guest_preview_used": True})
+            return
+
+        collected = []
+        try:
+            for delta in _stream_ai_reply(messages, "free_trial"):
+                collected.append(delta)
+                yield _sse_event({"type": "token", "delta": delta})
+        except Exception as e:
+            print(f"[Guest Preview Stream Error] Groq failed: {e}")
+            yield _sse_event({
+                "type": "error",
+                "reply": "Server is momentarily busy — please try again in a few seconds.",
+            })
+            return
+
+        final_reply = _sanitize_ai_reply("".join(collected))
+        if not final_reply:
+            yield _sse_event({
+                "type": "error",
+                "reply": "Server is momentarily busy — please try again in a few seconds.",
+            })
+            return
+        yield _sse_event({"type": "done", "reply": final_reply, "guest_preview_used": True})
+
+    resp = StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+    set_guest_preview_cookie(resp, request)
+    return resp
+
+
+@app.post("/api/chat/import-preview")
+async def api_chat_import_preview(request: Request):
+    """Carries a visitor's 1st guest preview Q&A into their new signed-in Supabase history."""
+    user_id = get_authenticated_user_id(request)
+    if not user_id:
+        return JSONResponse({"status": "error", "message": "Authentication required."}, status_code=401)
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid payload."}, status_code=400)
+
+    imported = import_guest_preview_turn(
+        user_id,
+        str(data.get("user_text") or ""),
+        str(data.get("ai_reply") or ""),
+    )
+    return JSONResponse({"status": "ok", "imported": imported}, headers=NO_CACHE_HEADERS)
+
+
+# ── Authenticated Streaming Chat Endpoint (SSE, Zero Nginx Buffering) ──────
+
+@app.post("/api/chat/stream")
+async def process_chat_stream(request: Request):
+    """
+    Word-by-word SSE streaming chat endpoint for authenticated web users.
+    Maintains 100% parity with /api/chat for access checks, commands, TRX, memory, and alerts.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "reply": "Invalid request payload."}, status_code=400)
+
+    user_text = str(data.get("message") or "").strip()
+    if not user_text:
+        return JSONResponse({"status": "error", "reply": "Please send a text message with your question."}, status_code=400)
+
+    session_user_id = get_authenticated_user_id(request)
+    if not session_user_id:
+        return JSONResponse(
+            {"status": "error", "code": "unauthenticated", "reply": "Please sign in with Google to start chatting."},
+            status_code=401,
+        )
+
+    current_user = get_user_by_identifier(session_user_id)
+    if not current_user:
+        resp = JSONResponse(
+            {"status": "error", "code": "unauthenticated", "reply": "Your session has expired. Please sign in again."},
+            status_code=401,
+        )
+        clear_user_session_cookie(resp)
+        return resp
+    sender_id = current_user["phone_number"]
+
+    # Delegate admin commands, REF, CODE, TRX, and paywalled turns to deterministic single-event SSE
+    can_chat, status, tier = evaluate_user_access(current_user)
+    is_special = (
+        user_text.startswith("/activate")
+        or user_text in ["/stats", "/metrics"]
+        or user_text.startswith("/broadcast")
+        or user_text.upper() in ["REFERRAL", "CODE", "MY CODE", "REF"]
+        or user_text.upper().startswith(("REF:", "CODE:", "REFERRAL:"))
+        or is_trx_message(user_text, status)
+        or (not can_chat)
+    )
+    if is_special:
+        # Reuse /api/chat logic directly via non-streaming fast path
+        if (
+            user_text.startswith("/activate")
+            or user_text in ["/stats", "/metrics"]
+            or user_text.startswith("/broadcast")
+        ):
+            return JSONResponse(
+                {"status": "error", "reply": "⛔ Unauthorized: Admin authentication required to run executive commands."},
+                status_code=403,
+            )
+        if user_text.upper() in ["REFERRAL", "CODE", "MY CODE", "REF"]:
+            stats = get_referral_stats(sender_id)
+            reply_txt = (
+                f"🎁 *Your Hassan AI Referral Hub*\n\n"
+                f"Your Referral Code: `{stats['code']}`\n"
+                f"Bonus Free Messages Earned: +{stats['bonus_questions']} (up to +{stats['max_bonus_questions']})\n"
+                f"Friends Subscribed: {stats['count']}\n"
+                f"Remaining for Next Free Month: {stats['needed']}\n\n"
+                f"• 1 friend signs up → you get +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages instantly\n"
+                f"• 3 friends subscribe → you automatically get 1 Month FREE!"
+            )
+            return StreamingResponse(
+                iter([_sse_event({"type": "done", "reply": reply_txt, "user": _public_user_payload(current_user)})]),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+        if user_text.upper().startswith(("REF:", "CODE:", "REFERRAL:")):
+            code_input = user_text.split(":")[-1].strip()
+            _, ref_msg = apply_referral_code(sender_id, code_input)
+            return StreamingResponse(
+                iter([_sse_event({"type": "done", "reply": ref_msg, "user": _public_user_payload(current_user)})]),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+        if is_trx_message(user_text, status):
+            trx_clean, plan_chosen, ref_code_in_trx = parse_trx_text(user_text)
+            if not trx_clean:
+                return StreamingResponse(
+                    iter([_sse_event({"type": "done", "reply": "Please provide a valid Transaction ID.", "user": _public_user_payload(current_user)})]),
+                    media_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+                )
+            if not current_user.get("contact_phone"):
+                return JSONResponse(
+                    {
+                        "status": "error",
+                        "code": "phone_required",
+                        "reply": "Please enter your Pakistani mobile / EasyPaisa number so we can verify your payment.",
+                    },
+                    status_code=400,
+                )
+            ref_note = ""
+            if ref_code_in_trx:
+                ok_ref, _ = apply_referral_code(sender_id, ref_code_in_trx)
+                if ok_ref:
+                    ref_note = f"\n(Referral code {ref_code_in_trx} recorded!)"
+            saved = submit_trx_id(sender_id, trx_clean, plan_selected=plan_chosen)
+            if saved:
+                notify_payment_submitted(current_user, trx_clean, ref_code=ref_code_in_trx)
+                trx_reply = (
+                    f"✅ Thank you! Your payment verification request for Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) has been received (TRX: {trx_clean}).{ref_note}\n\n"
+                    "Admin will verify and activate your pass within 10-15 minutes."
+                )
+            else:
+                trx_reply = "This Transaction ID has already been registered or submitted for review."
+            return StreamingResponse(
+                iter([_sse_event({"type": "done", "reply": trx_reply, "user": _public_user_payload(current_user)})]),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+        # Paywall reached
+        return StreamingResponse(
+            iter([_sse_event({"type": "done", "reply": PAYWALL_TEXT, "paywalled": True, "user": _public_user_payload(current_user)})]),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    retrieval_count = 6 if status == "subscribed" else 3
+    matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
+    history = get_recent_chat_history(sender_id, limit=CHAT_HISTORY_CONTEXT_MESSAGES)
+    messages = build_hassan_chat_messages(
+        user_text,
+        matching_chunks,
+        tier=tier,
+        history=history,
+        user_name=current_user.get("name", ""),
+        user_memory=current_user.get("memory_summary", ""),
+    )
+
+    def event_stream():
+        if not groq_client:
+            ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
+            yield _sse_event({"type": "token", "delta": ai_reply})
+        else:
+            collected = []
+            try:
+                for delta in _stream_ai_reply(messages, status):
+                    collected.append(delta)
+                    yield _sse_event({"type": "token", "delta": delta})
+            except Exception as e:
+                print(f"[AI Stream Error] Groq generation failed for {sender_id}: {e}")
+                yield _sse_event({
+                    "type": "error",
+                    "reply": "Server pe thoda load zyada aa gaya tha — apna message kuch seconds baad dobara bhej dein. Aapka free question count nahi hua.",
+                    "user": _public_user_payload(current_user),
+                })
+                return
+            ai_reply = _sanitize_ai_reply("".join(collected))
+            if not ai_reply:
+                yield _sse_event({
+                    "type": "error",
+                    "reply": "Server pe thoda load zyada aa gaya tha — apna message kuch seconds baad dobara bhej dein. Aapka free question count nahi hua.",
+                    "user": _public_user_payload(current_user),
+                })
+                return
+
+        u_info = complete_chat_turn(sender_id, user_text, ai_reply)
+        _schedule_memory_update(
+            sender_id,
+            current_user.get("memory_summary", ""),
+            history,
+            user_text,
+            ai_reply,
+            int(u_info.get("total_queries") or 0),
+        )
+
+        welcome_prefix = ""
+        if status == "subscribed" and not u_info.get("welcome_sent"):
+            welcome_prefix = build_welcome_message(tier, u_info.get("referral_code", "")) + "\n\n━━━━━━━━━━━━━━━━\n\n"
+            mark_welcome_sent(sender_id)
+
+        final_display = ai_reply
+        if status == "free_trial":
+            remaining = get_user_trial_limit(u_info) - (u_info.get("trial_questions_used") or 0)
+            if remaining > 0:
+                final_display += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
+            else:
+                notify_paywall_hit(u_info, user_text)
+                final_display += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
+        elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
+            stats = get_referral_stats(sender_id)
+            final_display += (
+                f"\n\n━━━━━━━━━━━━━━━━\n"
+                f"Quick reminder 👋\n"
+                f"Your referral code is: `{stats['code']}`\n"
+                f"You've referred {stats['count']} friend{'s' if stats['count'] != 1 else ''} so far.\n"
+                f"Share it and get 1 month FREE when you hit 3!"
+            )
+
+        yield _sse_event({
+            "type": "done",
+            "reply": welcome_prefix + final_display,
+            "user": _public_user_payload(u_info),
+        })
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 if __name__ == "__main__":

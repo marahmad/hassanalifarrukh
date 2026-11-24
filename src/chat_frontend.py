@@ -83,7 +83,8 @@ def render_chat_html(initial_auth: dict | None = None, initial_history: list[dic
         }
     auth_json = json.dumps(initial_auth, separators=(",", ":")).replace("</", "<\\/")
     history_json = json.dumps(initial_history or [], separators=(",", ":")).replace("</", "<\\/")
-    onboarding_cls = "" if initial_auth.get("authenticated") else " active"
+    show_onboarding_modal = (not initial_auth.get("authenticated")) and bool(initial_auth.get("guest_preview_used"))
+    onboarding_cls = " active" if show_onboarding_modal else ""
     return (
         base
         .replace("__INITIAL_AUTH_JSON__", auth_json)

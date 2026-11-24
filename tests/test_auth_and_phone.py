@@ -92,6 +92,8 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
 
         self._orig_groq = server.groq_client
         server.groq_client = None
+        server._GUEST_PREVIEW_HITS.clear()
+        server._TRANSCRIBE_HITS.clear()
 
         self._orig_bridge_secret = user_auth.WHATSAPP_BRIDGE_SECRET
         user_auth.WHATSAPP_BRIDGE_SECRET = "test_bridge_secret_xyz"
@@ -306,13 +308,15 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
         r2 = self.client.post("/api/auth/google", json={"credential": "eyJhbGciOiJub25lIn0.eyJlbWFpbCI6InZpY3RpbUBnbWFpbC5jb20ifQ."})
         self.assertEqual(r2.status_code, 401)
 
-        # Home page renders clean Google-only sign-in modal & unified PKR 1,000 Full Access plan
+        # Home page renders live guest-preview chat + Google sign-in modal & unified PKR 1,000 Full Access plan
         r_home = self.client.get("/")
         self.assertEqual(r_home.status_code, 200)
         self.assertIn("Continue with Google", r_home.text)
         self.assertIn("Watch Real Demo", r_home.text)
         self.assertIn("Opened in TikTok / Instagram?", r_home.text)
-        self.assertIn('class="modal-overlay active" id="onboarding-modal-overlay"', r_home.text)
+        self.assertIn('id="onboarding-modal-overlay"', r_home.text)
+        self.assertIn('id="mic-record-btn"', r_home.text)
+        self.assertIn('"guest_preview_used":false', r_home.text)
         self.assertIn('media="print" onload="this.media=\'all\'"', r_home.text)
         self.assertNotIn('<script src="https://accounts.google.com/gsi/client" async defer></script>', r_home.text)
         self.assertIn("PKR 1,000", r_home.text)
@@ -852,6 +856,203 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
         self.assertEqual(r_gate.status_code, 200)
         self.assertIn("/static/hassan_avatar.jpg", r_gate.text)
         self.assertIn("/apple-touch-icon.png", r_gate.text)
+
+    def test_guest_preview_one_message_limit_and_import_after_signin(self):
+        # Admin command blocked on guest preview
+        r_adm = self.client.post("/api/chat/guest-preview", json={"message": "/activate 03001234567 30"})
+        self.assertEqual(r_adm.status_code, 403)
+
+        # 1st guest preview succeeds and sets signed HttpOnly guest_preview_used cookie
+        r1 = self.client.post("/api/chat/guest-preview", json={"message": "How do I build discipline?"})
+        self.assertEqual(r1.status_code, 200)
+        self.assertEqual(r1.json()["status"], "ok")
+        self.assertTrue(r1.json()["guest_preview_used"])
+        self.assertIn(user_auth.GUEST_PREVIEW_COOKIE, r1.cookies)
+
+        # After preview is used, GET / activates the onboarding sign-in modal immediately
+        r_home2 = self.client.get("/")
+        self.assertIn('class="modal-overlay active" id="onboarding-modal-overlay"', r_home2.text)
+
+        # 2nd guest preview is blocked (403 signup_required)
+        r2 = self.client.post("/api/chat/guest-preview", json={"message": "Second free question"})
+        self.assertEqual(r2.status_code, 403)
+        self.assertEqual(r2.json()["code"], "signup_required")
+
+        # After signing in, guest preview turn imports once without consuming a trial credit
+        u = database.get_or_create_google_user("g_imp_1", "guestconv@example.com", "Guest Converted")
+        uid = u["phone_number"]
+        token = user_auth.generate_user_session_token(uid)
+        self.client.cookies.set(user_auth.USER_SESSION_COOKIE, token)
+
+        r_imp1 = self.client.post(
+            "/api/chat/import-preview",
+            json={"user_text": "How do I build discipline?", "ai_reply": r1.json()["reply"]},
+        )
+        self.assertEqual(r_imp1.status_code, 200)
+        self.assertTrue(r_imp1.json()["imported"])
+        self.assertEqual(len(database.get_recent_chat_history(uid, limit=10)), 2)
+        self.assertEqual(database.get_user_by_identifier(uid)["trial_questions_used"], 0)
+
+        # Calling import-preview a second time is a safe idempotent no-op
+        r_imp2 = self.client.post(
+            "/api/chat/import-preview",
+            json={"user_text": "Duplicate", "ai_reply": "Duplicate"},
+        )
+        self.assertFalse(r_imp2.json()["imported"])
+        self.assertEqual(len(database.get_recent_chat_history(uid, limit=10)), 2)
+
+    def test_sse_streaming_chat_and_guest_preview_stream(self):
+        import json as _json
+        from types import SimpleNamespace
+
+        # Unauthenticated /api/chat/stream rejected
+        self.assertEqual(self.client.post("/api/chat/stream", json={"message": "Hi"}).status_code, 401)
+
+        # Guest preview stream works & sets X-Accel-Buffering: no + guest cookie
+        r_gs = self.client.post("/api/chat/guest-preview/stream", json={"message": "Quick tip?"})
+        self.assertEqual(r_gs.status_code, 200)
+        self.assertEqual(r_gs.headers.get("x-accel-buffering"), "no")
+        self.assertIn(user_auth.GUEST_PREVIEW_COOKIE, r_gs.cookies)
+        self.assertIn('"type": "done"', r_gs.text)
+
+        # Authenticated streaming with mocked Groq deltas
+        u = database.get_or_create_google_user("g_stream_1", "streamer@example.com", "Stream User")
+        uid = u["phone_number"]
+        self.client.cookies.set(user_auth.USER_SESSION_COOKIE, user_auth.generate_user_session_token(uid))
+
+        def fake_stream_create(**kwargs):
+            for tok in ["Stay ", "**consistent** ", "every day."]:
+                yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=tok))])
+
+        fake_client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=fake_stream_create))
+        )
+        with patch.object(server, "groq_client", fake_client), \
+             patch.object(server, "search_knowledge", return_value=[]), \
+             patch.object(server, "_schedule_memory_update"):
+            r_st = self.client.post("/api/chat/stream", json={"message": "Give me advice"})
+
+        self.assertEqual(r_st.status_code, 200)
+        self.assertEqual(r_st.headers.get("x-accel-buffering"), "no")
+        events = [
+            _json.loads(line[5:].strip())
+            for line in r_st.text.splitlines()
+            if line.startswith("data:")
+        ]
+        token_events = [e for e in events if e.get("type") == "token"]
+        done_events = [e for e in events if e.get("type") == "done"]
+        self.assertEqual(len(token_events), 3)
+        self.assertEqual(len(done_events), 1)
+        # Final sanitized reply strips **bold** and saves turn to DB
+        self.assertIn("Stay consistent every day.", done_events[0]["reply"])
+        self.assertNotIn("**consistent**", done_events[0]["reply"])
+        self.assertEqual(database.get_user_by_identifier(uid)["trial_questions_used"], 1)
+
+    def test_voice_transcription_endpoint_groq_whisper(self):
+        from types import SimpleNamespace
+
+        captured_calls = []
+
+        def fake_transcribe(**kwargs):
+            captured_calls.append(kwargs)
+            return SimpleNamespace(text="Yar discipline kaise banaun?")
+
+        fake_client = SimpleNamespace(
+            audio=SimpleNamespace(transcriptions=SimpleNamespace(create=fake_transcribe))
+        )
+
+        # Too-short clip rejected (400)
+        with patch.object(server, "groq_client", fake_client):
+            r_short = self.client.post("/api/chat/transcribe", content=b"tiny", headers={"Content-Type": "audio/webm"})
+            self.assertEqual(r_short.status_code, 400)
+
+            # Valid iOS Safari MP4 clip transcribed with voice.m4a + whisper-large-v3-turbo
+            r_ok = self.client.post(
+                "/api/chat/transcribe",
+                content=b"\x00" * 1024,
+                headers={"Content-Type": "audio/mp4"},
+            )
+            self.assertEqual(r_ok.status_code, 200)
+            self.assertEqual(r_ok.json()["text"], "Yar discipline kaise banaun?")
+            self.assertEqual(captured_calls[0]["model"], "whisper-large-v3-turbo")
+            self.assertEqual(captured_calls[0]["file"][0], "voice.m4a")
+
+            # After guest preview is used, unauthenticated voice transcribe requires sign-in (401)
+            self.client.cookies.set(user_auth.GUEST_PREVIEW_COOKIE, user_auth.generate_guest_preview_token())
+            r_unauth = self.client.post(
+                "/api/chat/transcribe",
+                content=b"\x00" * 1024,
+                headers={"Content-Type": "audio/webm"},
+            )
+            self.assertEqual(r_unauth.status_code, 401)
+
+    def test_long_term_user_memory_card_persistence_and_dashboard_display(self):
+        from src.persona import build_hassan_chat_messages
+
+        u = database.get_or_create_google_user("g_mem_1", "mem@example.com", "Mem User")
+        uid = u["phone_number"]
+        summary = "- Female, 31, lives in small city with mother (cannot relocate)\n- Strong communication skills"
+        self.assertTrue(database.update_user_memory_summary(uid, summary))
+
+        u_loaded = database.get_user_by_identifier(uid)
+        self.assertEqual(u_loaded["memory_summary"], summary)
+
+        msgs = build_hassan_chat_messages("What next?", user_name="Mem User", user_memory=u_loaded["memory_summary"])
+        self.assertIn("LONG-TERM MEMORY ABOUT THIS USER", msgs[0]["content"])
+        self.assertIn("cannot relocate", msgs[0]["content"])
+
+        database.complete_chat_turn(uid, "Hello", "Hey!")
+        convs = database.get_chat_conversations()
+        self.assertEqual(convs[0]["memory_summary"], summary)
+
+        r_login = self.client.post("/api/admin/login", json={"passkey": server.ADMIN_PASSWORD})
+        self.assertEqual(r_login.status_code, 200)
+        r_dash = self.client.get("/admin/dashboard")
+        self.assertIn("Long-Term User Memory Card", r_dash.text)
+        self.assertIn("cannot relocate", r_dash.text)
+
+    def test_telegram_alerts_triggers_on_signup_paywall_and_payment(self):
+        fake_claims = {
+            "sub": "tg_sub_1",
+            "email": "alertuser@example.com",
+            "name": "Alert User",
+            "picture": "",
+        }
+        with patch.object(server, "verify_google_id_token", return_value=fake_claims), \
+             patch.object(server, "notify_new_signup") as mock_signup, \
+             patch.object(server, "notify_payment_submitted") as mock_pay, \
+             patch.object(server, "notify_paywall_hit") as mock_paywall:
+            # First login fires new signup alert
+            r1 = self.client.post("/api/auth/google", json={"credential": "tok1"})
+            self.assertEqual(r1.status_code, 200)
+            self.assertEqual(mock_signup.call_count, 1)
+
+            # Second login does NOT double-fire new signup alert
+            r2 = self.client.post("/api/auth/google", json={"credential": "tok2"})
+            self.assertEqual(r2.status_code, 200)
+            self.assertEqual(mock_signup.call_count, 1)
+
+            uid = r1.json()["user"]["id"]
+            # Exhaust first 4 free questions, then 5th triggers paywall alert
+            for _ in range(config.FREE_TRIAL_QUESTIONS - 1):
+                database.record_user_query(uid)
+            r_last = self.client.post("/api/chat", json={"message": "My last free question"})
+            self.assertEqual(r_last.status_code, 200)
+            self.assertEqual(mock_paywall.call_count, 1)
+
+            # Linking phone + submitting TRX fires payment alert
+            self.client.post("/api/auth/link-phone", json={"phone": "03007778888"})
+            r_trx = self.client.post("/api/chat", json={"message": "TRX: 9988776655"})
+            self.assertEqual(r_trx.status_code, 200)
+            self.assertEqual(mock_pay.call_count, 1)
+
+        # Admin test-alert endpoint requires auth
+        self.assertEqual(self.client.post("/api/admin/test-alert").status_code, 401)
+        self.client.post("/api/admin/login", json={"passkey": server.ADMIN_PASSWORD})
+        with patch.object(server, "is_telegram_alerts_enabled", return_value=True), \
+             patch.object(server, "send_telegram_alert", return_value=(True, "Alert delivered")):
+            r_ta = self.client.post("/api/admin/test-alert")
+            self.assertEqual(r_ta.status_code, 200)
 
 
 if __name__ == "__main__":

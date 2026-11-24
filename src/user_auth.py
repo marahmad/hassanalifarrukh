@@ -18,8 +18,10 @@ from src.config import (
 
 USER_SESSION_COOKIE = "user_session"
 OAUTH_STATE_COOKIE = "oauth_state"
+GUEST_PREVIEW_COOKIE = "guest_preview_used"
 MAX_USER_SESSION_AGE_SECONDS = 30 * 24 * 3600  # 30 days
 MAX_OAUTH_STATE_AGE_SECONDS = 10 * 60  # 10 minutes
+MAX_GUEST_PREVIEW_AGE_SECONDS = 30 * 24 * 3600  # 30 days
 
 
 def is_https_request(request: Request | None) -> bool:
@@ -106,6 +108,46 @@ def set_user_session_cookie(response: Response, user_id: str, request: Request |
 def clear_user_session_cookie(response: Response) -> None:
     """Clears the user_session cookie."""
     response.delete_cookie(key=USER_SESSION_COOKIE, path="/")
+
+
+def generate_guest_preview_token() -> str:
+    """Generates a signed token marking that this browser has used its 1-message guest preview."""
+    ts = str(int(time.time()))
+    payload = f"gp.{ts}"
+    sig = _sign_payload(payload)
+    return f"{payload}.{sig}"
+
+
+def has_used_guest_preview(request: Request) -> bool:
+    """Returns True if the request carries a valid signed guest_preview_used cookie."""
+    token = request.cookies.get(GUEST_PREVIEW_COOKIE)
+    if not token:
+        return False
+    parts = token.split(".")
+    if len(parts) != 3 or parts[0] != "gp":
+        return False
+    _, ts_str, sig = parts
+    try:
+        created_at = int(ts_str)
+        now = int(time.time())
+        if now - created_at > MAX_GUEST_PREVIEW_AGE_SECONDS or created_at > now + 300:
+            return False
+        return hmac.compare_digest(sig, _sign_payload(f"gp.{ts_str}"))
+    except Exception:
+        return False
+
+
+def set_guest_preview_cookie(response: Response, request: Request | None = None) -> None:
+    """Sets the signed HttpOnly guest_preview_used cookie after the 1 free guest reply."""
+    response.set_cookie(
+        key=GUEST_PREVIEW_COOKIE,
+        value=generate_guest_preview_token(),
+        max_age=MAX_GUEST_PREVIEW_AGE_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=is_https_request(request),
+        path="/",
+    )
 
 
 def generate_oauth_state() -> str:

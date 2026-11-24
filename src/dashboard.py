@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import html as html_lib
 import json
 
+from src.alerts import is_telegram_alerts_enabled
 from src.config import (
     FREE_TRIAL_QUESTIONS,
     MONTHLY_PRICE_PKR,
@@ -240,6 +241,12 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
     avg_queries = round(total_queries / total_users, 1) if total_users > 0 else 0.0
     db_backend = metrics.get("db_backend") or "Live Database"
     wa_api_ready = bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID)
+    tg_alerts_ready = is_telegram_alerts_enabled()
+    tg_badge_html = (
+        '<button type="button" id="btn-test-tg" onclick="testTelegramAlert()" class="btn-refresh" style="color:#38bdf8;border-color:rgba(56,189,248,0.3);" title="Send test Telegram alert to your phone">🔔 Test Alert</button>'
+        if tg_alerts_ready
+        else ''
+    )
 
     chart_payload = {
         "dates": metrics.get("chart_dates") or default_dates,
@@ -1535,6 +1542,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             }}
 
             .btn-logout {{
+                grid-column: 1 / -1;
                 text-align: center;
                 padding: 10px;
                 display: flex;
@@ -1882,6 +1890,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 
                 <div class="header-actions">
                     <button onclick="openActivateModal('')" class="btn-primary header-activate-btn">+ Quick Activate</button>
+                    {tg_badge_html}
                     <a href="/admin/dashboard" class="btn-refresh">↻ Refresh</a>
                     <button onclick="handleAdminLogout()" class="btn-logout" title="Lock Executive Hub">⎋ Lock / Sign Out</button>
                 </div>
@@ -2406,7 +2415,11 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 return;
             }}
 
-            bodyEl.innerHTML = msgs.map(m => {{
+            const memoryHtml = conv.memory_summary
+                ? '<div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.22);border-radius:10px;padding:10px 12px;font-size:12px;color:#cbd5e1;line-height:1.45;white-space:pre-wrap;"><div style="font-size:10.5px;font-weight:700;color:#38bdf8;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:4px;">🧠 Long-Term User Memory Card</div>' + escapeHtml(conv.memory_summary) + '</div>'
+                : '';
+
+            bodyEl.innerHTML = memoryHtml + msgs.map(m => {{
                 const isUser = m.role === 'user';
                 const cls = isUser ? 'chat-msg chat-msg-user' : 'chat-msg chat-msg-assistant';
                 const who = isUser ? (conv.name || 'User') : 'Hassan AI';
@@ -2685,6 +2698,25 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
         }}
 
         // Executive Lock / Logout Helper
+        async function testTelegramAlert() {{
+            const btn = document.getElementById('btn-test-tg');
+            if (btn) {{ btn.disabled = true; btn.textContent = 'Sending...'; }}
+            try {{
+                const res = await fetch('/api/admin/test-alert', {{ method: 'POST' }});
+                const data = await res.json().catch(() => ({{}}));
+                if (res.ok && data.status === 'ok') {{
+                    if (btn) btn.textContent = '✓ Alert Sent';
+                    setTimeout(() => {{ if (btn) {{ btn.disabled = false; btn.textContent = '🔔 Test Alert'; }} }}, 2500);
+                }} else {{
+                    alert(data.message || 'Could not send Telegram alert');
+                    if (btn) {{ btn.disabled = false; btn.textContent = '🔔 Test Alert'; }}
+                }}
+            }} catch (e) {{
+                alert('Network error while sending test alert');
+                if (btn) {{ btn.disabled = false; btn.textContent = '🔔 Test Alert'; }}
+            }}
+        }}
+
         async function handleAdminLogout() {{
             try {{
                 await fetch('/api/admin/logout', {{ method: 'POST' }});

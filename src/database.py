@@ -314,6 +314,7 @@ def init_db():
                     avatar_url TEXT,
                     auth_provider TEXT DEFAULT 'phone',
                     contact_phone TEXT,
+                    memory_summary TEXT DEFAULT '',
                     created_at TIMESTAMP,
                     last_active TIMESTAMP
                 );
@@ -321,6 +322,7 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_phone TEXT;")
             db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_trial_questions INTEGER DEFAULT 0;")
             db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_referral_credited INTEGER DEFAULT 0;")
+            db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS memory_summary TEXT DEFAULT '';")
             db.execute("CREATE INDEX IF NOT EXISTS users_contact_phone_idx ON users(contact_phone);")
             db.execute("CREATE INDEX IF NOT EXISTS users_email_lower_idx ON users(LOWER(email));")
 
@@ -375,6 +377,7 @@ def init_db():
                     avatar_url TEXT,
                     auth_provider TEXT DEFAULT 'phone',
                     contact_phone TEXT,
+                    memory_summary TEXT DEFAULT '',
                     created_at TIMESTAMP,
                     last_active TIMESTAMP
                 )
@@ -387,6 +390,8 @@ def init_db():
                 db.execute("ALTER TABLE users ADD COLUMN bonus_trial_questions INTEGER DEFAULT 0")
             if "signup_referral_credited" not in existing_cols:
                 db.execute("ALTER TABLE users ADD COLUMN signup_referral_credited INTEGER DEFAULT 0")
+            if "memory_summary" not in existing_cols:
+                db.execute("ALTER TABLE users ADD COLUMN memory_summary TEXT DEFAULT ''")
 
             db.execute("CREATE INDEX IF NOT EXISTS users_contact_phone_idx ON users(contact_phone)")
             db.execute("CREATE INDEX IF NOT EXISTS users_email_idx ON users(email)")
@@ -523,7 +528,9 @@ def get_or_create_google_user(google_id: str, email: str, name: str = "User", av
                 WHERE phone_number = ?
             """, (ts, google_id, norm_email, avatar_url, avatar_url, final_name, user_id))
             db.execute("SELECT * FROM users WHERE phone_number = ?", (user_id,))
-            return _serialize_user_row(db.fetchone())
+            existing_u = _serialize_user_row(db.fetchone())
+            existing_u["_is_new_user"] = False
+            return existing_u
 
         synth_id = _generate_email_user_id(db, norm_email) if norm_email else f"google_{google_id[-10:]}"
         ref_code = _generate_unique_referral_code(db)
@@ -536,7 +543,9 @@ def get_or_create_google_user(google_id: str, email: str, name: str = "User", av
             VALUES (?, ?, ?, ?, ?, 'google', 'basic', ?, 0, 0, 0, 0, ?, ?)
         """, (synth_id, clean_name, norm_email, google_id, avatar_url, ref_code, ts, ts))
         db.execute("SELECT * FROM users WHERE phone_number = ?", (synth_id,))
-        return _serialize_user_row(db.fetchone())
+        created_u = _serialize_user_row(db.fetchone())
+        created_u["_is_new_user"] = True
+        return created_u
 
 
 def link_phone_to_user(user_id: str, raw_phone: str) -> tuple[bool, str, str]:
@@ -893,6 +902,7 @@ def get_system_metrics() -> dict:
         db.execute("""
             SELECT phone_number, name, email, contact_phone, auth_provider, tier,
                    trial_questions_used, COALESCE(bonus_trial_questions, 0) AS bonus_trial_questions,
+                   COALESCE(memory_summary, '') AS memory_summary,
                    subscription_expiry, total_queries,
                    referral_code, referral_count, created_at, last_active
             FROM users
@@ -900,6 +910,7 @@ def get_system_metrics() -> dict:
         """ if db.is_pg else """
             SELECT phone_number, name, email, contact_phone, auth_provider, tier,
                    trial_questions_used, COALESCE(bonus_trial_questions, 0) AS bonus_trial_questions,
+                   COALESCE(memory_summary, '') AS memory_summary,
                    subscription_expiry, total_queries,
                    referral_code, referral_count, created_at, last_active
             FROM users
@@ -1139,6 +1150,62 @@ def grant_bonus_messages(identifier: str, bonus_delta: int) -> tuple[bool, dict 
         }
 
 
+def update_user_memory_summary(identifier: str, summary: str) -> bool:
+    """Persists a compact long-term profile memory card for a user across sessions."""
+    ident = str(identifier or "").strip()
+    clean_summary = str(summary or "").strip()[:600]
+    if not ident or not clean_summary:
+        return False
+    try:
+        with DBContext() as db:
+            row = _find_user_row(db, ident)
+            if not row:
+                return False
+            uid = str(row["phone_number"])
+            db.execute(
+                "UPDATE users SET memory_summary = ? WHERE phone_number = ?",
+                (clean_summary, uid),
+            )
+            return True
+    except Exception as e:
+        print(f"[Warning] Failed to update user memory summary: {e}")
+        return False
+
+
+def import_guest_preview_turn(user_id: str, user_text: str, ai_reply: str) -> bool:
+    """
+    Idempotently imports a guest preview Q&A turn into a brand-new user's chat_history
+    ONLY if they have 0 saved messages yet (does NOT deduct a signed-in free trial question).
+    """
+    u_txt = str(user_text or "").strip()[:1000]
+    a_txt = str(ai_reply or "").strip()[:4000]
+    if not user_id or not u_txt or not a_txt:
+        return False
+    now = _utc_now()
+    try:
+        with DBContext() as db:
+            row = _find_user_row(db, user_id)
+            if not row:
+                return False
+            uid = str(row["phone_number"])
+            db.execute("SELECT COUNT(*) AS c FROM chat_history WHERE phone_number = ?", (uid,))
+            if (db.fetchone()["c"] or 0) > 0:
+                return False
+            ts = _db_ts(db, now)
+            db.execute(
+                "INSERT INTO chat_history (phone_number, role, content, created_at) VALUES (?, 'user', ?, ?)",
+                (uid, u_txt, ts),
+            )
+            db.execute(
+                "INSERT INTO chat_history (phone_number, role, content, created_at) VALUES (?, 'assistant', ?, ?)",
+                (uid, a_txt, ts),
+            )
+            return True
+    except Exception as e:
+        print(f"[Warning] Failed to import guest preview turn: {e}")
+        return False
+
+
 def get_chat_conversations(limit_users: int = 100, messages_per_user: int = 100) -> list[dict]:
     """
     Returns users with saved chat_history threads ordered by most recent message first.
@@ -1168,6 +1235,7 @@ def get_chat_conversations(limit_users: int = 100, messages_per_user: int = 100)
                 SELECT phone_number, name, email, contact_phone, auth_provider,
                        tier, trial_questions_used,
                        COALESCE(bonus_trial_questions, 0) AS bonus_trial_questions,
+                       COALESCE(memory_summary, '') AS memory_summary,
                        subscription_expiry,
                        total_queries, created_at, last_active
                 FROM users
@@ -1227,6 +1295,7 @@ def get_chat_conversations(limit_users: int = 100, messages_per_user: int = 100)
                         "bonus_trial_questions": u.get("bonus_trial_questions", 0) or 0,
                         "max_free_trial": get_user_trial_limit(u),
                         "total_queries": u.get("total_queries", 0) or 0,
+                        "memory_summary": (u.get("memory_summary") or "").strip(),
                         "message_count": len(all_msgs),
                         "user_message_count": len(user_msgs),
                         "last_message_at": (last_msg.get("created_at") if last_msg else "") or (u.get("last_active") or ""),

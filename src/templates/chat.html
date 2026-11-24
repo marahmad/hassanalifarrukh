@@ -1,26 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
     <meta name="theme-color" content="#0b0b0d">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Hassan AI — Unofficial AI Mentor</title>
-    <meta name="description" content="Chat directly with an AI trained on Hassan Ali Farrukh's real reels and talks on discipline, career, mindset, and life in Pakistan.">
+    <meta name="description"
+        content="Chat directly with an AI trained on Hassan Ali Farrukh's real reels and talks on discipline, career, mindset, and life in Pakistan.">
     <meta property="og:site_name" content="Hassan AI">
     <meta property="og:title" content="Hassan AI — Unofficial AI Mentor">
-    <meta property="og:description" content="Direct, no-BS mindset, career, fitness & life guidance trained on Hassan Ali Farrukh's reels. Try __FREE_TRIAL_QUESTIONS__ free messages.">
+    <meta property="og:description"
+        content="Direct, no-BS mindset, career, fitness & life guidance trained on Hassan Ali Farrukh's reels. Try __FREE_TRIAL_QUESTIONS__ free messages.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://hassanalifarrukh.store/">
     <meta property="og:image" content="https://hassanalifarrukh.store/static/demo_poster.jpg">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b0b0d'/%3E%3Crect x='4' y='4' width='56' height='56' rx='13' fill='%23ffffff'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='-apple-system,sans-serif' font-size='28' font-weight='800' fill='%230b0b0d'%3EHF%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b0b0d'/%3E%3Crect x='4' y='4' width='56' height='56' rx='13' fill='%23ffffff'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='-apple-system,sans-serif' font-size='28' font-weight='800' fill='%230b0b0d'%3EHF%3C/text%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
     <style>
         :root {
             --bg-base: #0b0b0d;
@@ -82,7 +88,8 @@
             font-weight: 700 !important;
         }
 
-        html, body {
+        html,
+        body {
             height: 100%;
             background-color: var(--bg-base);
             color: var(--text-primary);
@@ -151,6 +158,7 @@
         .sidebar::-webkit-scrollbar {
             width: 4px;
         }
+
         .sidebar::-webkit-scrollbar-thumb {
             background: var(--border);
             border-radius: 4px;
@@ -335,8 +343,17 @@
         }
 
         @keyframes pulseDot {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.4; transform: scale(0.85); }
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(0.85);
+            }
         }
 
         /* Membership Tier Widget */
@@ -728,6 +745,7 @@
         .messages-container::-webkit-scrollbar {
             width: 5px;
         }
+
         .messages-container::-webkit-scrollbar-thumb {
             background: var(--border);
             border-radius: 5px;
@@ -746,7 +764,8 @@
             letter-spacing: 0.8px;
         }
 
-        .date-divider::before, .date-divider::after {
+        .date-divider::before,
+        .date-divider::after {
             content: '';
             flex: 1;
             max-width: 120px;
@@ -764,8 +783,15 @@
         }
 
         @keyframes msgEnter {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .msg-row.user {
@@ -899,12 +925,29 @@
             border-radius: 50%;
             animation: bounceDot 1.4s infinite ease-in-out;
         }
-        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
 
         @keyframes bounceDot {
-            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-            30% { transform: translateY(-6px); opacity: 1; background: var(--accent-green); }
+
+            0%,
+            60%,
+            100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+
+            30% {
+                transform: translateY(-6px);
+                opacity: 1;
+                background: var(--accent-green);
+            }
         }
 
         /* ─── QUICK TOPIC CHIPS ─────────────────────────────────────── */
@@ -1039,6 +1082,173 @@
             transform: none;
         }
 
+        .mic-button {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .mic-button:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text-primary);
+        }
+
+        .mic-button.recording {
+            background: rgba(239, 68, 68, 0.18);
+            border-color: rgba(239, 68, 68, 0.55);
+            color: #f87171;
+            animation: micPulse 1.2s infinite ease-in-out;
+        }
+
+        .mic-button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            animation: none;
+        }
+
+        @keyframes micPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); }
+            50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+        }
+
+        .voice-recording-bar {
+            display: none;
+            flex: 1;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            min-height: 36px;
+            padding: 2px 4px;
+        }
+
+        .voice-recording-bar.active {
+            display: flex;
+        }
+
+        .voice-rec-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: #fca5a5;
+            min-width: 0;
+        }
+
+        .voice-rec-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: micPulse 1s infinite;
+            flex-shrink: 0;
+        }
+
+        .voice-cancel-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .voice-cancel-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .stream-cursor {
+            display: inline-block;
+            width: 7px;
+            height: 15px;
+            background: var(--accent-green);
+            margin-left: 3px;
+            vertical-align: -2px;
+            border-radius: 2px;
+            animation: blinkCursor 0.8s step-end infinite;
+        }
+
+        @keyframes blinkCursor {
+            50% { opacity: 0; }
+        }
+
+        .guest-inline-cta {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: var(--radius-md);
+            background: rgba(34, 197, 94, 0.09);
+            border: 1px solid rgba(34, 197, 94, 0.28);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .guest-inline-cta-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 16px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: #0b0b0d;
+            font-family: var(--font-sans);
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .guest-inapp-strip {
+            display: none;
+            background: rgba(245, 158, 11, 0.12);
+            border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+            padding: 8px 16px;
+            font-size: 12px;
+            color: #fde68a;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .guest-inapp-strip.visible {
+            display: flex;
+        }
+
+        .modal-preview-link {
+            width: 100%;
+            margin-top: 10px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .modal-preview-link:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+        }
+
         .input-hints {
             display: flex;
             align-items: center;
@@ -1108,7 +1318,8 @@
             letter-spacing: 0.8px;
         }
 
-        .divider-line-text::before, .divider-line-text::after {
+        .divider-line-text::before,
+        .divider-line-text::after {
             content: '';
             flex: 1;
             height: 1px;
@@ -1148,7 +1359,7 @@
             display: flex;
             flex-direction: column;
             gap: 14px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
             animation: modalScale 0.25s var(--ease-out);
         }
 
@@ -1173,7 +1384,8 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        .modal-close-icon:hover, .modal-close-icon:active {
+        .modal-close-icon:hover,
+        .modal-close-icon:active {
             background: rgba(255, 255, 255, 0.12);
             color: #ffffff;
             transform: scale(0.96);
@@ -1197,8 +1409,15 @@
         }
 
         @keyframes modalScale {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         .modal-header {
@@ -1348,7 +1567,7 @@
             pointer-events: none;
             transition: all 0.25s var(--ease-out);
             z-index: 999;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
             max-width: calc(100vw - 28px);
             white-space: normal;
             text-align: center;
@@ -1361,6 +1580,7 @@
         }
 
         @media (max-width: 600px) {
+
             /* ── Header Mobile Optimization ── */
             .chat-header {
                 height: calc(58px + env(safe-area-inset-top, 0px));
@@ -1511,7 +1731,8 @@
             }
 
             .chat-textarea {
-                font-size: 16px; /* Essential to prevent iOS Safari auto-zoom on focus */
+                font-size: 16px;
+                /* Essential to prevent iOS Safari auto-zoom on focus */
                 min-height: 22px;
                 padding: 3px 0;
             }
@@ -1882,968 +2103,1184 @@
         }
     </style>
 </head>
+
 <body>
 
-<div class="app-container" id="app-root-container">
+    <div class="app-container" id="app-root-container">
 
-    <!-- ─── BACKDROP FOR DRAWER ─────────────────────────────────── -->
-    <div class="drawer-backdrop" id="drawer-backdrop" onclick="toggleDrawer(false)"></div>
+        <!-- ─── BACKDROP FOR DRAWER ─────────────────────────────────── -->
+        <div class="drawer-backdrop" id="drawer-backdrop" onclick="toggleDrawer(false)"></div>
 
-    <!-- ─── SLIDE-OUT DRAWER PANEL (THE HAMBURGER MENU) ──────────── -->
-    <aside class="sidebar" id="app-slide-drawer">
-        <!-- Dynamic User Drawer Header (Replaced static brand header) -->
-        <div class="drawer-user-header" id="sidebar-user-card">
-            <div class="drawer-user-left">
-                <div class="user-avatar-img" id="sidebar-user-avatar">GU</div>
-                <div class="user-meta-info">
-                    <div class="user-meta-name" id="sidebar-user-name">Guest User</div>
-                    <div class="user-meta-auth" id="sidebar-user-auth">
-                        <span style="color: var(--accent-green);">⚡ Free Trial</span>
-                    </div>
-                </div>
-            </div>
-            <div class="drawer-header-actions">
-                <button class="drawer-close-btn" style="width: 34px; height: 34px;" title="Switch Account / Sign Out" onclick="resetUserSession()">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                </button>
-                <button class="drawer-close-btn" onclick="toggleDrawer(false)" title="Close Menu">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- Profile Credentials -->
-        <div class="profile-card">
-            <p class="profile-bio">
-                Unofficial AI mentor trained on <strong>267 public video reels, leadership philosophy</strong>, and mindset talks by Hassan Ali Farrukh. <span style="color: var(--text-muted);">Not officially affiliated.</span>
-            </p>
-            <div class="knowledge-stats">
-                <div class="live-dot"></div>
-                <span>267+ Public Reels &amp; Talks Indexed</span>
-            </div>
-        </div>
-
-        <!-- Membership Widget (Single All-Access Monthly Plan) -->
-        <div class="membership-card">
-            <div class="membership-header">
-                <span class="membership-title">Full Access Pass</span>
-                <span class="membership-price">PKR __MONTHLY_PRICE__/mo</span>
-            </div>
-            <div id="sidebar-active-sub-banner" style="display:none; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); border-radius:10px; padding:9px 11px; font-size:12px; color:#4ade80; font-weight:600; line-height:1.4;"></div>
-            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45;">
-                Everything included — unlimited chats, full reel archive, and deep step-by-step answers.
-            </div>
-            <div class="quick-pay-box">
-                <div class="quick-pay-item">
-                    <span>EasyPaisa: <strong>__EASYPAISA_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
-                    <span class="copy-pill" onclick="copySnippet('__EASYPAISA_NUMBER__', this)">Copy</span>
-                </div>
-                <div class="quick-pay-item">
-                    <span>Allied Bank: <strong>__ALLIED_BANK_ACCOUNT__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
-                    <span class="copy-pill" onclick="copySnippet('__ALLIED_BANK_ACCOUNT__', this)">Copy</span>
-                </div>
-                <div class="quick-pay-item">
-                    <span>Raast: <strong>__RAAST_ID_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
-                    <span class="copy-pill" onclick="copySnippet('__RAAST_ID_NUMBER__', this)">Copy</span>
-                </div>
-            </div>
-            <button id="sidebar-membership-cta" class="btn-link btn-primary-action" onclick="toggleDrawer(false); openPaywallModal();">
-                💳 Submit Payment / Activate
-            </button>
-        </div>
-
-        <!-- Sidebar Footer -->
-        <div class="sidebar-footer">
-            <button class="btn-link" onclick="toggleDrawer(false); openDemoVideoModal();" style="width: 100%;">
-                ▶ Watch 35s Real Demo
-            </button>
-            <button class="btn-link" onclick="toggleDrawer(false); openReferralModal();" style="width: 100%;">
-                🎁 Invite Friends (+__SIGNUP_BONUS_QUESTIONS__ Free Msgs &amp; Free Months)
-            </button>
-        </div>
-    </aside>
-
-    <!-- ─── MAIN CHAT AREA (FOCUSED CONVERSATION CANVAS) ─────────── -->
-    <main class="chat-main">
-        <!-- Top Chat Header with 3-Bar Hamburger on Top Left -->
-        <header class="chat-header">
-            <div class="header-left">
-                <!-- ☰ 3-BAR HAMBURGER BUTTON -->
-                <button class="hamburger-btn" id="header-hamburger-trigger" onclick="toggleDrawer(true)" title="Open Menu">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">
-                        <line x1="4" y1="6" x2="20" y2="6"></line>
-                        <line x1="4" y1="12" x2="20" y2="12"></line>
-                        <line x1="4" y1="18" x2="20" y2="18"></line>
-                    </svg>
-                </button>
-
-                <div class="header-brand-badge">
-                    <div class="header-logo-box">
-                        <img src="/static/hassan_avatar.jpg" alt="Hassan Ali Farrukh" loading="eager" decoding="async" onerror="this.remove(); this.parentElement.textContent='HF';">
-                    </div>
-                    <div class="header-user-status">
-                        <div class="header-user-title">
-                            <span class="header-name-text">Hassan Ali Farrukh AI</span>
-                        </div>
-                        <div class="header-subtitle-status">
-                            <span class="live-dot" style="width: 6px; height: 6px;"></span>
-                            <span id="session-status-text">Unofficial AI • Public Reels</span>
+        <!-- ─── SLIDE-OUT DRAWER PANEL (THE HAMBURGER MENU) ──────────── -->
+        <aside class="sidebar" id="app-slide-drawer">
+            <!-- Dynamic User Drawer Header (Replaced static brand header) -->
+            <div class="drawer-user-header" id="sidebar-user-card">
+                <div class="drawer-user-left">
+                    <div class="user-avatar-img" id="sidebar-user-avatar">GU</div>
+                    <div class="user-meta-info">
+                        <div class="user-meta-name" id="sidebar-user-name">Guest User</div>
+                        <div class="user-meta-auth" id="sidebar-user-auth">
+                            <span style="color: var(--accent-green);">⚡ Free Trial</span>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="header-actions">
-                <div id="plan-badge-pill" class="badge-pill trial" onclick="openPaywallModal()">
-                    ⚡ Free Trial
-                </div>
-                <button class="btn-icon" title="Invite Friends & Get Free Month" onclick="openReferralModal()">
-                    🎁
-                </button>
-                <button class="btn-icon" title="Switch Account / Sign Out" onclick="resetUserSession()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                </button>
-            </div>
-        </header>
-
-        <!-- Trial Questions Ticker -->
-        <div class="trial-ticker" id="trial-ticker-bar">
-            <span id="trial-count-label">Free Trial: <strong>0 of __FREE_TRIAL_QUESTIONS__</strong> questions used</span>
-            <div class="trial-bar-container">
-                <div class="trial-bar-fill" id="trial-progress-bar" style="width: 0%;"></div>
-            </div>
-        </div>
-
-        <!-- Messages Flow Area -->
-        <div class="messages-container" id="chat-messages-flow">
-            <div class="date-divider">Today</div>
-        </div>
-
-        <!-- Typing Animation Row -->
-        <div class="typing-row" id="chat-typing-box">
-            <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="lazy"></div>
-            <div class="typing-box">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        </div>
-
-        <!-- Quick Topics Horizontal Chips -->
-        <div class="chips-scroll-area" id="quick-topics-row">
-            <button class="topic-chip" onclick="handleChipClick('Yar main discipline nahi bana pa raha, har baar 2-3 din baad routine toot jati hai.')">
-                💪 Can't stay disciplined
-            </button>
-            <button class="topic-chip" onclick="handleChipClick('Career aur paise ko le kar bohot confused hoon Pakistan mein, samajh nahi aa raha kya karun.')">
-                🎯 Stuck in career
-            </button>
-            <button class="topic-chip" onclick="handleChipClick('Bohot zyada overthinking hoti hai aaj kal, dimagh sukoon mein nahi rehta.')">
-                🧠 Overthinking a lot
-            </button>
-            <button class="topic-chip" onclick="handleChipClick('Kuch log meri energy aur waqt bohot zaya karte hain, unse kaise deal karun?')">
-                🔥 Toxic people
-            </button>
-            <button class="topic-chip" onclick="handleChipClick('Fitness aur daily workout routine dobara shuru karni hai, kahan se start karun?')">
-                🏋️ Getting back in shape
-            </button>
-        </div>
-
-        <!-- Footer Input Bar -->
-        <footer class="chat-footer">
-            <div class="input-dock-wrapper">
-                <div class="input-box">
-                    <textarea 
-                        id="user-chat-input" 
-                        class="chat-textarea" 
-                        placeholder="Write whatever's on your mind..." 
-                        rows="1"
-                    ></textarea>
-                    <button id="send-msg-btn" class="send-button" onclick="handleSendAction()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                <div class="drawer-header-actions">
+                    <button class="drawer-close-btn" style="width: 34px; height: 34px;"
+                        title="Switch Account / Sign Out" onclick="resetUserSession()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                    </button>
+                    <button class="drawer-close-btn" onclick="toggleDrawer(false)" title="Close Menu">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
                 </div>
-                <div class="input-hints">
-                    <span>Press <strong>Enter ↵</strong> to send • <strong>Shift+Enter</strong> for new line</span>
-                    <span id="user-phone-tag">Guest</span>
+            </div>
+
+            <!-- Profile Credentials -->
+            <div class="profile-card">
+                <p class="profile-bio">
+                    Unofficial AI mentor trained on <strong>267 public video reels, leadership philosophy</strong>, and
+                    mindset talks by Hassan Ali Farrukh. <span style="color: var(--text-muted);">Not officially
+                        affiliated.</span>
+                </p>
+                <div class="knowledge-stats">
+                    <div class="live-dot"></div>
+                    <span>267+ Public Reels &amp; Talks Indexed</span>
                 </div>
             </div>
-        </footer>
-    </main>
-</div>
 
-<!-- ─── GOOGLE SIGN-IN MODAL (VERIFIED 1-TAP OAUTH ONLY) ────── -->
-<div class="modal-overlay__ONBOARDING_MODAL_CLASS__" id="onboarding-modal-overlay">
-    <div class="modal-card">
-        <div class="modal-header">
-            <div class="modal-avatar-badge">
-                <img src="/static/hassan_avatar.jpg" alt="Hassan Ali Farrukh" loading="eager" decoding="async">
+            <!-- Membership Widget (Single All-Access Monthly Plan) -->
+            <div class="membership-card">
+                <div class="membership-header">
+                    <span class="membership-title">Full Access Pass</span>
+                    <span class="membership-price">PKR __MONTHLY_PRICE__/mo</span>
+                </div>
+                <div id="sidebar-active-sub-banner"
+                    style="display:none; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); border-radius:10px; padding:9px 11px; font-size:12px; color:#4ade80; font-weight:600; line-height:1.4;">
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45;">
+                    Everything included — unlimited chats, full reel archive, and deep step-by-step answers.
+                </div>
+                <div class="quick-pay-box">
+                    <div class="quick-pay-item">
+                        <span>EasyPaisa: <strong>__EASYPAISA_NUMBER__</strong> <span
+                                style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                        <span class="copy-pill" onclick="copySnippet('__EASYPAISA_NUMBER__', this)">Copy</span>
+                    </div>
+                    <div class="quick-pay-item">
+                        <span>Allied Bank: <strong>__ALLIED_BANK_ACCOUNT__</strong> <span
+                                style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                        <span class="copy-pill" onclick="copySnippet('__ALLIED_BANK_ACCOUNT__', this)">Copy</span>
+                    </div>
+                    <div class="quick-pay-item">
+                        <span>Raast: <strong>__RAAST_ID_NUMBER__</strong> <span
+                                style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                        <span class="copy-pill" onclick="copySnippet('__RAAST_ID_NUMBER__', this)">Copy</span>
+                    </div>
+                </div>
+                <button id="sidebar-membership-cta" class="btn-link btn-primary-action"
+                    onclick="toggleDrawer(false); openPaywallModal();">
+                    💳 Submit Payment / Activate
+                </button>
             </div>
-            <h2 class="modal-title">Talk to Hassan AI</h2>
-            <p class="modal-desc">
-                Unofficial AI mentor trained on Hassan Ali Farrukh's public reels &amp; talks. Sign in with Google to save your chat history, free trial, and membership across devices.
-            </p>
-        </div>
 
-        <div id="inapp-browser-banner" class="inapp-banner">
-            <div class="inapp-banner-row">
-                <div><strong>Opened in TikTok / Instagram?</strong><br>Tap <strong>⋯</strong> (top right) → <strong>Open in Safari</strong> (or Chrome) so Google Sign-In works smoothly.</div>
+            <!-- Sidebar Footer -->
+            <div class="sidebar-footer">
+                <button class="btn-link" onclick="toggleDrawer(false); openDemoVideoModal();" style="width: 100%;">
+                    ▶ Watch 35s Real Demo
+                </button>
+                <button class="btn-link" onclick="toggleDrawer(false); openReferralModal();" style="width: 100%;">
+                    🎁 Invite Friends (+__SIGNUP_BONUS_QUESTIONS__ Free Msgs &amp; Free Months)
+                </button>
+            </div>
+        </aside>
+
+        <!-- ─── MAIN CHAT AREA (FOCUSED CONVERSATION CANVAS) ─────────── -->
+        <main class="chat-main">
+            <!-- Top Chat Header with 3-Bar Hamburger on Top Left -->
+            <header class="chat-header">
+                <div class="header-left">
+                    <!-- ☰ 3-BAR HAMBURGER BUTTON -->
+                    <button class="hamburger-btn" id="header-hamburger-trigger" onclick="toggleDrawer(true)"
+                        title="Open Menu">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.3" stroke-linecap="round">
+                            <line x1="4" y1="6" x2="20" y2="6"></line>
+                            <line x1="4" y1="12" x2="20" y2="12"></line>
+                            <line x1="4" y1="18" x2="20" y2="18"></line>
+                        </svg>
+                    </button>
+
+                    <div class="header-brand-badge">
+                        <div class="header-logo-box">
+                            <img src="/static/hassan_avatar.jpg" alt="Hassan Ali Farrukh" loading="eager"
+                                decoding="async" onerror="this.remove(); this.parentElement.textContent='HF';">
+                        </div>
+                        <div class="header-user-status">
+                            <div class="header-user-title">
+                                <span class="header-name-text">Hassan Ali Farrukh AI</span>
+                            </div>
+                            <div class="header-subtitle-status">
+                                <span class="live-dot" style="width: 6px; height: 6px;"></span>
+                                <span id="session-status-text">Unofficial AI • Public Reels</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <div id="plan-badge-pill" class="badge-pill trial" onclick="handlePlanBadgeClick()">
+                        ⚡ Free Trial
+                    </div>
+                    <button class="btn-icon" title="Invite Friends & Get Free Month" onclick="openReferralModal()">
+                        🎁
+                    </button>
+                    <button class="btn-icon" title="Switch Account / Sign Out" onclick="resetUserSession()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Trial Questions Ticker -->
+            <div class="trial-ticker" id="trial-ticker-bar">
+                <span id="trial-count-label">Free Trial: <strong>0 of __FREE_TRIAL_QUESTIONS__</strong> questions
+                    used</span>
+                <div class="trial-bar-container">
+                    <div class="trial-bar-fill" id="trial-progress-bar" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- In-App Browser Rescue Strip (Visible in TikTok/IG WebView when chatting as guest) -->
+            <div id="guest-inapp-top-banner" class="guest-inapp-strip">
+                <span>Opened in TikTok / IG? Tap <strong>⋯ → Open in Safari/Chrome</strong> to sign in smoothly.</span>
                 <button type="button" class="inapp-copy-btn" onclick="copySnippet(window.location.href, this)">Copy Link</button>
             </div>
-        </div>
 
-        <button type="button" class="demo-trigger-card" onclick="openDemoVideoModal()">
-            <div class="demo-trigger-left">
-                <div class="demo-play-circle">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
+            <!-- Messages Flow Area -->
+            <div class="messages-container" id="chat-messages-flow">
+                <div class="date-divider">Today</div>
+            </div>
+
+            <!-- Typing Animation Row -->
+            <div class="typing-row" id="chat-typing-box">
+                <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="lazy"></div>
+                <div class="typing-box">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
                 </div>
-                <div class="demo-trigger-text">
-                    <span class="demo-trigger-title">Watch Real Demo</span>
-                    <span class="demo-trigger-sub">Hassan's clip + live mentor reply</span>
-                </div>
             </div>
-            <span class="demo-duration-pill">0:35</span>
-        </button>
 
-        <div id="ob-auth-error" class="auth-error-banner"></div>
-
-        <div class="form-group">
-            <label class="form-label" for="ob-input-ref">Referral Code (Optional)</label>
-            <input type="text" id="ob-input-ref" class="form-input" placeholder="e.g. HASSAN-XXXX" autocomplete="off">
-        </div>
-
-        <button id="google-login-btn" class="google-auth-btn" onclick="initiateGoogleSignIn()">
-            <svg class="google-icon-svg" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-            </svg>
-            <span>Continue with Google</span>
-            <span class="fast-badge">1-Tap</span>
-        </button>
-    </div>
-</div>
-
-<!-- ─── PAYWALL & UPGRADE MODAL (SINGLE ALL-ACCESS PLAN) ────── -->
-<div class="modal-overlay" id="paywall-modal-overlay">
-    <div class="modal-card">
-        <button class="modal-close-icon" onclick="closePaywallModal()" aria-label="Close modal">✕</button>
-        <div class="modal-header">
-            <div class="modal-icon-badge">👑</div>
-            <h2 class="modal-title">Unlock Full Access</h2>
-            <p class="modal-desc">
-                One simple monthly pass with everything included — unlimited chats, full reel archive, and deep step-by-step mentorship replies.
-            </p>
-        </div>
-
-        <div id="paywall-error-box" class="auth-error-banner"></div>
-
-        <div class="plan-option-row">
-            <div class="plan-option-card selected" id="plan-card-full" style="cursor: default;">
-                <span class="plan-option-name">👑 Full Access — Monthly Pass</span>
-                <span class="plan-option-price">PKR __MONTHLY_PRICE__ / month</span>
-                <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Unlimited AI chats • Full reel archive • Deep step-by-step answers • Everything included</span>
-            </div>
-        </div>
-
-        <div class="paywall-bank-box">
-            <div class="paywall-bank-title">SEND PKR __MONTHLY_PRICE__ VIA EASYPAISA / ALLIED BANK / RAAST:</div>
-            
-            <div class="quick-pay-item">
-                <span>EasyPaisa: <strong>__EASYPAISA_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
-                <span class="copy-pill" onclick="copySnippet('__EASYPAISA_NUMBER__', this)">Copy</span>
-            </div>
-            <div class="quick-pay-item">
-                <span>Allied Bank: <strong>__ALLIED_BANK_ACCOUNT__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
-                <span class="copy-pill" onclick="copySnippet('__ALLIED_BANK_ACCOUNT__', this)">Copy</span>
-            </div>
-            <div class="quick-pay-item">
-                <span>Raast: <strong>__RAAST_ID_NUMBER__</strong> <span style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
-                <span class="copy-pill" onclick="copySnippet('__RAAST_ID_NUMBER__', this)">Copy</span>
-            </div>
-        </div>
-
-        <button type="button" id="paywall-wa-btn" class="form-btn" onclick="openWhatsAppPaymentProof()" style="background: #25D366; color: #062814; font-weight: 700;">
-            💬 Send Screenshot on WhatsApp (Fastest Activation)
-        </button>
-
-        <div style="text-align: center; font-size: 11px; color: var(--text-muted); margin: -2px 0;">
-            — or submit Transaction ID directly below —
-        </div>
-
-        <div class="form-group">
-            <label class="form-label" for="paywall-phone-input">Your Pakistani Mobile / EasyPaisa Number</label>
-            <input type="tel" id="paywall-phone-input" class="form-input" placeholder="0300 7560313 or +92 300 7560313" autocomplete="tel" oninput="updatePhonePreview('paywall-phone-input', 'paywall-phone-preview')">
-            <div id="paywall-phone-preview" class="phone-preview-hint"></div>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label" for="paywall-trx-input">Transaction ID (TRX ID)</label>
-            <input type="text" id="paywall-trx-input" class="form-input" placeholder="e.g. 202410319874">
-        </div>
-
-        <button id="paywall-submit-btn" class="form-btn" onclick="submitPaywallPayment()">
-            ✓ Submit Payment for Verification
-        </button>
-
-        <div style="background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.22); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-            <div style="font-size: 12px; font-weight: 700; color: #4ade80;">🎁 Want +__SIGNUP_BONUS_QUESTIONS__ Free Messages Right Now?</div>
-            <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
-                Invite a friend with your link — the moment they sign up, you unlock <strong>+__SIGNUP_BONUS_QUESTIONS__ bonus free messages</strong> (up to +__MAX_BONUS_QUESTIONS__), plus <strong>1 Month FREE</strong> when 3 friends subscribe.
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <button type="button" onclick="shareReferralOnWhatsApp()" style="flex: 1; background: rgba(37, 211, 102, 0.16); border: 1px solid rgba(37, 211, 102, 0.4); color: #4ade80; border-radius: 8px; padding: 9px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                    📲 Share on WhatsApp
+            <!-- Quick Topics Horizontal Chips -->
+            <div class="chips-scroll-area" id="quick-topics-row">
+                <button class="topic-chip"
+                    onclick="handleChipClick('Yar main discipline nahi bana pa raha, har baar 2-3 din baad routine toot jati hai.')">
+                    💪 Can't stay disciplined
                 </button>
-                <button type="button" onclick="copyReferralInvite()" style="flex: 1; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); color: var(--text-primary); border-radius: 8px; padding: 9px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                    📋 Copy Link
+                <button class="topic-chip"
+                    onclick="handleChipClick('Career aur paise ko le kar bohot confused hoon Pakistan mein, samajh nahi aa raha kya karun.')">
+                    🎯 Stuck in career
+                </button>
+                <button class="topic-chip"
+                    onclick="handleChipClick('Bohot zyada overthinking hoti hai aaj kal, dimagh sukoon mein nahi rehta.')">
+                    🧠 Overthinking a lot
+                </button>
+                <button class="topic-chip"
+                    onclick="handleChipClick('Kuch log meri energy aur waqt bohot zaya karte hain, unse kaise deal karun?')">
+                    🔥 Toxic people
+                </button>
+                <button class="topic-chip"
+                    onclick="handleChipClick('Fitness aur daily workout routine dobara shuru karni hai, kahan se start karun?')">
+                    🏋️ Getting back in shape
                 </button>
             </div>
-        </div>
 
-        <button class="modal-dismiss-link" onclick="closePaywallModal()">
-            Continue Browsing
-        </button>
+            <!-- Footer Input Bar -->
+            <footer class="chat-footer">
+                <div class="input-dock-wrapper">
+                    <div class="input-box">
+                        <textarea id="user-chat-input" class="chat-textarea"
+                            placeholder="Write or tap 🎙️ to speak..." rows="1"></textarea>
+                        <div id="voice-recording-bar" class="voice-recording-bar">
+                            <div class="voice-rec-status">
+                                <span class="voice-rec-dot"></span>
+                                <span id="voice-rec-timer">Recording 0:00</span>
+                            </div>
+                            <button type="button" class="voice-cancel-btn" onclick="cancelVoiceRecording()">✕ Cancel</button>
+                        </div>
+                        <button type="button" id="mic-record-btn" class="mic-button" onclick="toggleVoiceRecording()" title="Send voice message (Urdu / English)">
+                            <svg id="mic-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="23"></line>
+                                <line x1="8" y1="23" x2="16" y2="23"></line>
+                            </svg>
+                        </button>
+                        <button id="send-msg-btn" class="send-button" onclick="handleSendAction()" title="Send message">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="input-hints">
+                        <span>Press <strong>Enter ↵</strong> to send • <strong>Shift+Enter</strong> for new line</span>
+                        <span id="user-phone-tag">Guest</span>
+                    </div>
+                </div>
+            </footer>
+        </main>
     </div>
-</div>
 
-<!-- ─── REFERRAL HUB MODAL ──────────────────────────────────── -->
-<div class="modal-overlay" id="referral-modal-overlay">
-    <div class="modal-card">
-        <button class="modal-close-icon" onclick="closeReferralModal()" aria-label="Close modal">✕</button>
-        <div class="modal-header">
-            <div class="modal-icon-badge">🎁</div>
-            <h2 class="modal-title">Your Referral Hub</h2>
-            <p class="modal-desc">
-                <strong>+__SIGNUP_BONUS_QUESTIONS__ bonus free messages</strong> every time a friend signs up (up to +__MAX_BONUS_QUESTIONS__), plus <strong>1 Month FREE</strong> when 3 friends subscribe!
-            </p>
-        </div>
-
-        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; text-align: center;">
-            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">YOUR INVITE CODE</div>
-            <div id="referral-code-display" style="font-family: var(--font-mono); font-size: 22px; font-weight: 800; color: var(--accent-green); letter-spacing: 1px;">
-                HASSAN-XXXX
+    <!-- ─── GOOGLE SIGN-IN MODAL (VERIFIED 1-TAP OAUTH ONLY) ────── -->
+    <div class="modal-overlay__ONBOARDING_MODAL_CLASS__" id="onboarding-modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-avatar-badge">
+                    <img src="/static/hassan_avatar.jpg" alt="Hassan Ali Farrukh" loading="eager" decoding="async">
+                </div>
+                <h2 class="modal-title">Talk to Hassan AI</h2>
+                <p class="modal-desc">
+                    Unofficial AI mentor trained on Hassan Ali Farrukh's public reels &amp; talks. Sign in with Google
+                    to save your chat history, free trial, and membership across devices.
+                </p>
             </div>
+
+            <div id="inapp-browser-banner" class="inapp-banner">
+                <div class="inapp-banner-row">
+                    <div><strong>Opened in TikTok / Instagram?</strong><br>Tap <strong>⋯</strong> (top right) →
+                        <strong>Open in Safari</strong> (or Chrome) so Google Sign-In works smoothly.
+                    </div>
+                    <button type="button" class="inapp-copy-btn" onclick="copySnippet(window.location.href, this)">Copy
+                        Link</button>
+                </div>
+            </div>
+
+            <button type="button" class="demo-trigger-card" onclick="openDemoVideoModal()">
+                <div class="demo-trigger-left">
+                    <div class="demo-play-circle">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="6,4 20,12 6,20" />
+                        </svg>
+                    </div>
+                    <div class="demo-trigger-text">
+                        <span class="demo-trigger-title">Watch Real Demo</span>
+                        <span class="demo-trigger-sub">Hassan's clip + live mentor reply</span>
+                    </div>
+                </div>
+                <span class="demo-duration-pill">0:35</span>
+            </button>
+
+            <div id="ob-auth-error" class="auth-error-banner"></div>
+
+            <div class="form-group">
+                <label class="form-label" for="ob-input-ref">Referral Code (Optional)</label>
+                <input type="text" id="ob-input-ref" class="form-input" placeholder="e.g. HASSAN-XXXX"
+                    autocomplete="off">
+            </div>
+
+            <button id="google-login-btn" class="google-auth-btn" onclick="initiateGoogleSignIn()">
+                <svg class="google-icon-svg" viewBox="0 0 24 24">
+                    <path fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>Continue with Google</span>
+                <span class="fast-badge">1-Tap</span>
+            </button>
+            <button id="ob-try-preview-btn" type="button" class="modal-preview-link" onclick="closeAuthModalForPreview()" style="display:none;">
+                ✨ Try 1 Free Question First (No Sign-In)
+            </button>
         </div>
-
-        <button type="button" class="form-btn" onclick="shareReferralOnWhatsApp()" style="background: #25D366; color: #062814; font-weight: 700;">
-            📲 Share on WhatsApp (+__SIGNUP_BONUS_QUESTIONS__ Free Messages)
-        </button>
-
-        <button class="form-btn" onclick="copyReferralInvite()" style="background: rgba(255, 255, 255, 0.08); color: #ffffff; border: 1px solid var(--border);">
-            📋 Copy Referral Link
-        </button>
-
-        <button style="background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; padding: 4px;" onclick="closeReferralModal()">
-            Close
-        </button>
     </div>
-</div>
 
-<!-- ─── LAZY DEMO VIDEO MODAL (0 KB LOADED UNTIL TAPPED) ─────── -->
-<div class="modal-overlay" id="demo-video-modal-overlay">
-    <div class="modal-card video-modal-card">
-        <button class="modal-close-icon" onclick="closeDemoVideoModal()" aria-label="Close demo video">✕</button>
-        <div class="modal-header" style="padding-top: 2px;">
-            <h2 class="modal-title" style="font-size: 16px;">Hassan AI — Real Demo</h2>
+    <!-- ─── PAYWALL & UPGRADE MODAL (SINGLE ALL-ACCESS PLAN) ────── -->
+    <div class="modal-overlay" id="paywall-modal-overlay">
+        <div class="modal-card">
+            <button class="modal-close-icon" onclick="closePaywallModal()" aria-label="Close modal">✕</button>
+            <div class="modal-header">
+                <div class="modal-icon-badge">👑</div>
+                <h2 class="modal-title">Unlock Full Access</h2>
+                <p class="modal-desc">
+                    One simple monthly pass with everything included — unlimited chats, full reel archive, and deep
+                    step-by-step mentorship replies.
+                </p>
+            </div>
+
+            <div id="paywall-error-box" class="auth-error-banner"></div>
+
+            <div class="plan-option-row">
+                <div class="plan-option-card selected" id="plan-card-full" style="cursor: default;">
+                    <span class="plan-option-name">👑 Full Access — Monthly Pass</span>
+                    <span class="plan-option-price">PKR __MONTHLY_PRICE__ / month</span>
+                    <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Unlimited AI chats •
+                        Full reel archive • Deep step-by-step answers • Everything included</span>
+                </div>
+            </div>
+
+            <div class="paywall-bank-box">
+                <div class="paywall-bank-title">SEND PKR __MONTHLY_PRICE__ VIA EASYPAISA / ALLIED BANK / RAAST:</div>
+
+                <div class="quick-pay-item">
+                    <span>EasyPaisa: <strong>__EASYPAISA_NUMBER__</strong> <span
+                            style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                    <span class="copy-pill" onclick="copySnippet('__EASYPAISA_NUMBER__', this)">Copy</span>
+                </div>
+                <div class="quick-pay-item">
+                    <span>Allied Bank: <strong>__ALLIED_BANK_ACCOUNT__</strong> <span
+                            style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                    <span class="copy-pill" onclick="copySnippet('__ALLIED_BANK_ACCOUNT__', this)">Copy</span>
+                </div>
+                <div class="quick-pay-item">
+                    <span>Raast: <strong>__RAAST_ID_NUMBER__</strong> <span
+                            style="font-size:11px;color:var(--text-muted);display:block;">__ACCOUNT_TITLE__</span></span>
+                    <span class="copy-pill" onclick="copySnippet('__RAAST_ID_NUMBER__', this)">Copy</span>
+                </div>
+            </div>
+
+            <button type="button" id="paywall-wa-btn" class="form-btn" onclick="openWhatsAppPaymentProof()"
+                style="background: #25D366; color: #062814; font-weight: 700;">
+                💬 Send Screenshot on WhatsApp (Fastest Activation)
+            </button>
+
+            <div style="text-align: center; font-size: 11px; color: var(--text-muted); margin: -2px 0;">
+                — or submit Transaction ID directly below —
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="paywall-phone-input">Your Pakistani Mobile / EasyPaisa Number</label>
+                <input type="tel" id="paywall-phone-input" class="form-input"
+                    placeholder="0300 7560313 or +92 300 7560313" autocomplete="tel"
+                    oninput="updatePhonePreview('paywall-phone-input', 'paywall-phone-preview')">
+                <div id="paywall-phone-preview" class="phone-preview-hint"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="paywall-trx-input">Transaction ID (TRX ID)</label>
+                <input type="text" id="paywall-trx-input" class="form-input" placeholder="e.g. 202410319874">
+            </div>
+
+            <button id="paywall-submit-btn" class="form-btn" onclick="submitPaywallPayment()">
+                ✓ Submit Payment for Verification
+            </button>
+
+            <div
+                style="background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.22); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-size: 12px; font-weight: 700; color: #4ade80;">🎁 Want +__SIGNUP_BONUS_QUESTIONS__ Free
+                    Messages Right Now?</div>
+                <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+                    Invite a friend with your link — the moment they sign up, you unlock
+                    <strong>+__SIGNUP_BONUS_QUESTIONS__ bonus free messages</strong> (up to +__MAX_BONUS_QUESTIONS__),
+                    plus <strong>1 Month FREE</strong> when 3 friends subscribe.
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" onclick="shareReferralOnWhatsApp()"
+                        style="flex: 1; background: rgba(37, 211, 102, 0.16); border: 1px solid rgba(37, 211, 102, 0.4); color: #4ade80; border-radius: 8px; padding: 9px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                        📲 Share on WhatsApp
+                    </button>
+                    <button type="button" onclick="copyReferralInvite()"
+                        style="flex: 1; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); color: var(--text-primary); border-radius: 8px; padding: 9px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                        📋 Copy Link
+                    </button>
+                </div>
+            </div>
+
+            <button class="modal-dismiss-link" onclick="closePaywallModal()">
+                Continue Browsing
+            </button>
         </div>
-        <div class="demo-video-frame" id="demo-video-slot"></div>
-        <button id="demo-modal-cta-btn" class="form-btn" onclick="closeDemoVideoModal(); if (!APP_STATE.authenticated) initiateGoogleSignIn();">
-            Try __FREE_TRIAL_QUESTIONS__ Free Messages →
-        </button>
     </div>
-</div>
 
-<!-- ─── TOAST NOTIFICATION ──────────────────────────────────── -->
-<div id="app-toast-box" class="toast-notify">Copied to clipboard ✓</div>
+    <!-- ─── REFERRAL HUB MODAL ──────────────────────────────────── -->
+    <div class="modal-overlay" id="referral-modal-overlay">
+        <div class="modal-card">
+            <button class="modal-close-icon" onclick="closeReferralModal()" aria-label="Close modal">✕</button>
+            <div class="modal-header">
+                <div class="modal-icon-badge">🎁</div>
+                <h2 class="modal-title">Your Referral Hub</h2>
+                <p class="modal-desc">
+                    <strong>+__SIGNUP_BONUS_QUESTIONS__ bonus free messages</strong> every time a friend signs up (up to
+                    +__MAX_BONUS_QUESTIONS__), plus <strong>1 Month FREE</strong> when 3 friends subscribe!
+                </p>
+            </div>
 
-<script>
-// ── Application State (Server-Hydrated for Zero-Waterfall First Paint) ──
-const GOOGLE_OAUTH_ENABLED = __GOOGLE_OAUTH_ENABLED__;
-const GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
-const SUPPORT_WHATSAPP_PHONE = "__SUPPORT_WHATSAPP_PHONE__";
-const INITIAL_AUTH = __INITIAL_AUTH_JSON__;
-const INITIAL_HISTORY = __INITIAL_HISTORY_JSON__;
-const PKT_TZ = 'Asia/Karachi';
+            <div
+                style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; text-align: center;">
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">YOUR INVITE CODE</div>
+                <div id="referral-code-display"
+                    style="font-family: var(--font-mono); font-size: 22px; font-weight: 800; color: var(--accent-green); letter-spacing: 1px;">
+                    HASSAN-XXXX
+                </div>
+            </div>
 
-const APP_STATE = {
-    authenticated: false,
-    userId: '',
-    userName: '',
-    userPhone: '',
-    displayPhone: '',
-    userEmail: '',
-    avatarUrl: '',
-    authProvider: '',
-    trialQuestionsUsed: 0,
-    maxFreeTrial: __FREE_TRIAL_QUESTIONS__,
-    currentTier: 'trial',
-    referralCode: 'HASSAN-XXXX',
-    isSubscribed: false,
-    subscriptionExpiry: '',
-    drawerOpen: false,
-    googleEnabled: GOOGLE_OAUTH_ENABLED,
-    welcomeInjected: false,
-    historyLoaded: false,
-    lastRenderedDateKey: '',
-    renderedMessageIds: new Set(),
-    isSending: false
-};
+            <button type="button" class="form-btn" onclick="shareReferralOnWhatsApp()"
+                style="background: #25D366; color: #062814; font-weight: 700;">
+                📲 Share on WhatsApp (+__SIGNUP_BONUS_QUESTIONS__ Free Messages)
+            </button>
 
-// ── Consistent PKT (Asia/Karachi, UTC+5) Time Helpers (Matches Admin Dashboard) ──
-function parseUtcTimestamp(iso) {
-    if (!iso) return null;
-    if (iso instanceof Date) return isNaN(iso.getTime()) ? null : iso;
-    let s = String(iso).trim();
-    if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
-        s = s.replace(' ', 'T');
-    }
-    s = s.replace(/(\.\d{3})\d+/, '$1');
-    if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
-        s += 'Z';
-    }
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? null : d;
-}
+            <button class="form-btn" onclick="copyReferralInvite()"
+                style="background: rgba(255, 255, 255, 0.08); color: #ffffff; border: 1px solid var(--border);">
+                📋 Copy Referral Link
+            </button>
 
-function getPktDateKey(dateObj) {
-    try {
-        const parts = new Intl.DateTimeFormat('en-CA', {
-            timeZone: PKT_TZ,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-        }).formatToParts(dateObj);
-        const map = {};
-        parts.forEach(p => { map[p.type] = p.value; });
-        return map.year + '-' + map.month + '-' + map.day;
-    } catch (e) {
-        return new Date(dateObj.getTime() + 5 * 3600 * 1000).toISOString().slice(0, 10);
-    }
-}
+            <button
+                style="background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; padding: 4px;"
+                onclick="closeReferralModal()">
+                Close
+            </button>
+        </div>
+    </div>
 
-function formatPktDateDivider(dateObj) {
-    const now = new Date();
-    const todayKey = getPktDateKey(now);
-    const yesterdayKey = getPktDateKey(new Date(now.getTime() - 86400000));
-    const targetKey = getPktDateKey(dateObj);
-    if (targetKey === todayKey) return 'Today';
-    if (targetKey === yesterdayKey) return 'Yesterday';
-    try {
-        const sameYear = targetKey.slice(0, 4) === todayKey.slice(0, 4);
-        return new Intl.DateTimeFormat('en-US', {
-            timeZone: PKT_TZ,
-            month: 'short',
-            day: 'numeric',
-            ...(sameYear ? {} : { year: 'numeric' })
-        }).format(dateObj);
-    } catch (e) {
-        return targetKey;
-    }
-}
+    <!-- ─── LAZY DEMO VIDEO MODAL (0 KB LOADED UNTIL TAPPED) ─────── -->
+    <div class="modal-overlay" id="demo-video-modal-overlay">
+        <div class="modal-card video-modal-card">
+            <button class="modal-close-icon" onclick="closeDemoVideoModal()" aria-label="Close demo video">✕</button>
+            <div class="modal-header" style="padding-top: 2px;">
+                <h2 class="modal-title" style="font-size: 16px;">Hassan AI — Real Demo</h2>
+            </div>
+            <div class="demo-video-frame" id="demo-video-slot"></div>
+            <button id="demo-modal-cta-btn" class="form-btn"
+                onclick="closeDemoVideoModal(); if (!APP_STATE.authenticated) initiateGoogleSignIn();">
+                Try __FREE_TRIAL_QUESTIONS__ Free Messages →
+            </button>
+        </div>
+    </div>
 
-function formatPktClockTime(dateObj) {
-    try {
-        return new Intl.DateTimeFormat('en-US', {
-            timeZone: PKT_TZ,
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        }).format(dateObj);
-    } catch (e) {
-        const shifted = new Date(dateObj.getTime() + 5 * 3600 * 1000);
-        const h = shifted.getUTCHours();
-        const m = String(shifted.getUTCMinutes()).padStart(2, '0');
-        return ((h % 12) || 12) + ':' + m + ' ' + (h < 12 ? 'AM' : 'PM');
-    }
-}
+    <!-- ─── TOAST NOTIFICATION ──────────────────────────────────── -->
+    <div id="app-toast-box" class="toast-notify">Copied to clipboard ✓</div>
 
-function formatPktExpiryDate(iso) {
-    const d = parseUtcTimestamp(iso);
-    if (!d) return '';
-    try {
-        return new Intl.DateTimeFormat('en-US', {
-            timeZone: PKT_TZ,
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        }).format(d);
-    } catch (e) {
-        return String(iso).slice(0, 10);
-    }
-}
+    <script>
+        // ── Application State (Server-Hydrated for Zero-Waterfall First Paint) ──
+        const GOOGLE_OAUTH_ENABLED = __GOOGLE_OAUTH_ENABLED__;
+        const GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
+        const SUPPORT_WHATSAPP_PHONE = "__SUPPORT_WHATSAPP_PHONE__";
+        const INITIAL_AUTH = __INITIAL_AUTH_JSON__;
+        const INITIAL_HISTORY = __INITIAL_HISTORY_JSON__;
+        const PKT_TZ = 'Asia/Karachi';
 
-// ── Canonical Pakistani Mobile Normalization (Mirrors src/phone_utils.py) ──
-function normalizePkPhoneClient(raw) {
-    if (!raw) return null;
-    const cleaned = String(raw).replace(/[\u200b-\u200f\u202a-\u202e\ufeff\u00a0]/g, '').trim();
-    if (!cleaned || !/^[\d\s\+\-\(\)\.]+$/.test(cleaned)) return null;
-    if (cleaned.slice(1).includes('+')) return null;
-
-    const digits = cleaned.replace(/\D/g, '');
-    let canon = '';
-    if (digits.startsWith('00920') && digits.length === 15) {
-        canon = '92' + digits.slice(5);
-    } else if (digits.startsWith('0092') && digits.length === 14) {
-        canon = digits.slice(2);
-    } else if (digits.startsWith('920') && digits.length === 13) {
-        canon = '92' + digits.slice(3);
-    } else if (digits.startsWith('92') && digits.length === 12) {
-        canon = digits;
-    } else if (digits.startsWith('03') && digits.length === 11) {
-        canon = '92' + digits.slice(1);
-    } else if (digits.startsWith('3') && digits.length === 10) {
-        canon = '92' + digits;
-    } else {
-        return null;
-    }
-    return /^923\d{9}$/.test(canon) ? canon : null;
-}
-
-function formatUserPhoneDisplay(phone) {
-    const canon = normalizePkPhoneClient(phone);
-    if (!canon) return '';
-    return '+92 ' + canon.slice(2, 5) + ' ' + canon.slice(5);
-}
-
-function updatePhonePreview(inputId, previewId) {
-    const inputEl = document.getElementById(inputId);
-    const previewEl = document.getElementById(previewId);
-    if (!inputEl || !previewEl) return;
-    const raw = inputEl.value.trim();
-    if (!raw) {
-        previewEl.textContent = '';
-        previewEl.className = 'phone-preview-hint';
-        return;
-    }
-    const canon = normalizePkPhoneClient(raw);
-    if (canon) {
-        previewEl.textContent = `✓ Saved as ${formatUserPhoneDisplay(canon)}`;
-        previewEl.className = 'phone-preview-hint valid';
-    } else {
-        previewEl.textContent = 'Enter a valid Pakistani mobile number (e.g. 0300 7560313 or +92 300 7560313)';
-        previewEl.className = 'phone-preview-hint invalid';
-    }
-}
-
-function showModalError(boxId, message) {
-    const el = document.getElementById(boxId);
-    if (!el) return;
-    if (message) {
-        el.textContent = message;
-        el.classList.add('visible');
-    } else {
-        el.textContent = '';
-        el.classList.remove('visible');
-    }
-}
-
-// ── Hamburger Drawer Toggle ────────────────────────────────────
-function toggleDrawer(open) {
-    const container = document.getElementById('app-root-container');
-    if (open === undefined) {
-        APP_STATE.drawerOpen = !APP_STATE.drawerOpen;
-    } else {
-        APP_STATE.drawerOpen = !!open;
-    }
-
-    if (APP_STATE.drawerOpen) {
-        container.classList.add('drawer-open');
-    } else {
-        container.classList.remove('drawer-open');
-    }
-}
-
-// Close drawer/modals on Escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        toggleDrawer(false);
-        closePaywallModal();
-        closeReferralModal();
-        closeDemoVideoModal();
-    }
-});
-
-// ── In-App Browser Detection (TikTok / Instagram / FB WKWebView) ──
-function isInAppBrowser() {
-    const ua = navigator.userAgent || '';
-    return /BytedanceWebview|musical_ly|TikTok|Instagram|FBAN|FBAV|Snapchat|Line\//i.test(ua);
-}
-
-function checkInAppBrowserBanner() {
-    const banner = document.getElementById('inapp-browser-banner');
-    if (banner && isInAppBrowser()) {
-        banner.classList.add('visible');
-    }
-}
-
-// ── Lazy Demo Video Modal (Zero Network Bytes on Initial Load) ──
-function openDemoVideoModal() {
-    const overlay = document.getElementById('demo-video-modal-overlay');
-    const slot = document.getElementById('demo-video-slot');
-    const ctaBtn = document.getElementById('demo-modal-cta-btn');
-    if (!overlay || !slot) return;
-
-    if (ctaBtn) {
-        ctaBtn.style.display = APP_STATE.authenticated ? 'none' : 'flex';
-    }
-
-    let vid = document.getElementById('demo-video-player');
-    if (!vid) {
-        vid = document.createElement('video');
-        vid.id = 'demo-video-player';
-        vid.src = '/static/demo_preview.mp4';
-        vid.poster = '/static/demo_poster.jpg';
-        vid.controls = true;
-        vid.playsInline = true;
-        vid.setAttribute('playsinline', '');
-        vid.setAttribute('webkit-playsinline', '');
-        vid.preload = 'metadata';
-        slot.appendChild(vid);
-    }
-
-    overlay.classList.add('active');
-    const playPromise = vid.play();
-    if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(() => {});
-    }
-}
-
-function closeDemoVideoModal() {
-    const overlay = document.getElementById('demo-video-modal-overlay');
-    if (overlay) overlay.classList.remove('active');
-    const vid = document.getElementById('demo-video-player');
-    if (vid && !vid.paused) {
-        try { vid.pause(); } catch (e) {}
-    }
-}
-
-// ── Initialization (Instant Synchronous Hydration — Zero Waterfall) ──
-window.addEventListener('DOMContentLoaded', async () => {
-    setupInputAutoResize();
-    setupModalBackdropDismiss();
-    checkInAppBrowserBanner();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const signedInVia = urlParams.get('signed_in');
-    const authErrorParam = urlParams.get('auth_error');
-    const refParam = (urlParams.get('ref') || '').trim().toUpperCase();
-    if (refParam) {
-        const refInput = document.getElementById('ob-input-ref');
-        if (refInput && !refInput.value) {
-            refInput.value = refParam;
-        }
-    }
-    if (signedInVia || authErrorParam) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    if (typeof INITIAL_AUTH === 'object' && INITIAL_AUTH !== null) {
-        applyInitialAuthPayload(INITIAL_AUTH, signedInVia, authErrorParam);
-    } else {
-        await hydrateSessionFromServer(signedInVia, authErrorParam);
-    }
-});
-
-function setupModalBackdropDismiss() {
-    const paywallOverlay = document.getElementById('paywall-modal-overlay');
-    if (paywallOverlay) {
-        paywallOverlay.addEventListener('click', (e) => {
-            if (e.target === paywallOverlay) closePaywallModal();
-        });
-    }
-    const refOverlay = document.getElementById('referral-modal-overlay');
-    if (refOverlay) {
-        refOverlay.addEventListener('click', (e) => {
-            if (e.target === refOverlay) closeReferralModal();
-        });
-    }
-    const demoOverlay = document.getElementById('demo-video-modal-overlay');
-    if (demoOverlay) {
-        demoOverlay.addEventListener('click', (e) => {
-            if (e.target === demoOverlay) closeDemoVideoModal();
-        });
-    }
-}
-
-function applyInitialAuthPayload(data, signedInVia = null, authErrorParam = null) {
-    APP_STATE.googleEnabled = !!data.google_enabled;
-
-    if (data.authenticated && data.user) {
-        const hydratedHistory = Array.isArray(INITIAL_HISTORY) ? INITIAL_HISTORY : [];
-        applyAuthenticatedUser(data.user, { showWelcomeToast: !!signedInVia, history: hydratedHistory });
-        if (signedInVia === 'google') {
-            showToast(`Welcome ${data.user.name}! Signed in via Google ✓`);
-        }
-        return;
-    }
-
-    openAuthModal();
-    if (!APP_STATE.googleEnabled) {
-        showModalError('ob-auth-error', 'Google Sign-In is not configured on the server yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env to enable sign-in.');
-    } else if (authErrorParam) {
-        const msgMap = {
-            google_not_configured: 'Google Sign-In is not configured on the server yet.',
-            invalid_state: 'Sign-in session expired. Please try again.',
-            cancelled: 'Google Sign-In was cancelled.',
-            verification_failed: 'Google could not verify your email address.'
+        const APP_STATE = {
+            authenticated: false,
+            userId: '',
+            userName: '',
+            userPhone: '',
+            displayPhone: '',
+            userEmail: '',
+            avatarUrl: '',
+            authProvider: '',
+            trialQuestionsUsed: 0,
+            maxFreeTrial: __FREE_TRIAL_QUESTIONS__,
+            currentTier: 'trial',
+            referralCode: 'HASSAN-XXXX',
+            isSubscribed: false,
+            subscriptionExpiry: '',
+            drawerOpen: false,
+            googleEnabled: GOOGLE_OAUTH_ENABLED,
+            welcomeInjected: false,
+            historyLoaded: false,
+            lastRenderedDateKey: '',
+            renderedMessageIds: new Set(),
+            guestPreviewUsed: !!(INITIAL_AUTH && INITIAL_AUTH.guest_preview_used),
+            isRecording: false,
+            isTranscribing: false,
+            isSending: false
         };
-        showModalError('ob-auth-error', msgMap[authErrorParam] || 'Google Sign-In failed. Please try again.');
-    }
-    if (APP_STATE.googleEnabled && !isInAppBrowser()) {
-        scheduleGoogleOneTapLazyLoad();
-    }
-}
 
-async function hydrateSessionFromServer(signedInVia = null, authErrorParam = null) {
-    try {
-        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
-        const data = await res.json();
-        applyInitialAuthPayload(data, signedInVia, authErrorParam);
-        return;
-    } catch (e) {
-        console.error('Session check failed:', e);
-    }
-    applyInitialAuthPayload({ authenticated: false, user: null, google_enabled: APP_STATE.googleEnabled }, signedInVia, authErrorParam);
-}
-
-function openAuthModal() {
-    APP_STATE.authenticated = false;
-    document.getElementById('onboarding-modal-overlay').classList.add('active');
-}
-
-// ── Google Authentication (Lazy One-Tap After Paint; 1-Tap OAuth Always Ready) ──
-let _gsiScriptRequested = false;
-
-function scheduleGoogleOneTapLazyLoad() {
-    // Skip heavy 103 KB GSI script on iOS Safari/WebKit where ITP suppresses One-Tap anyway
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-    if (isIOS || _gsiScriptRequested || !GOOGLE_CLIENT_ID) return;
-
-    const trigger = () => {
-        if (APP_STATE.authenticated || _gsiScriptRequested) return;
-        _gsiScriptRequested = true;
-        const s = document.createElement('script');
-        s.src = 'https://accounts.google.com/gsi/client';
-        s.async = true;
-        s.defer = true;
-        s.onload = initGoogleOneTap;
-        document.head.appendChild(s);
-    };
-
-    if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => setTimeout(trigger, 800), { timeout: 2500 });
-    } else {
-        setTimeout(trigger, 1200);
-    }
-}
-
-function initGoogleOneTap() {
-    if (!APP_STATE.authenticated && APP_STATE.googleEnabled && GOOGLE_CLIENT_ID && window.google && window.google.accounts) {
-        try {
-            google.accounts.id.initialize({
-                client_id: GOOGLE_CLIENT_ID,
-                callback: handleGoogleCredentialResponse,
-                auto_select: false
-            });
-            google.accounts.id.prompt();
-        } catch (e) {
-            console.log('Google One Tap init deferred', e);
+        // ── Consistent PKT (Asia/Karachi, UTC+5) Time Helpers (Matches Admin Dashboard) ──
+        function parseUtcTimestamp(iso) {
+            if (!iso) return null;
+            if (iso instanceof Date) return isNaN(iso.getTime()) ? null : iso;
+            let s = String(iso).trim();
+            if (!s) return null;
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
+                s = s.replace(' ', 'T');
+            }
+            s = s.replace(/(\.\d{3})\d+/, '$1');
+            if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
+                s += 'Z';
+            }
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
         }
-    }
-}
 
-function initiateGoogleSignIn() {
-    if (!APP_STATE.googleEnabled) {
-        showModalError('ob-auth-error', 'Google Sign-In is not configured yet. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.');
-        return;
-    }
-    const refInput = document.getElementById('ob-input-ref');
-    const refCode = refInput ? refInput.value.trim().toUpperCase() : '';
-    const loginUrl = refCode
-        ? `/api/auth/google/login?ref=${encodeURIComponent(refCode)}`
-        : '/api/auth/google/login';
-    window.location.href = loginUrl;
-}
-
-async function handleGoogleCredentialResponse(response) {
-    showModalError('ob-auth-error', '');
-    showToast('Verifying Google credentials...');
-    const refInput = document.getElementById('ob-input-ref');
-    const refCode = refInput ? refInput.value.trim().toUpperCase() : '';
-    try {
-        const res = await fetch('/api/auth/google', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ credential: response.credential, referral_code: refCode })
-        });
-        const data = await res.json();
-        if (res.ok && data.status === 'ok' && data.user) {
-            applyAuthenticatedUser(data.user, { showWelcomeToast: true, fetchHistory: true });
-        } else {
-            showModalError('ob-auth-error', data.message || 'Google verification failed. Please try again.');
+        function getPktDateKey(dateObj) {
+            try {
+                const parts = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: PKT_TZ,
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).formatToParts(dateObj);
+                const map = {};
+                parts.forEach(p => { map[p.type] = p.value; });
+                return map.year + '-' + map.month + '-' + map.day;
+            } catch (e) {
+                return new Date(dateObj.getTime() + 5 * 3600 * 1000).toISOString().slice(0, 10);
+            }
         }
-    } catch (e) {
-        showModalError('ob-auth-error', 'Error connecting to server. Please try again.');
-    }
-}
 
-// ── Apply Server-Verified User State ───────────────────────────
-function syncUserState(user) {
-    if (!user) return;
-    APP_STATE.authenticated = true;
-    APP_STATE.userId = user.id || user.phone_number || '';
-    APP_STATE.userName = user.name || 'User';
-    APP_STATE.userPhone = user.contact_phone || '';
-    APP_STATE.displayPhone = user.display_phone || formatUserPhoneDisplay(APP_STATE.userPhone);
-    APP_STATE.userEmail = user.email || '';
-    APP_STATE.avatarUrl = user.avatar_url || '';
-    APP_STATE.authProvider = user.auth_provider || 'google';
-    APP_STATE.referralCode = user.referral_code || 'HASSAN-XXXX';
-    APP_STATE.currentTier = user.is_subscribed ? 'pro' : 'trial';
-    APP_STATE.trialQuestionsUsed = user.trial_questions_used || 0;
-    APP_STATE.maxFreeTrial = user.max_free_trial || APP_STATE.maxFreeTrial;
-    APP_STATE.isSubscribed = !!user.is_subscribed;
-    APP_STATE.subscriptionExpiry = user.subscription_expiry || '';
-
-    renderUserProfileUI();
-    updateTrialIndicator();
-    updateTierUI(APP_STATE.currentTier);
-}
-
-function renderHydratedHistory(messages) {
-    const messagesBox = document.getElementById('chat-messages-flow');
-    if (!messagesBox || !Array.isArray(messages) || !messages.length) return false;
-
-    messagesBox.innerHTML = '';
-    APP_STATE.lastRenderedDateKey = '';
-    APP_STATE.renderedMessageIds = new Set();
-
-    for (const m of messages) {
-        const uiRole = m.role === 'user' ? 'user' : 'ai';
-        appendMessageBubble(uiRole, m.content || '', m.created_at || null, m.id || null);
-    }
-    APP_STATE.historyLoaded = true;
-    APP_STATE.welcomeInjected = true;
-    const scrollToLatest = () => { messagesBox.scrollTop = messagesBox.scrollHeight; };
-    requestAnimationFrame(scrollToLatest);
-    setTimeout(scrollToLatest, 150);
-    return true;
-}
-
-async function fetchAndHydrateHistory() {
-    try {
-        const res = await fetch('/api/chat/history', { credentials: 'same-origin', cache: 'no-store' });
-        if (!res.ok) return false;
-        const data = await res.json();
-        if (data.user) syncUserState(data.user);
-        if (data.status === 'ok' && Array.isArray(data.messages) && data.messages.length) {
-            return renderHydratedHistory(data.messages);
+        function formatPktDateDivider(dateObj) {
+            const now = new Date();
+            const todayKey = getPktDateKey(now);
+            const yesterdayKey = getPktDateKey(new Date(now.getTime() - 86400000));
+            const targetKey = getPktDateKey(dateObj);
+            if (targetKey === todayKey) return 'Today';
+            if (targetKey === yesterdayKey) return 'Yesterday';
+            try {
+                const sameYear = targetKey.slice(0, 4) === todayKey.slice(0, 4);
+                return new Intl.DateTimeFormat('en-US', {
+                    timeZone: PKT_TZ,
+                    month: 'short',
+                    day: 'numeric',
+                    ...(sameYear ? {} : { year: 'numeric' })
+                }).format(dateObj);
+            } catch (e) {
+                return targetKey;
+            }
         }
-    } catch (e) {}
-    return false;
-}
 
-function applyAuthenticatedUser(user, { showWelcomeToast = false, history = null, fetchHistory = false } = {}) {
-    syncUserState(user);
-    document.getElementById('onboarding-modal-overlay').classList.remove('active');
+        function formatPktClockTime(dateObj) {
+            try {
+                return new Intl.DateTimeFormat('en-US', {
+                    timeZone: PKT_TZ,
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                }).format(dateObj);
+            } catch (e) {
+                const shifted = new Date(dateObj.getTime() + 5 * 3600 * 1000);
+                const h = shifted.getUTCHours();
+                const m = String(shifted.getUTCMinutes()).padStart(2, '0');
+                return ((h % 12) || 12) + ':' + m + ' ' + (h < 12 ? 'AM' : 'PM');
+            }
+        }
 
-    if (Array.isArray(history) && history.length) {
-        renderHydratedHistory(history);
-    } else if (fetchHistory) {
-        fetchAndHydrateHistory().then((loaded) => {
-            if (!loaded && !APP_STATE.welcomeInjected) {
-                injectInitialWelcome(APP_STATE.userName);
-                APP_STATE.welcomeInjected = true;
+        function formatPktExpiryDate(iso) {
+            const d = parseUtcTimestamp(iso);
+            if (!d) return '';
+            try {
+                return new Intl.DateTimeFormat('en-US', {
+                    timeZone: PKT_TZ,
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                }).format(d);
+            } catch (e) {
+                return String(iso).slice(0, 10);
+            }
+        }
+
+        // ── Canonical Pakistani Mobile Normalization (Mirrors src/phone_utils.py) ──
+        function normalizePkPhoneClient(raw) {
+            if (!raw) return null;
+            const cleaned = String(raw).replace(/[\u200b-\u200f\u202a-\u202e\ufeff\u00a0]/g, '').trim();
+            if (!cleaned || !/^[\d\s\+\-\(\)\.]+$/.test(cleaned)) return null;
+            if (cleaned.slice(1).includes('+')) return null;
+
+            const digits = cleaned.replace(/\D/g, '');
+            let canon = '';
+            if (digits.startsWith('00920') && digits.length === 15) {
+                canon = '92' + digits.slice(5);
+            } else if (digits.startsWith('0092') && digits.length === 14) {
+                canon = digits.slice(2);
+            } else if (digits.startsWith('920') && digits.length === 13) {
+                canon = '92' + digits.slice(3);
+            } else if (digits.startsWith('92') && digits.length === 12) {
+                canon = digits;
+            } else if (digits.startsWith('03') && digits.length === 11) {
+                canon = '92' + digits.slice(1);
+            } else if (digits.startsWith('3') && digits.length === 10) {
+                canon = '92' + digits;
+            } else {
+                return null;
+            }
+            return /^923\d{9}$/.test(canon) ? canon : null;
+        }
+
+        function formatUserPhoneDisplay(phone) {
+            const canon = normalizePkPhoneClient(phone);
+            if (!canon) return '';
+            return '+92 ' + canon.slice(2, 5) + ' ' + canon.slice(5);
+        }
+
+        function updatePhonePreview(inputId, previewId) {
+            const inputEl = document.getElementById(inputId);
+            const previewEl = document.getElementById(previewId);
+            if (!inputEl || !previewEl) return;
+            const raw = inputEl.value.trim();
+            if (!raw) {
+                previewEl.textContent = '';
+                previewEl.className = 'phone-preview-hint';
+                return;
+            }
+            const canon = normalizePkPhoneClient(raw);
+            if (canon) {
+                previewEl.textContent = `✓ Saved as ${formatUserPhoneDisplay(canon)}`;
+                previewEl.className = 'phone-preview-hint valid';
+            } else {
+                previewEl.textContent = 'Enter a valid Pakistani mobile number (e.g. 0300 7560313 or +92 300 7560313)';
+                previewEl.className = 'phone-preview-hint invalid';
+            }
+        }
+
+        function showModalError(boxId, message) {
+            const el = document.getElementById(boxId);
+            if (!el) return;
+            if (message) {
+                el.textContent = message;
+                el.classList.add('visible');
+            } else {
+                el.textContent = '';
+                el.classList.remove('visible');
+            }
+        }
+
+        // ── Hamburger Drawer Toggle ────────────────────────────────────
+        function toggleDrawer(open) {
+            const container = document.getElementById('app-root-container');
+            if (open === undefined) {
+                APP_STATE.drawerOpen = !APP_STATE.drawerOpen;
+            } else {
+                APP_STATE.drawerOpen = !!open;
+            }
+
+            if (APP_STATE.drawerOpen) {
+                container.classList.add('drawer-open');
+            } else {
+                container.classList.remove('drawer-open');
+            }
+        }
+
+        // Close drawer/modals on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                toggleDrawer(false);
+                closePaywallModal();
+                closeReferralModal();
+                closeDemoVideoModal();
             }
         });
-    } else if (!APP_STATE.welcomeInjected) {
-        injectInitialWelcome(APP_STATE.userName);
-        APP_STATE.welcomeInjected = true;
-    }
-    if (showWelcomeToast) {
-        showToast(`Verified as ${APP_STATE.userName} (${APP_STATE.userEmail || APP_STATE.displayPhone}) ✓`);
-    }
-}
 
-function renderUserProfileUI() {
-    const tag = document.getElementById('user-phone-tag');
-    if (tag) {
-        if (APP_STATE.displayPhone && APP_STATE.userEmail) {
-            tag.textContent = `${APP_STATE.displayPhone} • ${APP_STATE.userEmail}`;
-        } else if (APP_STATE.userEmail) {
-            tag.textContent = `${APP_STATE.userName} (${APP_STATE.userEmail})`;
-        } else if (APP_STATE.displayPhone) {
-            tag.textContent = `${APP_STATE.displayPhone} • ${APP_STATE.userName}`;
-        } else {
-            tag.textContent = APP_STATE.userName || 'Guest';
+        // ── In-App Browser Detection (TikTok / Instagram / FB WKWebView) ──
+        function isInAppBrowser() {
+            const ua = navigator.userAgent || '';
+            return /BytedanceWebview|musical_ly|TikTok|Instagram|FBAN|FBAV|Snapchat|Line\//i.test(ua);
         }
-    }
 
-    const statusSub = document.getElementById('session-status-text');
-    if (statusSub) {
-        const verifiedLabel = APP_STATE.authProvider === 'google' ? 'Google Verified' : 'Verified';
-        statusSub.textContent = APP_STATE.authenticated
-            ? `${verifiedLabel} • ${APP_STATE.userName}`
-            : 'Unofficial AI • Public Reels';
-    }
-
-    const sbName = document.getElementById('sidebar-user-name');
-    const sbAuth = document.getElementById('sidebar-user-auth');
-    const sbAvatar = document.getElementById('sidebar-user-avatar');
-
-    if (sbName) sbName.textContent = APP_STATE.userName || 'Guest User';
-    if (sbAuth) {
-        if (APP_STATE.authProvider === 'google') {
-            sbAuth.innerHTML = `<span style="color:#38bdf8; font-weight:600;">✓ Google Verified${APP_STATE.displayPhone ? ' • ' + escapeHtml(APP_STATE.displayPhone) : ''}</span>`;
-        } else if (APP_STATE.userEmail) {
-            sbAuth.innerHTML = `<span style="color:var(--accent-green); font-weight:600;">✓ ${escapeHtml(APP_STATE.displayPhone || APP_STATE.userEmail)}</span>`;
-        } else {
-            sbAuth.innerHTML = '<span>⚡ Free Trial</span>';
+        function checkInAppBrowserBanner() {
+            const inApp = isInAppBrowser();
+            const banner = document.getElementById('inapp-browser-banner');
+            if (banner && inApp) {
+                banner.classList.add('visible');
+            }
+            const topStrip = document.getElementById('guest-inapp-top-banner');
+            if (topStrip && inApp && !APP_STATE.authenticated) {
+                topStrip.classList.add('visible');
+            }
         }
-    }
-    if (sbAvatar) {
-        if (APP_STATE.avatarUrl && APP_STATE.avatarUrl.startsWith('http')) {
-            sbAvatar.innerHTML = `<img src="${escapeHtml(APP_STATE.avatarUrl)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt="Avatar">`;
-        } else if (APP_STATE.userName) {
-            sbAvatar.textContent = APP_STATE.userName.substring(0, 2).toUpperCase();
-        } else {
-            sbAvatar.textContent = 'HF';
+
+        // ── Lazy Demo Video Modal (Zero Network Bytes on Initial Load) ──
+        function openDemoVideoModal() {
+            const overlay = document.getElementById('demo-video-modal-overlay');
+            const slot = document.getElementById('demo-video-slot');
+            const ctaBtn = document.getElementById('demo-modal-cta-btn');
+            if (!overlay || !slot) return;
+
+            if (ctaBtn) {
+                ctaBtn.style.display = APP_STATE.authenticated ? 'none' : 'flex';
+            }
+
+            let vid = document.getElementById('demo-video-player');
+            if (!vid) {
+                vid = document.createElement('video');
+                vid.id = 'demo-video-player';
+                vid.src = '/static/demo_preview.mp4';
+                vid.poster = '/static/demo_poster.jpg';
+                vid.controls = true;
+                vid.playsInline = true;
+                vid.setAttribute('playsinline', '');
+                vid.setAttribute('webkit-playsinline', '');
+                vid.preload = 'metadata';
+                slot.appendChild(vid);
+            }
+
+            overlay.classList.add('active');
+            const playPromise = vid.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch(() => { });
+            }
         }
-    }
-}
 
-async function resetUserSession() {
-    if (!confirm('Sign out and switch account?')) return;
-    try {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
-    } catch (e) {}
-    localStorage.clear();
-    location.reload();
-}
+        function closeDemoVideoModal() {
+            const overlay = document.getElementById('demo-video-modal-overlay');
+            if (overlay) overlay.classList.remove('active');
+            const vid = document.getElementById('demo-video-player');
+            if (vid && !vid.paused) {
+                try { vid.pause(); } catch (e) { }
+            }
+        }
 
-// ── Welcome Message (Natural, Human & Personal) ────────────────
-function injectInitialWelcome(name) {
-    const messagesBox = document.getElementById('chat-messages-flow');
-    messagesBox.innerHTML = '<div class="date-divider">Today</div>';
-    APP_STATE.lastRenderedDateKey = getPktDateKey(new Date());
+        // ── Initialization (Instant Synchronous Hydration — Zero Waterfall) ──
+        window.addEventListener('DOMContentLoaded', async () => {
+            setupInputAutoResize();
+            setupModalBackdropDismiss();
+            checkInAppBrowserBanner();
 
-    const displayName = (name || '').trim() || 'friend';
-    const expiryLabel = formatPktExpiryDate(APP_STATE.subscriptionExpiry);
-    const trialNote = APP_STATE.isSubscribed
-        ? (expiryLabel
-            ? `<p style="font-size: 12px; color: #4ade80; margin-top: 6px; font-weight: 600;">👑 Full Access Active — Unlimited chats until ${escapeHtml(expiryLabel)}.</p>`
-            : `<p style="font-size: 12px; color: #4ade80; margin-top: 6px; font-weight: 600;">👑 Full Access Active — Unlimited chats unlocked.</p>`)
-        : `<p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">You have <strong>${APP_STATE.maxFreeTrial} free messages</strong> to try it out — unlimited access is PKR __MONTHLY_PRICE__/month.</p>`;
+            const urlParams = new URLSearchParams(window.location.search);
+            const signedInVia = urlParams.get('signed_in');
+            const authErrorParam = urlParams.get('auth_error');
+            const refParam = (urlParams.get('ref') || '').trim().toUpperCase();
+            if (refParam) {
+                const refInput = document.getElementById('ob-input-ref');
+                if (refInput && !refInput.value) {
+                    refInput.value = refParam;
+                }
+            }
+            if (signedInVia || authErrorParam) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
 
-    const welcomeHtml = `
+            if (typeof INITIAL_AUTH === 'object' && INITIAL_AUTH !== null) {
+                applyInitialAuthPayload(INITIAL_AUTH, signedInVia, authErrorParam);
+            } else {
+                await hydrateSessionFromServer(signedInVia, authErrorParam);
+            }
+        });
+
+        function setupModalBackdropDismiss() {
+            const paywallOverlay = document.getElementById('paywall-modal-overlay');
+            if (paywallOverlay) {
+                paywallOverlay.addEventListener('click', (e) => {
+                    if (e.target === paywallOverlay) closePaywallModal();
+                });
+            }
+            const refOverlay = document.getElementById('referral-modal-overlay');
+            if (refOverlay) {
+                refOverlay.addEventListener('click', (e) => {
+                    if (e.target === refOverlay) closeReferralModal();
+                });
+            }
+            const demoOverlay = document.getElementById('demo-video-modal-overlay');
+            if (demoOverlay) {
+                demoOverlay.addEventListener('click', (e) => {
+                    if (e.target === demoOverlay) closeDemoVideoModal();
+                });
+            }
+            const obOverlay = document.getElementById('onboarding-modal-overlay');
+            if (obOverlay) {
+                obOverlay.addEventListener('click', (e) => {
+                    if (e.target === obOverlay && !APP_STATE.guestPreviewUsed && !APP_STATE.authenticated) {
+                        closeAuthModalForPreview();
+                    }
+                });
+            }
+        }
+
+        function handlePlanBadgeClick() {
+            if (!APP_STATE.authenticated) {
+                openAuthModal();
+                return;
+            }
+            openPaywallModal();
+        }
+
+        function closeAuthModalForPreview() {
+            if (APP_STATE.guestPreviewUsed) return;
+            document.getElementById('onboarding-modal-overlay').classList.remove('active');
+            if (!APP_STATE.welcomeInjected) {
+                injectGuestWelcome();
+                APP_STATE.welcomeInjected = true;
+            }
+        }
+
+        function updateGuestPreviewUI() {
+            const ticker = document.getElementById('trial-ticker-bar');
+            const countLabel = document.getElementById('trial-count-label');
+            const fillBar = document.getElementById('trial-progress-bar');
+            const badge = document.getElementById('plan-badge-pill');
+            const tryBtn = document.getElementById('ob-try-preview-btn');
+            if (tryBtn) {
+                tryBtn.style.display = APP_STATE.guestPreviewUsed ? 'none' : 'block';
+            }
+            if (badge) {
+                badge.className = 'badge-pill trial';
+                badge.innerHTML = '🔐 Sign In';
+            }
+            if (ticker && countLabel) {
+                ticker.style.display = 'flex';
+                if (fillBar && fillBar.parentElement) fillBar.parentElement.style.display = 'none';
+                if (APP_STATE.guestPreviewUsed) {
+                    ticker.classList.add('expired');
+                    countLabel.innerHTML = `✨ <strong>Free preview used</strong> • <span style="text-decoration: underline; cursor: pointer; color: #4ade80; font-weight: 700;" onclick="openAuthModal()">Sign in with Google for __FREE_TRIAL_QUESTIONS__ Free Messages ➔</span>`;
+                } else {
+                    ticker.classList.remove('expired');
+                    countLabel.innerHTML = `✨ <strong>1 Free Preview</strong> (type or 🎙️ speak) • <span style="text-decoration: underline; cursor: pointer; color: #4ade80; font-weight: 700;" onclick="openAuthModal()">Sign in for __FREE_TRIAL_QUESTIONS__ Free</span>`;
+                }
+            }
+        }
+
+        function injectGuestWelcome() {
+            const messagesBox = document.getElementById('chat-messages-flow');
+            messagesBox.innerHTML = '<div class="date-divider">Today</div>';
+            APP_STATE.lastRenderedDateKey = getPktDateKey(new Date());
+            const welcomeHtml = `
+        <div class="msg-row ai">
+            <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="eager"></div>
+            <div class="msg-bubble">
+                <p>Assalamu Alaikum!</p>
+                <p>Seedhi baat karte hain — aaj kal kya chal raha hai? Career, routine, fitness, ya koi cheez dimagh mein atki hui hai?</p>
+                <p>Type your question below or tap the <strong>🎙️ mic button</strong> to speak in Urdu or English — <strong>try your first message free right now</strong> without signing in.</p>
+                <div style="margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" onclick="openDemoVideoModal()" style="background:rgba(255,255,255,0.06); border:1px solid var(--border); color:#e4e4e7; border-radius:8px; padding:6px 11px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;">▶ Watch 35s Demo</button>
+                    <button type="button" onclick="openAuthModal()" style="background:rgba(34,197,94,0.14); border:1px solid rgba(34,197,94,0.35); color:#4ade80; border-radius:8px; padding:6px 11px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;">Sign in for __FREE_TRIAL_QUESTIONS__ Free Messages</button>
+                </div>
+                <div class="msg-meta">
+                    <span>Hassan AI • Unofficial AI Mentor</span>
+                    <span>Just now</span>
+                </div>
+            </div>
+        </div>
+    `;
+            messagesBox.insertAdjacentHTML('beforeend', welcomeHtml);
+        }
+
+        function applyInitialAuthPayload(data, signedInVia = null, authErrorParam = null) {
+            APP_STATE.googleEnabled = !!data.google_enabled;
+            APP_STATE.guestPreviewUsed = !!data.guest_preview_used;
+
+            if (data.authenticated && data.user) {
+                const topStrip = document.getElementById('guest-inapp-top-banner');
+                if (topStrip) topStrip.classList.remove('visible');
+                const hydratedHistory = Array.isArray(INITIAL_HISTORY) ? INITIAL_HISTORY : [];
+                applyAuthenticatedUser(data.user, { showWelcomeToast: !!signedInVia, history: hydratedHistory });
+                if (signedInVia === 'google') {
+                    showToast(`Welcome ${data.user.name}! Signed in via Google ✓`);
+                }
+                return;
+            }
+
+            updateGuestPreviewUI();
+            if (!APP_STATE.guestPreviewUsed && !authErrorParam) {
+                // Zero-friction landing: let new TikTok/Instagram visitors try 1 real message first!
+                document.getElementById('onboarding-modal-overlay').classList.remove('active');
+                if (!APP_STATE.welcomeInjected) {
+                    injectGuestWelcome();
+                    APP_STATE.welcomeInjected = true;
+                }
+            } else {
+                openAuthModal();
+            }
+
+            if (!APP_STATE.googleEnabled) {
+                showModalError('ob-auth-error', 'Google Sign-In is not configured on the server yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env to enable sign-in.');
+            } else if (authErrorParam) {
+                const msgMap = {
+                    google_not_configured: 'Google Sign-In is not configured on the server yet.',
+                    invalid_state: 'Sign-in session expired. Please try again.',
+                    cancelled: 'Google Sign-In was cancelled.',
+                    verification_failed: 'Google could not verify your email address.'
+                };
+                showModalError('ob-auth-error', msgMap[authErrorParam] || 'Google Sign-In failed. Please try again.');
+            }
+            if (APP_STATE.googleEnabled && !isInAppBrowser()) {
+                scheduleGoogleOneTapLazyLoad();
+            }
+        }
+
+        async function hydrateSessionFromServer(signedInVia = null, authErrorParam = null) {
+            try {
+                const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+                const data = await res.json();
+                applyInitialAuthPayload(data, signedInVia, authErrorParam);
+                return;
+            } catch (e) {
+                console.error('Session check failed:', e);
+            }
+            applyInitialAuthPayload({ authenticated: false, user: null, google_enabled: APP_STATE.googleEnabled }, signedInVia, authErrorParam);
+        }
+
+        function openAuthModal() {
+            APP_STATE.authenticated = false;
+            const tryBtn = document.getElementById('ob-try-preview-btn');
+            if (tryBtn) {
+                tryBtn.style.display = APP_STATE.guestPreviewUsed ? 'none' : 'block';
+            }
+            document.getElementById('onboarding-modal-overlay').classList.add('active');
+        }
+
+        // ── Google Authentication (Lazy One-Tap After Paint; 1-Tap OAuth Always Ready) ──
+        let _gsiScriptRequested = false;
+
+        function scheduleGoogleOneTapLazyLoad() {
+            // Skip heavy 103 KB GSI script on iOS Safari/WebKit where ITP suppresses One-Tap anyway
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+            if (isIOS || _gsiScriptRequested || !GOOGLE_CLIENT_ID) return;
+
+            const trigger = () => {
+                if (APP_STATE.authenticated || _gsiScriptRequested) return;
+                _gsiScriptRequested = true;
+                const s = document.createElement('script');
+                s.src = 'https://accounts.google.com/gsi/client';
+                s.async = true;
+                s.defer = true;
+                s.onload = initGoogleOneTap;
+                document.head.appendChild(s);
+            };
+
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(() => setTimeout(trigger, 800), { timeout: 2500 });
+            } else {
+                setTimeout(trigger, 1200);
+            }
+        }
+
+        function initGoogleOneTap() {
+            if (!APP_STATE.authenticated && APP_STATE.googleEnabled && GOOGLE_CLIENT_ID && window.google && window.google.accounts) {
+                try {
+                    google.accounts.id.initialize({
+                        client_id: GOOGLE_CLIENT_ID,
+                        callback: handleGoogleCredentialResponse,
+                        auto_select: false
+                    });
+                    google.accounts.id.prompt();
+                } catch (e) {
+                    console.log('Google One Tap init deferred', e);
+                }
+            }
+        }
+
+        function initiateGoogleSignIn() {
+            if (!APP_STATE.googleEnabled) {
+                showModalError('ob-auth-error', 'Google Sign-In is not configured yet. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.');
+                return;
+            }
+            const refInput = document.getElementById('ob-input-ref');
+            const refCode = refInput ? refInput.value.trim().toUpperCase() : '';
+            const loginUrl = refCode
+                ? `/api/auth/google/login?ref=${encodeURIComponent(refCode)}`
+                : '/api/auth/google/login';
+            window.location.href = loginUrl;
+        }
+
+        async function handleGoogleCredentialResponse(response) {
+            showModalError('ob-auth-error', '');
+            showToast('Verifying Google credentials...');
+            const refInput = document.getElementById('ob-input-ref');
+            const refCode = refInput ? refInput.value.trim().toUpperCase() : '';
+            try {
+                const res = await fetch('/api/auth/google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ credential: response.credential, referral_code: refCode })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'ok' && data.user) {
+                    applyAuthenticatedUser(data.user, { showWelcomeToast: true, fetchHistory: true });
+                } else {
+                    showModalError('ob-auth-error', data.message || 'Google verification failed. Please try again.');
+                }
+            } catch (e) {
+                showModalError('ob-auth-error', 'Error connecting to server. Please try again.');
+            }
+        }
+
+        // ── Apply Server-Verified User State ───────────────────────────
+        function syncUserState(user) {
+            if (!user) return;
+            APP_STATE.authenticated = true;
+            APP_STATE.userId = user.id || user.phone_number || '';
+            APP_STATE.userName = user.name || 'User';
+            APP_STATE.userPhone = user.contact_phone || '';
+            APP_STATE.displayPhone = user.display_phone || formatUserPhoneDisplay(APP_STATE.userPhone);
+            APP_STATE.userEmail = user.email || '';
+            APP_STATE.avatarUrl = user.avatar_url || '';
+            APP_STATE.authProvider = user.auth_provider || 'google';
+            APP_STATE.referralCode = user.referral_code || 'HASSAN-XXXX';
+            APP_STATE.currentTier = user.is_subscribed ? 'pro' : 'trial';
+            APP_STATE.trialQuestionsUsed = user.trial_questions_used || 0;
+            APP_STATE.maxFreeTrial = user.max_free_trial || APP_STATE.maxFreeTrial;
+            APP_STATE.isSubscribed = !!user.is_subscribed;
+            APP_STATE.subscriptionExpiry = user.subscription_expiry || '';
+
+            renderUserProfileUI();
+            updateTrialIndicator();
+            updateTierUI(APP_STATE.currentTier);
+        }
+
+        function renderHydratedHistory(messages) {
+            const messagesBox = document.getElementById('chat-messages-flow');
+            if (!messagesBox || !Array.isArray(messages) || !messages.length) return false;
+
+            messagesBox.innerHTML = '';
+            APP_STATE.lastRenderedDateKey = '';
+            APP_STATE.renderedMessageIds = new Set();
+
+            for (const m of messages) {
+                const uiRole = m.role === 'user' ? 'user' : 'ai';
+                appendMessageBubble(uiRole, m.content || '', m.created_at || null, m.id || null);
+            }
+            APP_STATE.historyLoaded = true;
+            APP_STATE.welcomeInjected = true;
+            const scrollToLatest = () => { messagesBox.scrollTop = messagesBox.scrollHeight; };
+            requestAnimationFrame(scrollToLatest);
+            setTimeout(scrollToLatest, 150);
+            return true;
+        }
+
+        async function fetchAndHydrateHistory() {
+            try {
+                const res = await fetch('/api/chat/history', { credentials: 'same-origin', cache: 'no-store' });
+                if (!res.ok) return false;
+                const data = await res.json();
+                if (data.user) syncUserState(data.user);
+                if (data.status === 'ok' && Array.isArray(data.messages) && data.messages.length) {
+                    return renderHydratedHistory(data.messages);
+                }
+            } catch (e) { }
+            return false;
+        }
+
+        async function importSavedGuestPreviewIfAny() {
+            try {
+                const raw = sessionStorage.getItem('hassan_guest_preview_turn');
+                if (!raw) return null;
+                sessionStorage.removeItem('hassan_guest_preview_turn');
+                const parsed = JSON.parse(raw);
+                if (!parsed || !parsed.user_text || !parsed.ai_reply) return null;
+                await fetch('/api/chat/import-preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(parsed)
+                });
+                return parsed;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function applyAuthenticatedUser(user, { showWelcomeToast = false, history = null, fetchHistory = false } = {}) {
+            syncUserState(user);
+            document.getElementById('onboarding-modal-overlay').classList.remove('active');
+            const topStrip = document.getElementById('guest-inapp-top-banner');
+            if (topStrip) topStrip.classList.remove('visible');
+
+            if (Array.isArray(history) && history.length) {
+                sessionStorage.removeItem('hassan_guest_preview_turn');
+                renderHydratedHistory(history);
+            } else if (fetchHistory) {
+                importSavedGuestPreviewIfAny().then(() => fetchAndHydrateHistory()).then((loaded) => {
+                    if (!loaded && !APP_STATE.welcomeInjected) {
+                        injectInitialWelcome(APP_STATE.userName);
+                        APP_STATE.welcomeInjected = true;
+                    }
+                });
+            } else {
+                importSavedGuestPreviewIfAny().then((importedTurn) => {
+                    if (importedTurn) {
+                        renderHydratedHistory([
+                            { role: 'user', content: importedTurn.user_text, created_at: new Date().toISOString() },
+                            { role: 'assistant', content: importedTurn.ai_reply, created_at: new Date().toISOString() }
+                        ]);
+                    } else if (!APP_STATE.welcomeInjected) {
+                        injectInitialWelcome(APP_STATE.userName);
+                        APP_STATE.welcomeInjected = true;
+                    }
+                });
+            }
+            if (showWelcomeToast) {
+                showToast(`Verified as ${APP_STATE.userName} (${APP_STATE.userEmail || APP_STATE.displayPhone}) ✓`);
+            }
+        }
+
+        function renderUserProfileUI() {
+            const tag = document.getElementById('user-phone-tag');
+            if (tag) {
+                if (APP_STATE.displayPhone && APP_STATE.userEmail) {
+                    tag.textContent = `${APP_STATE.displayPhone} • ${APP_STATE.userEmail}`;
+                } else if (APP_STATE.userEmail) {
+                    tag.textContent = `${APP_STATE.userName} (${APP_STATE.userEmail})`;
+                } else if (APP_STATE.displayPhone) {
+                    tag.textContent = `${APP_STATE.displayPhone} • ${APP_STATE.userName}`;
+                } else {
+                    tag.textContent = APP_STATE.userName || 'Guest';
+                }
+            }
+
+            const statusSub = document.getElementById('session-status-text');
+            if (statusSub) {
+                const verifiedLabel = APP_STATE.authProvider === 'google' ? 'Google Verified' : 'Verified';
+                statusSub.textContent = APP_STATE.authenticated
+                    ? `${verifiedLabel} • ${APP_STATE.userName}`
+                    : 'Unofficial AI • Public Reels';
+            }
+
+            const sbName = document.getElementById('sidebar-user-name');
+            const sbAuth = document.getElementById('sidebar-user-auth');
+            const sbAvatar = document.getElementById('sidebar-user-avatar');
+
+            if (sbName) sbName.textContent = APP_STATE.userName || 'Guest User';
+            if (sbAuth) {
+                if (APP_STATE.authProvider === 'google') {
+                    sbAuth.innerHTML = `<span style="color:#38bdf8; font-weight:600;">✓ Google Verified${APP_STATE.displayPhone ? ' • ' + escapeHtml(APP_STATE.displayPhone) : ''}</span>`;
+                } else if (APP_STATE.userEmail) {
+                    sbAuth.innerHTML = `<span style="color:var(--accent-green); font-weight:600;">✓ ${escapeHtml(APP_STATE.displayPhone || APP_STATE.userEmail)}</span>`;
+                } else {
+                    sbAuth.innerHTML = '<span>⚡ Free Trial</span>';
+                }
+            }
+            if (sbAvatar) {
+                if (APP_STATE.avatarUrl && APP_STATE.avatarUrl.startsWith('http')) {
+                    sbAvatar.innerHTML = `<img src="${escapeHtml(APP_STATE.avatarUrl)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt="Avatar">`;
+                } else if (APP_STATE.userName) {
+                    sbAvatar.textContent = APP_STATE.userName.substring(0, 2).toUpperCase();
+                } else {
+                    sbAvatar.textContent = 'HF';
+                }
+            }
+        }
+
+        async function resetUserSession() {
+            if (!confirm('Sign out and switch account?')) return;
+            try {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+            } catch (e) { }
+            localStorage.clear();
+            location.reload();
+        }
+
+        // ── Welcome Message (Natural, Human & Personal) ────────────────
+        function injectInitialWelcome(name) {
+            const messagesBox = document.getElementById('chat-messages-flow');
+            messagesBox.innerHTML = '<div class="date-divider">Today</div>';
+            APP_STATE.lastRenderedDateKey = getPktDateKey(new Date());
+
+            const displayName = (name || '').trim() || 'friend';
+            const expiryLabel = formatPktExpiryDate(APP_STATE.subscriptionExpiry);
+            const trialNote = APP_STATE.isSubscribed
+                ? (expiryLabel
+                    ? `<p style="font-size: 12px; color: #4ade80; margin-top: 6px; font-weight: 600;">👑 Full Access Active — Unlimited chats until ${escapeHtml(expiryLabel)}.</p>`
+                    : `<p style="font-size: 12px; color: #4ade80; margin-top: 6px; font-weight: 600;">👑 Full Access Active — Unlimited chats unlocked.</p>`)
+                : `<p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">You have <strong>${APP_STATE.maxFreeTrial} free messages</strong> to try it out — unlimited access is PKR __MONTHLY_PRICE__/month.</p>`;
+
+            const welcomeHtml = `
         <div class="msg-row ai">
             <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="eager"></div>
             <div class="msg-bubble">
@@ -2859,130 +3296,474 @@ function injectInitialWelcome(name) {
             </div>
         </div>
     `;
-    messagesBox.insertAdjacentHTML('beforeend', welcomeHtml);
-}
-
-// ── Send & Message Flow (Cookie-Authenticated) ─────────────────
-async function handleSendAction() {
-    if (APP_STATE.isSending) return;
-    const textarea = document.getElementById('user-chat-input');
-    const sendBtn = document.getElementById('send-msg-btn');
-    const text = textarea.value.trim();
-
-    if (!text) return;
-    if (!APP_STATE.authenticated) {
-        openAuthModal();
-        return;
-    }
-
-    APP_STATE.isSending = true;
-    if (sendBtn) sendBtn.disabled = true;
-
-    appendMessageBubble('user', text);
-    textarea.value = '';
-    textarea.style.height = 'auto';
-
-    setTypingState(true);
-
-    try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ message: text })
-        });
-
-        const data = await response.json().catch(() => ({}));
-        setTypingState(false);
-
-        if (response.status === 401 || data.code === 'unauthenticated') {
-            showToast('Please sign in to continue.');
-            openAuthModal();
-            return;
+            messagesBox.insertAdjacentHTML('beforeend', welcomeHtml);
         }
 
-        if (data.code === 'phone_required') {
-            appendMessageBubble('ai', data.reply || 'Please add your Pakistani mobile number first.');
-            openPaywallModal();
-            return;
+        // ── WhatsApp-Style Voice Input (Groq Whisper Urdu/English Transcription) ──
+        let _voiceMediaRecorder = null;
+        let _voiceAudioStream = null;
+        let _voiceChunks = [];
+        let _voiceTimerInterval = null;
+        let _voiceRecStartTs = 0;
+        let _voiceCancelled = false;
+
+        function _pickSupportedAudioMime() {
+            if (typeof MediaRecorder === 'undefined') return '';
+            const candidates = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4',
+                'audio/ogg;codecs=opus',
+                'audio/ogg'
+            ];
+            for (const c of candidates) {
+                try {
+                    if (MediaRecorder.isTypeSupported(c)) return c;
+                } catch (e) {}
+            }
+            return '';
         }
 
-        if (data.user) {
-            syncUserState(data.user);
+        function _resetVoiceUI() {
+            APP_STATE.isRecording = false;
+            clearInterval(_voiceTimerInterval);
+            _voiceTimerInterval = null;
+            const micBtn = document.getElementById('mic-record-btn');
+            const recBar = document.getElementById('voice-recording-bar');
+            const textarea = document.getElementById('user-chat-input');
+            const sendBtn = document.getElementById('send-msg-btn');
+            if (micBtn) {
+                micBtn.classList.remove('recording');
+                micBtn.disabled = APP_STATE.isTranscribing;
+                micBtn.title = 'Send voice message (Urdu / English)';
+            }
+            if (recBar) recBar.classList.remove('active');
+            if (textarea) textarea.style.display = '';
+            if (sendBtn && !APP_STATE.isSending) sendBtn.disabled = false;
+            if (_voiceAudioStream) {
+                try { _voiceAudioStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+                _voiceAudioStream = null;
+            }
         }
 
-        const reply = data.reply || 'No response received. Please try again.';
-        appendMessageBubble('ai', reply);
-
-        if (data.paywalled || reply.includes('free questions are up')) {
-            APP_STATE.trialQuestionsUsed = APP_STATE.maxFreeTrial;
-            updateTrialIndicator();
-            setTimeout(() => openPaywallModal(), 1200);
+        function cancelVoiceRecording() {
+            _voiceCancelled = true;
+            if (_voiceMediaRecorder && _voiceMediaRecorder.state !== 'inactive') {
+                try { _voiceMediaRecorder.stop(); } catch (e) {}
+            }
+            _resetVoiceUI();
+            showToast('Voice recording cancelled');
         }
 
-    } catch (err) {
-        // Mobile lock-screen / app-switch recovery (handles Nginx 499 when server still saved the reply)
-        let recovered = false;
-        try {
-            await new Promise(r => setTimeout(r, 1800));
-            const hRes = await fetch('/api/chat/history', { credentials: 'same-origin', cache: 'no-store' });
-            if (hRes.ok) {
-                const hData = await hRes.json();
-                if (hData.user) syncUserState(hData.user);
-                const msgs = Array.isArray(hData.messages) ? hData.messages : [];
-                if (msgs.length >= 2) {
-                    const last = msgs[msgs.length - 1];
-                    const prev = msgs[msgs.length - 2];
-                    if (
-                        last.role === 'assistant'
-                        && prev.role === 'user'
-                        && (prev.content || '').trim() === text
-                        && (!last.id || !APP_STATE.renderedMessageIds.has(last.id))
-                    ) {
-                        setTypingState(false);
-                        appendMessageBubble('ai', last.content || '', last.created_at || null, last.id || null);
-                        recovered = true;
+        async function toggleVoiceRecording() {
+            if (APP_STATE.isSending || APP_STATE.isTranscribing) return;
+            if (!APP_STATE.authenticated && APP_STATE.guestPreviewUsed) {
+                openAuthModal();
+                return;
+            }
+
+            if (APP_STATE.isRecording) {
+                _voiceCancelled = false;
+                if (_voiceMediaRecorder && _voiceMediaRecorder.state !== 'inactive') {
+                    try { _voiceMediaRecorder.stop(); } catch (e) {}
+                }
+                return;
+            }
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+                showToast('Voice recording is not supported in this browser. Please type your message.');
+                return;
+            }
+
+            try {
+                _voiceAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (e) {
+                showToast('Microphone access denied. Allow mic permission in browser settings to speak.');
+                return;
+            }
+
+            const mimeType = _pickSupportedAudioMime();
+            try {
+                _voiceMediaRecorder = mimeType
+                    ? new MediaRecorder(_voiceAudioStream, { mimeType })
+                    : new MediaRecorder(_voiceAudioStream);
+            } catch (e) {
+                _voiceMediaRecorder = new MediaRecorder(_voiceAudioStream);
+            }
+
+            _voiceChunks = [];
+            _voiceCancelled = false;
+            APP_STATE.isRecording = true;
+            _voiceRecStartTs = Date.now();
+
+            const micBtn = document.getElementById('mic-record-btn');
+            const recBar = document.getElementById('voice-recording-bar');
+            const timerEl = document.getElementById('voice-rec-timer');
+            const textarea = document.getElementById('user-chat-input');
+            const sendBtn = document.getElementById('send-msg-btn');
+
+            if (micBtn) {
+                micBtn.classList.add('recording');
+                micBtn.title = 'Tap to stop & transcribe';
+            }
+            if (textarea) textarea.style.display = 'none';
+            if (recBar) recBar.classList.add('active');
+            if (timerEl) timerEl.textContent = 'Recording 0:00 — tap mic to stop';
+            if (sendBtn) sendBtn.disabled = true;
+
+            _voiceTimerInterval = setInterval(() => {
+                const secs = Math.floor((Date.now() - _voiceRecStartTs) / 1000);
+                const m = Math.floor(secs / 60);
+                const s = String(secs % 60).padStart(2, '0');
+                if (timerEl) timerEl.textContent = `Recording ${m}:${s} — tap mic to stop`;
+                if (secs >= 120 && _voiceMediaRecorder && _voiceMediaRecorder.state !== 'inactive') {
+                    _voiceMediaRecorder.stop();
+                }
+            }, 300);
+
+            _voiceMediaRecorder.ondataavailable = (ev) => {
+                if (ev.data && ev.data.size > 0) _voiceChunks.push(ev.data);
+            };
+
+            _voiceMediaRecorder.onstop = async () => {
+                const wasCancelled = _voiceCancelled;
+                const recMime = (_voiceMediaRecorder && _voiceMediaRecorder.mimeType) || mimeType || 'audio/webm';
+                const blob = new Blob(_voiceChunks, { type: recMime });
+                _voiceChunks = [];
+                _resetVoiceUI();
+
+                if (wasCancelled || blob.size < 250) {
+                    if (!wasCancelled) showToast('Recording was too short. Tap mic and speak clearly.');
+                    return;
+                }
+
+                APP_STATE.isTranscribing = true;
+                if (micBtn) micBtn.disabled = true;
+                showToast('🎙️ Transcribing voice...');
+
+                try {
+                    const res = await fetch('/api/chat/transcribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': recMime.split(';')[0] || 'audio/webm' },
+                        credentials: 'same-origin',
+                        body: blob
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.status === 401) {
+                        openAuthModal();
+                        return;
+                    }
+                    if (res.ok && data.status === 'ok' && data.text) {
+                        const input = document.getElementById('user-chat-input');
+                        if (input) {
+                            input.value = (input.value ? input.value + ' ' : '') + data.text;
+                            input.style.height = 'auto';
+                            input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+                            input.focus();
+                        }
+                        showToast('🎙️ Voice transcribed — review or tap Send ✓');
+                    } else {
+                        showToast(data.message || 'Could not transcribe voice note. Please try again.');
+                    }
+                } catch (err) {
+                    showToast('Network error while transcribing voice. Please try again.');
+                } finally {
+                    APP_STATE.isTranscribing = false;
+                    if (micBtn) micBtn.disabled = false;
+                }
+            };
+
+            _voiceMediaRecorder.start(250);
+        }
+
+        // ── Streaming AI Bubble Helper ─────────────────────────────────
+        function createStreamingAiBubble() {
+            const messagesBox = document.getElementById('chat-messages-flow');
+            const now = new Date();
+            const dateKey = getPktDateKey(now);
+            if (dateKey && dateKey !== APP_STATE.lastRenderedDateKey) {
+                messagesBox.insertAdjacentHTML('beforeend', `<div class="date-divider">${escapeHtml(formatPktDateDivider(now))}</div>`);
+                APP_STATE.lastRenderedDateKey = dateKey;
+            }
+            const timeStr = formatPktClockTime(now);
+            const row = document.createElement('div');
+            row.className = 'msg-row ai';
+            row.innerHTML = `
+                <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="eager"></div>
+                <div class="msg-bubble">
+                    <div class="stream-content"></div>
+                    <div class="stream-extra"></div>
+                    <div class="msg-meta">
+                        <span>Hassan AI • Unofficial AI Mentor</span>
+                        <span>${timeStr}</span>
+                    </div>
+                </div>
+            `;
+            messagesBox.appendChild(row);
+            messagesBox.scrollTop = messagesBox.scrollHeight;
+            return {
+                row,
+                contentEl: row.querySelector('.stream-content'),
+                extraEl: row.querySelector('.stream-extra'),
+            };
+        }
+
+        function _buildPaywallActionHtml(content) {
+            if (!content || !(content.includes('free questions are up') || content.includes('reply with your Transaction ID') || content.includes('Unlock **Full Access'))) {
+                return '';
+            }
+            return `
+            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                <button class="paywall-chat-action-btn" onclick="openPaywallModal()" style="
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    padding: 13px 18px;
+                    font-family: var(--font-sans);
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #0b0b0d;
+                    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                    border: none;
+                    border-radius: var(--radius-md);
+                    cursor: pointer;
+                    box-shadow: 0 4px 18px rgba(34, 197, 94, 0.35);
+                ">
+                    <span style="font-size: 16px;">👑</span>
+                    <span>Unlock Full Access (PKR __MONTHLY_PRICE__/mo)</span>
+                </button>
+            </div>`;
+        }
+
+        function _buildGuestSignupCardHtml() {
+            return `
+            <div class="guest-inline-cta">
+                <div style="font-size: 12.5px; color: #e4e4e7; line-height: 1.45;">
+                    <strong style="color:#4ade80;">Want to keep talking?</strong> Sign in with Google in 1 tap to save this chat and unlock <strong>__FREE_TRIAL_QUESTIONS__ more free messages</strong>.
+                </div>
+                <button type="button" class="guest-inline-cta-btn" onclick="openAuthModal()">
+                    Continue with Google (__FREE_TRIAL_QUESTIONS__ Free Messages) →
+                </button>
+            </div>`;
+        }
+
+        // ── Send & Word-by-Word Streaming Flow (Authenticated + 1-Msg Guest Preview) ──
+        async function handleSendAction() {
+            if (APP_STATE.isSending || APP_STATE.isRecording) return;
+            const textarea = document.getElementById('user-chat-input');
+            const sendBtn = document.getElementById('send-msg-btn');
+            const micBtn = document.getElementById('mic-record-btn');
+            const text = textarea.value.trim();
+
+            if (!text) return;
+            const isGuestPreview = !APP_STATE.authenticated;
+            if (isGuestPreview && APP_STATE.guestPreviewUsed) {
+                openAuthModal();
+                return;
+            }
+
+            APP_STATE.isSending = true;
+            if (sendBtn) sendBtn.disabled = true;
+            if (micBtn) micBtn.disabled = true;
+
+            appendMessageBubble('user', text);
+            textarea.value = '';
+            textarea.style.height = 'auto';
+
+            setTypingState(true);
+            let streamBubble = null;
+            let streamedRaw = '';
+            const endpoint = isGuestPreview ? '/api/chat/guest-preview/stream' : '/api/chat/stream';
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ message: text })
+                });
+
+                const contentType = (response.headers.get('content-type') || '').toLowerCase();
+                if (!response.ok || !contentType.includes('text/event-stream') || !response.body) {
+                    const data = await response.json().catch(() => ({}));
+                    setTypingState(false);
+
+                    if (response.status === 401 || data.code === 'unauthenticated') {
+                        showToast('Please sign in to continue.');
+                        openAuthModal();
+                        return;
+                    }
+                    if (data.code === 'signup_required') {
+                        APP_STATE.guestPreviewUsed = true;
+                        updateGuestPreviewUI();
+                        appendMessageBubble('ai', data.reply || 'Sign in with Google to continue chatting!');
+                        setTimeout(() => openAuthModal(), 400);
+                        return;
+                    }
+                    if (data.code === 'phone_required') {
+                        appendMessageBubble('ai', data.reply || 'Please add your Pakistani mobile number first.');
+                        openPaywallModal();
+                        return;
+                    }
+                    if (data.user) syncUserState(data.user);
+                    appendMessageBubble('ai', data.reply || 'No response received. Please try again.');
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let sseBuf = '';
+                let doneHandled = false;
+                const messagesBox = document.getElementById('chat-messages-flow');
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    sseBuf += decoder.decode(value, { stream: true });
+                    const events = sseBuf.split('\n\n');
+                    sseBuf = events.pop() || '';
+
+                    for (const rawEvt of events) {
+                        const dataLine = rawEvt.split('\n').find(l => l.startsWith('data:'));
+                        if (!dataLine) continue;
+                        let evt;
+                        try { evt = JSON.parse(dataLine.slice(5).trim()); } catch (e) { continue; }
+
+                        if (evt.type === 'token' && evt.delta) {
+                            if (!streamBubble) {
+                                setTypingState(false);
+                                streamBubble = createStreamingAiBubble();
+                            }
+                            streamedRaw += evt.delta;
+                            streamBubble.contentEl.innerHTML = formatMarkdown(streamedRaw) + '<span class="stream-cursor"></span>';
+                            messagesBox.scrollTop = messagesBox.scrollHeight;
+                        } else if (evt.type === 'done') {
+                            doneHandled = true;
+                            setTypingState(false);
+                            if (evt.user) syncUserState(evt.user);
+                            const finalReply = evt.reply || streamedRaw || 'No response received. Please try again.';
+                            if (!streamBubble) {
+                                streamBubble = createStreamingAiBubble();
+                            }
+                            streamBubble.contentEl.innerHTML = formatMarkdown(finalReply);
+
+                            if (isGuestPreview) {
+                                APP_STATE.guestPreviewUsed = true;
+                                updateGuestPreviewUI();
+                                try {
+                                    sessionStorage.setItem('hassan_guest_preview_turn', JSON.stringify({
+                                        user_text: text,
+                                        ai_reply: finalReply
+                                    }));
+                                } catch (e) {}
+                                streamBubble.extraEl.innerHTML = _buildGuestSignupCardHtml();
+                            } else {
+                                streamBubble.extraEl.innerHTML = _buildPaywallActionHtml(finalReply);
+                                if (evt.paywalled || finalReply.includes('free questions are up')) {
+                                    APP_STATE.trialQuestionsUsed = APP_STATE.maxFreeTrial;
+                                    updateTrialIndicator();
+                                    setTimeout(() => openPaywallModal(), 1200);
+                                }
+                            }
+                            messagesBox.scrollTop = messagesBox.scrollHeight;
+                        } else if (evt.type === 'error') {
+                            doneHandled = true;
+                            setTypingState(false);
+                            if (evt.user) syncUserState(evt.user);
+                            const errMsg = evt.reply || 'Something went wrong. Please send your message again.';
+                            if (streamBubble) {
+                                streamBubble.contentEl.innerHTML = formatMarkdown(errMsg);
+                            } else {
+                                appendMessageBubble('ai', errMsg);
+                            }
+                        }
                     }
                 }
+
+                if (!doneHandled) {
+                    setTypingState(false);
+                    if (streamBubble && streamedRaw) {
+                        streamBubble.contentEl.innerHTML = formatMarkdown(streamedRaw);
+                    }
+                }
+
+            } catch (err) {
+                // Mobile lock-screen / app-switch recovery (handles Nginx 499 when server still saved the reply)
+                let recovered = false;
+                if (!isGuestPreview) {
+                    try {
+                        await new Promise(r => setTimeout(r, 1800));
+                        const hRes = await fetch('/api/chat/history', { credentials: 'same-origin', cache: 'no-store' });
+                        if (hRes.ok) {
+                            const hData = await hRes.json();
+                            if (hData.user) syncUserState(hData.user);
+                            const msgs = Array.isArray(hData.messages) ? hData.messages : [];
+                            if (msgs.length >= 2) {
+                                const last = msgs[msgs.length - 1];
+                                const prev = msgs[msgs.length - 2];
+                                if (
+                                    last.role === 'assistant'
+                                    && prev.role === 'user'
+                                    && (prev.content || '').trim() === text
+                                    && (!last.id || !APP_STATE.renderedMessageIds.has(last.id))
+                                ) {
+                                    setTypingState(false);
+                                    if (streamBubble) {
+                                        streamBubble.contentEl.innerHTML = formatMarkdown(last.content || '');
+                                        if (last.id) APP_STATE.renderedMessageIds.add(last.id);
+                                    } else {
+                                        appendMessageBubble('ai', last.content || '', last.created_at || null, last.id || null);
+                                    }
+                                    recovered = true;
+                                }
+                            }
+                        }
+                    } catch (recErr) { }
+                }
+
+                if (!recovered) {
+                    setTypingState(false);
+                    if (streamBubble && streamedRaw) {
+                        streamBubble.contentEl.innerHTML = formatMarkdown(streamedRaw);
+                    } else {
+                        appendMessageBubble('ai', 'Connection was interrupted while waiting for a reply. Please check your internet or send your message again.');
+                    }
+                }
+            } finally {
+                APP_STATE.isSending = false;
+                if (sendBtn) sendBtn.disabled = false;
+                if (micBtn && !APP_STATE.isTranscribing) micBtn.disabled = false;
             }
-        } catch (recErr) {}
-
-        if (!recovered) {
-            setTypingState(false);
-            appendMessageBubble('ai', 'Connection was interrupted while waiting for a reply. Please check your internet or send your message again.');
         }
-    } finally {
-        APP_STATE.isSending = false;
-        if (sendBtn) sendBtn.disabled = false;
-    }
-}
 
-function handleChipClick(chipText) {
-    if (APP_STATE.isSending) return;
-    const input = document.getElementById('user-chat-input');
-    input.value = chipText;
-    handleSendAction();
-}
+        function handleChipClick(chipText) {
+            if (APP_STATE.isSending) return;
+            const input = document.getElementById('user-chat-input');
+            input.value = chipText;
+            handleSendAction();
+        }
 
-function appendMessageBubble(role, content, createdAtIso = null, msgId = null) {
-    const messagesBox = document.getElementById('chat-messages-flow');
-    if (msgId) APP_STATE.renderedMessageIds.add(msgId);
+        function appendMessageBubble(role, content, createdAtIso = null, msgId = null) {
+            const messagesBox = document.getElementById('chat-messages-flow');
+            if (msgId) APP_STATE.renderedMessageIds.add(msgId);
 
-    const msgDate = parseUtcTimestamp(createdAtIso) || new Date();
-    const dateKey = getPktDateKey(msgDate);
-    if (dateKey && dateKey !== APP_STATE.lastRenderedDateKey) {
-        const dividerLabel = formatPktDateDivider(msgDate);
-        messagesBox.insertAdjacentHTML('beforeend', `<div class="date-divider">${escapeHtml(dividerLabel)}</div>`);
-        APP_STATE.lastRenderedDateKey = dateKey;
-    }
+            const msgDate = parseUtcTimestamp(createdAtIso) || new Date();
+            const dateKey = getPktDateKey(msgDate);
+            if (dateKey && dateKey !== APP_STATE.lastRenderedDateKey) {
+                const dividerLabel = formatPktDateDivider(msgDate);
+                messagesBox.insertAdjacentHTML('beforeend', `<div class="date-divider">${escapeHtml(dividerLabel)}</div>`);
+                APP_STATE.lastRenderedDateKey = dateKey;
+            }
 
-    const timeStr = formatPktClockTime(msgDate);
+            const timeStr = formatPktClockTime(msgDate);
 
-    let formattedContent = formatMarkdown(content);
+            let formattedContent = formatMarkdown(content);
 
-    let paywallButtonHtml = '';
-    if (role === 'ai' && (content.includes('free questions are up') || content.includes('reply with your Transaction ID') || content.includes('Unlock **Full Access'))) {
-        paywallButtonHtml = `
+            let paywallButtonHtml = '';
+            if (role === 'ai' && (content.includes('free questions are up') || content.includes('reply with your Transaction ID') || content.includes('Unlock **Full Access'))) {
+                paywallButtonHtml = `
             <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
                 <button class="paywall-chat-action-btn" onclick="openPaywallModal()" style="
                     width: 100%;
@@ -3007,9 +3788,9 @@ function appendMessageBubble(role, content, createdAtIso = null, msgId = null) {
                 </button>
             </div>
         `;
-    }
+            }
 
-    const bubbleHtml = role === 'user' ? `
+            const bubbleHtml = role === 'user' ? `
         <div class="msg-row user">
             <div class="msg-bubble">
                 <div>${formattedContent}</div>
@@ -3033,328 +3814,329 @@ function appendMessageBubble(role, content, createdAtIso = null, msgId = null) {
         </div>
     `;
 
-    messagesBox.insertAdjacentHTML('beforeend', bubbleHtml);
-    messagesBox.scrollTop = messagesBox.scrollHeight;
-}
-
-function setTypingState(isTyping) {
-    const typingBox = document.getElementById('chat-typing-box');
-    const sendBtn = document.getElementById('send-msg-btn');
-    const messagesBox = document.getElementById('chat-messages-flow');
-
-    if (isTyping) {
-        typingBox.classList.add('visible');
-        sendBtn.disabled = true;
-        messagesBox.scrollTop = messagesBox.scrollHeight;
-    } else {
-        typingBox.classList.remove('visible');
-        sendBtn.disabled = false;
-    }
-}
-
-function updateTrialIndicator() {
-    const used = APP_STATE.trialQuestionsUsed;
-    const max = APP_STATE.maxFreeTrial;
-    const countLabel = document.getElementById('trial-count-label');
-    const fillBar = document.getElementById('trial-progress-bar');
-    const ticker = document.getElementById('trial-ticker-bar');
-
-    if (APP_STATE.isSubscribed) {
-        ticker.style.display = 'none';
-        return;
-    }
-
-    ticker.style.display = 'flex';
-    const pct = Math.min((used / max) * 100, 100);
-    fillBar.style.width = pct + '%';
-
-    if (pct >= 100) {
-        ticker.classList.add('expired');
-        if (fillBar.parentElement) fillBar.parentElement.style.display = 'none';
-        countLabel.innerHTML = `👑 <strong>Free Trial Ended</strong> (${used} of ${max} used) • <span style="text-decoration: underline; cursor: pointer; color: #fbbf24; font-weight: 700;" onclick="openPaywallModal()">Unlock Full Access (PKR __MONTHLY_PRICE__/mo) ➔</span>`;
-        const chatInput = document.getElementById('user-chat-input');
-        if (chatInput) chatInput.placeholder = "Tap Unlock to submit your EasyPaisa / Bank Transaction ID...";
-    } else {
-        ticker.classList.remove('expired');
-        if (fillBar.parentElement) fillBar.parentElement.style.display = 'block';
-        fillBar.style.background = 'var(--accent-green)';
-        countLabel.innerHTML = `Free Trial: <strong>${used} of ${max}</strong> questions used`;
-        const chatInput = document.getElementById('user-chat-input');
-        if (chatInput) chatInput.placeholder = "Write whatever's on your mind...";
-    }
-}
-
-function updateTierUI(tier) {
-    const badge = document.getElementById('plan-badge-pill');
-    const subBanner = document.getElementById('sidebar-active-sub-banner');
-    const memCta = document.getElementById('sidebar-membership-cta');
-    if (APP_STATE.isSubscribed) {
-        badge.className = 'badge-pill pro';
-        badge.innerHTML = '👑 Full Access';
-        if (subBanner) {
-            const expLabel = formatPktExpiryDate(APP_STATE.subscriptionExpiry);
-            subBanner.textContent = expLabel
-                ? `👑 Full Access Active • Valid until ${expLabel}`
-                : '👑 Full Access Active • Unlimited Chats';
-            subBanner.style.display = 'block';
+            messagesBox.insertAdjacentHTML('beforeend', bubbleHtml);
+            messagesBox.scrollTop = messagesBox.scrollHeight;
         }
-        if (memCta) memCta.textContent = '👑 Extend / Renew Pass';
-    } else {
-        badge.className = 'badge-pill trial';
-        badge.innerHTML = '⚡ Free Trial';
-        if (subBanner) subBanner.style.display = 'none';
-        if (memCta) memCta.textContent = '💳 Submit Payment / Activate';
-    }
-}
 
-// ── Modals & Actions (Normalized Pakistani Phone Linked on Payment) ──
-function openPaywallModal() {
-    if (!APP_STATE.authenticated) {
-        openAuthModal();
-        return;
-    }
-    showModalError('paywall-error-box', '');
-    const phoneInput = document.getElementById('paywall-phone-input');
-    if (phoneInput && APP_STATE.displayPhone && !phoneInput.value) {
-        phoneInput.value = APP_STATE.displayPhone;
-        updatePhonePreview('paywall-phone-input', 'paywall-phone-preview');
-    }
-    document.getElementById('paywall-modal-overlay').classList.add('active');
-}
+        function setTypingState(isTyping) {
+            const typingBox = document.getElementById('chat-typing-box');
+            const sendBtn = document.getElementById('send-msg-btn');
+            const messagesBox = document.getElementById('chat-messages-flow');
 
-function closePaywallModal() {
-    document.getElementById('paywall-modal-overlay').classList.remove('active');
-}
-
-async function linkUserPhone(rawPhone) {
-    const res = await fetch('/api/auth/link-phone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ phone: rawPhone })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.status !== 'ok') {
-        return { ok: false, message: data.message || 'Could not save mobile number.' };
-    }
-    if (data.user) {
-        syncUserState(data.user);
-    } else if (data.contact_phone) {
-        APP_STATE.userPhone = data.contact_phone;
-        APP_STATE.displayPhone = data.display_phone || formatUserPhoneDisplay(data.contact_phone);
-        renderUserProfileUI();
-    }
-    return { ok: true };
-}
-
-async function submitPaywallPayment() {
-    showModalError('paywall-error-box', '');
-    const rawPhone = document.getElementById('paywall-phone-input').value.trim();
-    const trx = document.getElementById('paywall-trx-input').value.trim();
-
-    const canon = normalizePkPhoneClient(rawPhone);
-    if (!canon) {
-        showModalError('paywall-error-box', 'Please enter a valid Pakistani mobile number (e.g. 0300 7560313 or +92 300 7560313).');
-        document.getElementById('paywall-phone-input').focus();
-        return;
-    }
-
-    if (!trx) {
-        showModalError('paywall-error-box', 'Please enter your Transaction ID (TRX ID).');
-        document.getElementById('paywall-trx-input').focus();
-        return;
-    }
-
-    const btn = document.getElementById('paywall-submit-btn');
-    btn.disabled = true;
-    btn.textContent = 'Submitting...';
-
-    try {
-        // 1. Link & normalize Pakistani phone number (rejects duplicates owned by another user)
-        if (APP_STATE.userPhone !== canon) {
-            const linkRes = await linkUserPhone(rawPhone);
-            if (!linkRes.ok) {
-                showModalError('paywall-error-box', linkRes.message);
-                return;
+            if (isTyping) {
+                typingBox.classList.add('visible');
+                sendBtn.disabled = true;
+                messagesBox.scrollTop = messagesBox.scrollHeight;
+            } else {
+                typingBox.classList.remove('visible');
+                sendBtn.disabled = false;
             }
         }
 
-        // 2. Submit TRX ID over authenticated cookie session
-        const command = `TRX: ${trx}`;
-        closePaywallModal();
-        appendMessageBubble('user', `Payment submitted: ${trx} (Full Access — PKR __MONTHLY_PRICE__/mo)`);
-        setTypingState(true);
+        function updateTrialIndicator() {
+            const used = APP_STATE.trialQuestionsUsed;
+            const max = APP_STATE.maxFreeTrial;
+            const countLabel = document.getElementById('trial-count-label');
+            const fillBar = document.getElementById('trial-progress-bar');
+            const ticker = document.getElementById('trial-ticker-bar');
 
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ message: command })
-        });
-        const d = await res.json().catch(() => ({}));
-        setTypingState(false);
+            if (APP_STATE.isSubscribed) {
+                ticker.style.display = 'none';
+                return;
+            }
 
-        if (res.status === 401) {
-            openAuthModal();
-            return;
+            ticker.style.display = 'flex';
+            const pct = Math.min((used / max) * 100, 100);
+            fillBar.style.width = pct + '%';
+
+            if (pct >= 100) {
+                ticker.classList.add('expired');
+                if (fillBar.parentElement) fillBar.parentElement.style.display = 'none';
+                countLabel.innerHTML = `👑 <strong>Free Trial Ended</strong> (${used} of ${max} used) • <span style="text-decoration: underline; cursor: pointer; color: #fbbf24; font-weight: 700;" onclick="openPaywallModal()">Unlock Full Access (PKR __MONTHLY_PRICE__/mo) ➔</span>`;
+                const chatInput = document.getElementById('user-chat-input');
+                if (chatInput) chatInput.placeholder = "Tap Unlock to submit your EasyPaisa / Bank Transaction ID...";
+            } else {
+                ticker.classList.remove('expired');
+                if (fillBar.parentElement) fillBar.parentElement.style.display = 'block';
+                fillBar.style.background = 'var(--accent-green)';
+                countLabel.innerHTML = `Free Trial: <strong>${used} of ${max}</strong> questions used`;
+                const chatInput = document.getElementById('user-chat-input');
+                if (chatInput) chatInput.placeholder = "Write whatever's on your mind...";
+            }
         }
-        if (d.user) syncUserState(d.user);
-        appendMessageBubble('ai', d.reply || 'Payment submitted! Admin will verify and activate your pass shortly.');
-        document.getElementById('paywall-trx-input').value = '';
-        showToast('Payment submitted for verification ✓');
-    } catch (e) {
-        setTypingState(false);
-        showModalError('paywall-error-box', 'Error submitting payment. Please try again.');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '✓ Submit Payment for Verification';
-    }
-}
 
-function openReferralModal() {
-    if (!APP_STATE.authenticated) {
-        openAuthModal();
-        return;
-    }
-    document.getElementById('referral-code-display').textContent = APP_STATE.referralCode || 'HASSAN-XXXX';
-    fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ message: 'CODE' })
-    })
-    .then(r => r.json())
-    .then(d => {
-        const text = d.reply || '';
-        const match = text.match(/`([^`]+)`/);
-        if (match) {
-            APP_STATE.referralCode = match[1];
-            document.getElementById('referral-code-display').textContent = match[1];
+        function updateTierUI(tier) {
+            const badge = document.getElementById('plan-badge-pill');
+            const subBanner = document.getElementById('sidebar-active-sub-banner');
+            const memCta = document.getElementById('sidebar-membership-cta');
+            if (APP_STATE.isSubscribed) {
+                badge.className = 'badge-pill pro';
+                badge.innerHTML = '👑 Full Access';
+                if (subBanner) {
+                    const expLabel = formatPktExpiryDate(APP_STATE.subscriptionExpiry);
+                    subBanner.textContent = expLabel
+                        ? `👑 Full Access Active • Valid until ${expLabel}`
+                        : '👑 Full Access Active • Unlimited Chats';
+                    subBanner.style.display = 'block';
+                }
+                if (memCta) memCta.textContent = '👑 Extend / Renew Pass';
+            } else {
+                badge.className = 'badge-pill trial';
+                badge.innerHTML = '⚡ Free Trial';
+                if (subBanner) subBanner.style.display = 'none';
+                if (memCta) memCta.textContent = '💳 Submit Payment / Activate';
+            }
         }
-    })
-    .catch(() => {});
 
-    document.getElementById('referral-modal-overlay').classList.add('active');
-}
-
-function closeReferralModal() {
-    document.getElementById('referral-modal-overlay').classList.remove('active');
-}
-
-function copySnippet(text, el) {
-    try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(() => onCopyDone()).catch(() => fallbackCopy(text));
-            return;
+        // ── Modals & Actions (Normalized Pakistani Phone Linked on Payment) ──
+        function openPaywallModal() {
+            if (!APP_STATE.authenticated) {
+                openAuthModal();
+                return;
+            }
+            showModalError('paywall-error-box', '');
+            const phoneInput = document.getElementById('paywall-phone-input');
+            if (phoneInput && APP_STATE.displayPhone && !phoneInput.value) {
+                phoneInput.value = APP_STATE.displayPhone;
+                updatePhonePreview('paywall-phone-input', 'paywall-phone-preview');
+            }
+            document.getElementById('paywall-modal-overlay').classList.add('active');
         }
-    } catch (e) {}
 
-    fallbackCopy(text);
-
-    function fallbackCopy(str) {
-        const temp = document.createElement('textarea');
-        temp.value = str;
-        temp.style.position = 'fixed';
-        temp.style.left = '-9999px';
-        temp.style.top = '0';
-        document.body.appendChild(temp);
-        temp.focus();
-        temp.select();
-        try {
-            document.execCommand('copy');
-            onCopyDone();
-        } catch (err) {
-            prompt('Copy payment number (Ctrl+C / Cmd+C):', str);
+        function closePaywallModal() {
+            document.getElementById('paywall-modal-overlay').classList.remove('active');
         }
-        document.body.removeChild(temp);
-    }
 
-    function onCopyDone() {
-        if (el) {
-            const orig = el.textContent;
-            el.textContent = 'Copied!';
-            setTimeout(() => { el.textContent = orig; }, 1800);
+        async function linkUserPhone(rawPhone) {
+            const res = await fetch('/api/auth/link-phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ phone: rawPhone })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.status !== 'ok') {
+                return { ok: false, message: data.message || 'Could not save mobile number.' };
+            }
+            if (data.user) {
+                syncUserState(data.user);
+            } else if (data.contact_phone) {
+                APP_STATE.userPhone = data.contact_phone;
+                APP_STATE.displayPhone = data.display_phone || formatUserPhoneDisplay(data.contact_phone);
+                renderUserProfileUI();
+            }
+            return { ok: true };
         }
-        showToast(`Copied ${text} ✓`);
-    }
-}
 
-function getReferralInviteText() {
-    const code = (APP_STATE.referralCode || '').trim();
-    const refUrl = code && code !== 'HASSAN-XXXX'
-        ? `${window.location.origin}/?ref=${encodeURIComponent(code)}`
-        : `${window.location.origin}/`;
-    return `Yar check out Hassan Ali Farrukh's AI Mentor — it answers career, mindset & life questions in his real style (__FREE_TRIAL_QUESTIONS__ free messages). Use my invite link: ${refUrl}`;
-}
+        async function submitPaywallPayment() {
+            showModalError('paywall-error-box', '');
+            const rawPhone = document.getElementById('paywall-phone-input').value.trim();
+            const trx = document.getElementById('paywall-trx-input').value.trim();
 
-function copyReferralInvite() {
-    copySnippet(getReferralInviteText());
-}
+            const canon = normalizePkPhoneClient(rawPhone);
+            if (!canon) {
+                showModalError('paywall-error-box', 'Please enter a valid Pakistani mobile number (e.g. 0300 7560313 or +92 300 7560313).');
+                document.getElementById('paywall-phone-input').focus();
+                return;
+            }
 
-function shareReferralOnWhatsApp() {
-    const url = `https://wa.me/?text=${encodeURIComponent(getReferralInviteText())}`;
-    const win = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!win) window.location.href = url;
-}
+            if (!trx) {
+                showModalError('paywall-error-box', 'Please enter your Transaction ID (TRX ID).');
+                document.getElementById('paywall-trx-input').focus();
+                return;
+            }
 
-function openWhatsAppPaymentProof() {
-    const phoneInput = (document.getElementById('paywall-phone-input')?.value || '').trim();
-    const trxInput = (document.getElementById('paywall-trx-input')?.value || '').trim();
-    const identity = APP_STATE.userEmail || APP_STATE.displayPhone || APP_STATE.userName || 'User';
-    const lines = [
-        `Assalamu Alaikum! I just paid PKR __MONTHLY_PRICE__ for Hassan AI Full Access.`,
-        `Account: ${identity}`,
-    ];
-    if (phoneInput) lines.push(`Phone: ${phoneInput}`);
-    if (trxInput) lines.push(`TRX ID: ${trxInput}`);
-    lines.push(`Sharing my payment screenshot below for activation:`);
-    const url = `https://wa.me/${SUPPORT_WHATSAPP_PHONE}?text=${encodeURIComponent(lines.join('\n'))}`;
-    const win = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!win) window.location.href = url;
-}
+            const btn = document.getElementById('paywall-submit-btn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
 
-function showToast(msg) {
-    const toast = document.getElementById('app-toast-box');
-    toast.textContent = msg;
-    toast.classList.add('visible');
-    setTimeout(() => toast.classList.remove('visible'), 2800);
-}
+            try {
+                // 1. Link & normalize Pakistani phone number (rejects duplicates owned by another user)
+                if (APP_STATE.userPhone !== canon) {
+                    const linkRes = await linkUserPhone(rawPhone);
+                    if (!linkRes.ok) {
+                        showModalError('paywall-error-box', linkRes.message);
+                        return;
+                    }
+                }
 
-function setupInputAutoResize() {
-    const textarea = document.getElementById('user-chat-input');
-    textarea.addEventListener('input', () => {
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
-    });
+                // 2. Submit TRX ID over authenticated cookie session
+                const command = `TRX: ${trx}`;
+                closePaywallModal();
+                appendMessageBubble('user', `Payment submitted: ${trx} (Full Access — PKR __MONTHLY_PRICE__/mo)`);
+                setTypingState(true);
 
-    textarea.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendAction();
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ message: command })
+                });
+                const d = await res.json().catch(() => ({}));
+                setTypingState(false);
+
+                if (res.status === 401) {
+                    openAuthModal();
+                    return;
+                }
+                if (d.user) syncUserState(d.user);
+                appendMessageBubble('ai', d.reply || 'Payment submitted! Admin will verify and activate your pass shortly.');
+                document.getElementById('paywall-trx-input').value = '';
+                showToast('Payment submitted for verification ✓');
+            } catch (e) {
+                setTypingState(false);
+                showModalError('paywall-error-box', 'Error submitting payment. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✓ Submit Payment for Verification';
+            }
         }
-    });
-}
 
-function formatMarkdown(text) {
-    if (!text) return '';
-    let out = escapeHtml(text);
-    out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
-    out = out.replace(/\n/g, '<br>');
-    return out;
-}
+        function openReferralModal() {
+            if (!APP_STATE.authenticated) {
+                openAuthModal();
+                return;
+            }
+            document.getElementById('referral-code-display').textContent = APP_STATE.referralCode || 'HASSAN-XXXX';
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ message: 'CODE' })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    const text = d.reply || '';
+                    const match = text.match(/`([^`]+)`/);
+                    if (match) {
+                        APP_STATE.referralCode = match[1];
+                        document.getElementById('referral-code-display').textContent = match[1];
+                    }
+                })
+                .catch(() => { });
 
-function escapeHtml(string) {
-    const entityMap = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    };
-    return String(string).replace(/[&<>"']/g, s => entityMap[s]);
-}
-</script>
+            document.getElementById('referral-modal-overlay').classList.add('active');
+        }
+
+        function closeReferralModal() {
+            document.getElementById('referral-modal-overlay').classList.remove('active');
+        }
+
+        function copySnippet(text, el) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => onCopyDone()).catch(() => fallbackCopy(text));
+                    return;
+                }
+            } catch (e) { }
+
+            fallbackCopy(text);
+
+            function fallbackCopy(str) {
+                const temp = document.createElement('textarea');
+                temp.value = str;
+                temp.style.position = 'fixed';
+                temp.style.left = '-9999px';
+                temp.style.top = '0';
+                document.body.appendChild(temp);
+                temp.focus();
+                temp.select();
+                try {
+                    document.execCommand('copy');
+                    onCopyDone();
+                } catch (err) {
+                    prompt('Copy payment number (Ctrl+C / Cmd+C):', str);
+                }
+                document.body.removeChild(temp);
+            }
+
+            function onCopyDone() {
+                if (el) {
+                    const orig = el.textContent;
+                    el.textContent = 'Copied!';
+                    setTimeout(() => { el.textContent = orig; }, 1800);
+                }
+                showToast(`Copied ${text} ✓`);
+            }
+        }
+
+        function getReferralInviteText() {
+            const code = (APP_STATE.referralCode || '').trim();
+            const refUrl = code && code !== 'HASSAN-XXXX'
+                ? `${window.location.origin}/?ref=${encodeURIComponent(code)}`
+                : `${window.location.origin}/`;
+            return `Yar check out Hassan Ali Farrukh's AI Mentor — it answers career, mindset & life questions in his real style (__FREE_TRIAL_QUESTIONS__ free messages). Use my invite link: ${refUrl}`;
+        }
+
+        function copyReferralInvite() {
+            copySnippet(getReferralInviteText());
+        }
+
+        function shareReferralOnWhatsApp() {
+            const url = `https://wa.me/?text=${encodeURIComponent(getReferralInviteText())}`;
+            const win = window.open(url, '_blank', 'noopener,noreferrer');
+            if (!win) window.location.href = url;
+        }
+
+        function openWhatsAppPaymentProof() {
+            const phoneInput = (document.getElementById('paywall-phone-input')?.value || '').trim();
+            const trxInput = (document.getElementById('paywall-trx-input')?.value || '').trim();
+            const identity = APP_STATE.userEmail || APP_STATE.displayPhone || APP_STATE.userName || 'User';
+            const lines = [
+                `Assalamu Alaikum! I just paid PKR __MONTHLY_PRICE__ for Hassan AI Full Access.`,
+                `Account: ${identity}`,
+            ];
+            if (phoneInput) lines.push(`Phone: ${phoneInput}`);
+            if (trxInput) lines.push(`TRX ID: ${trxInput}`);
+            lines.push(`Sharing my payment screenshot below for activation:`);
+            const url = `https://wa.me/${SUPPORT_WHATSAPP_PHONE}?text=${encodeURIComponent(lines.join('\n'))}`;
+            const win = window.open(url, '_blank', 'noopener,noreferrer');
+            if (!win) window.location.href = url;
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('app-toast-box');
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 2800);
+        }
+
+        function setupInputAutoResize() {
+            const textarea = document.getElementById('user-chat-input');
+            textarea.addEventListener('input', () => {
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
+            });
+
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendAction();
+                }
+            });
+        }
+
+        function formatMarkdown(text) {
+            if (!text) return '';
+            let out = escapeHtml(text);
+            out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+            out = out.replace(/\n/g, '<br>');
+            return out;
+        }
+
+        function escapeHtml(string) {
+            const entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            };
+            return String(string).replace(/[&<>"']/g, s => entityMap[s]);
+        }
+    </script>
 
 </body>
+
 </html>
