@@ -86,13 +86,16 @@ def render_admin_login_html(error: str = "") -> str:
 
         body {{
             min-height: 100vh;
+            min-height: 100dvh;
             background-color: var(--bg-base);
             color: var(--text-primary);
             font-family: var(--font-sans);
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px)) 20px;
+            overscroll-behavior-y: none;
+            -webkit-font-smoothing: antialiased;
             background-image: 
                 radial-gradient(ellipse 60% 50% at 50% 0%, rgba(34, 197, 94, 0.08) 0%, transparent 70%),
                 radial-gradient(circle at 50% 100%, rgba(56, 189, 248, 0.04) 0%, transparent 60%);

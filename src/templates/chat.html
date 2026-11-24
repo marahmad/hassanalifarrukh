@@ -130,9 +130,10 @@
             display: flex;
             flex-direction: column;
             gap: 18px;
-            padding: 24px 20px;
+            padding: calc(18px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px)) 20px;
             z-index: 90;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
             scrollbar-width: thin;
             transform: translateX(-100%);
             transition: transform 0.28s var(--ease-drawer);
@@ -1261,7 +1262,7 @@
         /* ─── TOAST NOTIFICATION ────────────────────────────────────── */
         .toast-notify {
             position: fixed;
-            bottom: 24px;
+            bottom: calc(24px + env(safe-area-inset-bottom, 0px));
             left: 50%;
             transform: translateX(-50%) translateY(30px);
             background: #1f1f23;
@@ -1273,13 +1274,17 @@
             font-weight: 600;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             opacity: 0;
             pointer-events: none;
             transition: all 0.25s var(--ease-out);
             z-index: 999;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            white-space: nowrap;
+            max-width: calc(100vw - 28px);
+            white-space: normal;
+            text-align: center;
+            line-height: 1.35;
         }
 
         .toast-notify.visible {
@@ -1481,11 +1486,11 @@
             }
 
             .modal-card {
-                padding: 16px 14px;
+                padding: 14px 14px;
                 gap: 8px;
                 border-radius: 16px;
                 max-width: 380px;
-                max-height: calc(100dvh - 36px);
+                max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
             }
 
             .modal-close-icon {

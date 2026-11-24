@@ -28,16 +28,28 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
         raw_id = str(rec.get("phone_number") or "")
         canon_phone = normalize_pk_phone_or_none(rec.get("contact_phone")) or normalize_pk_phone_or_none(raw_id) or ""
         email = str(rec.get("email") or "").strip()
+        raw_name = str(rec.get("name") or rec.get("user_name") or "").strip()
+        has_real_name = bool(raw_name and raw_name.lower() != "user")
         display_phone = format_pk_phone_display(canon_phone) if canon_phone else ""
 
-        if display_phone and email:
-            cell = f"{_escape(display_phone)}<div style='font-size:11.5px;color:#71717a;font-weight:400;'>{_escape(email)}</div>"
+        sub_parts = [p for p in (display_phone, email) if p]
+        if has_real_name and sub_parts:
+            sub_html = " · ".join(_escape(p) for p in sub_parts)
+            cell = (
+                f"<div class='user-primary-line'>{_escape(raw_name)}</div>"
+                f"<div class='user-secondary-line'>{sub_html}</div>"
+            )
+        elif display_phone and email:
+            cell = (
+                f"<div class='user-primary-line'>{_escape(display_phone)}</div>"
+                f"<div class='user-secondary-line'>{_escape(email)}</div>"
+            )
         elif display_phone:
-            cell = _escape(display_phone)
+            cell = f"<div class='user-primary-line'>{_escape(display_phone)}</div>"
         elif email:
-            cell = _escape(email)
+            cell = f"<div class='user-primary-line'>{_escape(email)}</div>"
         else:
-            cell = _escape(raw_id)
+            cell = f"<div class='user-primary-line'>{_escape(raw_id)}</div>"
 
         activate_target = canon_phone or email or raw_id
         return cell, activate_target, canon_phone
@@ -62,22 +74,22 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             
             action_btn = ""
             if not is_approved:
-                action_btn = f"""<button onclick="quickActivate('{_escape(activate_target)}')" class="btn-action">Approve &amp; Activate</button>"""
+                action_btn = f"""<button type="button" data-target="{_escape(activate_target)}" onclick="quickActivate(this.dataset.target)" class="btn-action">Approve &amp; Activate</button>"""
             else:
-                action_btn = "<span style='color: #71717a; font-size: 12px;'>✓ Activated</span>"
+                action_btn = "<span class='activated-label'>✓ Activated</span>"
 
             rows += f"""
-            <tr>
-                <td style="font-weight: 500; color: #f4f4f5;">{user_cell}</td>
-                <td><code class="code-pill">{_escape(p['trx_id'])}</code></td>
-                <td><span class="plan-pill">PKR {MONTHLY_PRICE_PKR:,} / MO</span></td>
-                <td><span class="status-pill" style="color: {status_color}; background: {status_bg};">● {_escape(p['status'].upper())}</span></td>
-                <td style="color: #71717a; font-size: 13px;">{_escape((p.get('created_at') or '')[:16])}</td>
-                <td style="text-align: right;">{action_btn}</td>
+            <tr class="data-row payment-row">
+                <td class="td-user" data-label="User">{user_cell}</td>
+                <td class="td-trx" data-label="TRX ID"><code class="code-pill">{_escape(p['trx_id'])}</code></td>
+                <td class="td-plan" data-label="Plan"><span class="plan-pill">PKR {MONTHLY_PRICE_PKR:,} / MO</span></td>
+                <td class="td-status" data-label="Status"><span class="status-pill" style="color: {status_color}; background: {status_bg};">● {_escape(p['status'].upper())}</span></td>
+                <td class="td-time" data-label="Time" style="color: #71717a; font-size: 13px;">{_escape((p.get('created_at') or '').replace('T', ' ')[:16])}</td>
+                <td class="td-actions" style="text-align: right;">{action_btn}</td>
             </tr>
             """
         if not rows:
-            rows = "<tr><td colspan='6' class='empty-cell'>No payment requests submitted yet</td></tr>"
+            rows = "<tr class='empty-row'><td colspan='6' class='empty-cell'>No payment requests submitted yet</td></tr>"
         return rows
 
     def build_users_rows(users: list) -> str:
@@ -112,25 +124,25 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             user_cell, activate_target, _ = _format_user_cell(u)
             raw_uid = str(u.get("phone_number") or "")
             chats_btn = (
-                f"""<button type="button" data-uid="{_escape(raw_uid)}" onclick="openUserConversation(this.dataset.uid)" class="btn-sm-action" style="margin-right:6px;">Chats</button>"""
+                f"""<button type="button" data-uid="{_escape(raw_uid)}" onclick="openUserConversation(this.dataset.uid)" class="btn-sm-action btn-chats-action">💬 Chats</button>"""
                 if raw_uid in users_with_chats
                 else ""
             )
             rows += f"""
-            <tr>
-                <td style="font-weight: 500; color: #f4f4f5;">{user_cell}</td>
-                <td><span class="plan-pill" style="color: {plan_style};">{plan_label}</span></td>
-                <td>{status_html}</td>
-                <td>{expiry_fmt}</td>
-                <td><code class="code-pill">{_escape(u.get('referral_code', 'N/A'))}</code> ({u.get('referral_count', 0)} refs)</td>
-                <td style="color: #71717a; font-size: 12px;">{_escape((u.get('last_active') or '')[:16])}</td>
-                <td style="text-align: right; white-space: nowrap;">
-                    {chats_btn}<button type="button" data-target="{_escape(activate_target)}" onclick="openActivateModal(this.dataset.target)" class="btn-sm-action">Manage</button>
+            <tr class="data-row user-row">
+                <td class="td-user" data-label="User">{user_cell}</td>
+                <td class="td-plan" data-label="Plan"><span class="plan-pill" style="color: {plan_style};">{plan_label}</span></td>
+                <td class="td-status" data-label="Status">{status_html}</td>
+                <td class="td-expiry" data-label="Expiry">{expiry_fmt}</td>
+                <td class="td-ref" data-label="Referral"><code class="code-pill">{_escape(u.get('referral_code', 'N/A'))}</code> <span class="ref-count">({u.get('referral_count', 0)} refs)</span></td>
+                <td class="td-time" data-label="Last Active" style="color: #71717a; font-size: 12px;">{_escape((u.get('last_active') or '').replace('T', ' ')[:16])}</td>
+                <td class="td-actions" style="text-align: right; white-space: nowrap;">
+                    <div class="row-actions-wrap">{chats_btn}<button type="button" data-target="{_escape(activate_target)}" onclick="openActivateModal(this.dataset.target)" class="btn-sm-action btn-manage-action">Manage</button></div>
                 </td>
             </tr>
             """
         if not rows:
-            rows = "<tr><td colspan='7' class='empty-cell'>No users recorded yet</td></tr>"
+            rows = "<tr class='empty-row'><td colspan='7' class='empty-cell'>No users recorded yet</td></tr>"
         return rows
 
     # 3. Compile 100% Real Production Data & 14-Day Activity Series
@@ -1128,6 +1140,56 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             font-size: 13px;
         }}
 
+        .chat-mobile-back {{
+            display: none;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+            color: #ffffff;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            flex-shrink: 0;
+        }}
+
+        .user-primary-line {{
+            font-weight: 600;
+            color: #f4f4f5;
+            font-size: 13.5px;
+            line-height: 1.3;
+            overflow-wrap: anywhere;
+        }}
+
+        .user-secondary-line {{
+            font-size: 11.5px;
+            color: #71717a;
+            font-weight: 400;
+            margin-top: 2px;
+            overflow-wrap: anywhere;
+        }}
+
+        .row-actions-wrap {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+        }}
+
+        .activated-label {{
+            color: #71717a;
+            font-size: 12px;
+            font-weight: 500;
+        }}
+
+        .ref-count {{
+            color: var(--text-muted);
+            font-size: 11.5px;
+        }}
+
         .nav-label-mobile {{
             display: none;
         }}
@@ -1162,13 +1224,13 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 overflow-x: hidden;
             }}
 
-            /* Executive Top Bar */
+            /* Executive Top Bar (iOS Notch & Status Bar Safe — NO backdrop-filter so fixed .nav-menu stays pinned to viewport bottom!) */
             .sidebar {{
                 position: sticky;
                 top: 0;
                 width: 100%;
                 height: auto;
-                padding: 12px 16px;
+                padding: calc(10px + var(--safe-top)) 16px 12px 16px;
                 border-right: none;
                 border-bottom: 1px solid var(--border);
                 background: #141416;
@@ -1177,7 +1239,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 flex-direction: row;
                 align-items: center;
                 justify-content: space-between;
-                gap: 0;
+                gap: 8px;
                 z-index: 1000;
             }}
 
@@ -1185,6 +1247,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 margin-bottom: 0;
                 padding: 0;
                 gap: 10px;
+                min-width: 0;
             }}
 
             .logo-box {{
@@ -1196,10 +1259,11 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
 
             .profile-info {{
                 display: flex !important;
+                min-width: 0;
             }}
 
             .profile-name {{
-                font-size: 13px;
+                font-size: 13.5px;
             }}
 
             .profile-badge {{
@@ -1208,11 +1272,16 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
 
             .sidebar-footer {{
                 margin-top: 0;
-                padding: 5px 9px;
-                border-radius: 6px;
+                padding: 5px 10px;
+                border-radius: 999px;
                 font-size: 11px;
                 display: flex !important;
                 gap: 6px;
+                flex-shrink: 0;
+            }}
+
+            .mobile-db-label {{
+                display: none !important;
             }}
 
             /* iOS-Style Floating Glass Bottom Navigation Bar */
@@ -1222,16 +1291,17 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 left: 0;
                 right: 0;
                 width: 100%;
-                height: calc(58px + var(--safe-bottom));
-                background: rgba(18, 18, 20, 0.96);
-                backdrop-filter: blur(20px);
-                -webkit-backdrop-filter: blur(20px);
+                height: auto;
+                min-height: calc(58px + var(--safe-bottom));
+                background: rgba(16, 16, 18, 0.96);
+                backdrop-filter: blur(22px);
+                -webkit-backdrop-filter: blur(22px);
                 border-top: 1px solid var(--border);
                 display: flex;
                 flex-direction: row;
                 justify-content: space-around;
                 align-items: center;
-                padding: 4px 6px calc(4px + var(--safe-bottom)) 6px;
+                padding: 6px 6px calc(6px + var(--safe-bottom)) 6px;
                 z-index: 9999;
                 box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.6);
             }}
@@ -1240,9 +1310,9 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                padding: 5px 2px;
+                padding: 6px 2px;
                 gap: 3px;
-                border-radius: 8px;
+                border-radius: 10px;
                 text-align: center;
                 flex: 1;
                 min-width: 0;
@@ -1250,7 +1320,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             }}
 
             .nav-item.active {{
-                background: rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.1);
                 color: #ffffff;
             }}
 
@@ -1265,10 +1335,10 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
 
             .nav-label-mobile {{
                 display: block !important;
-                font-size: 9.5px;
+                font-size: 10px;
                 line-height: 1.1;
                 font-weight: 500;
-                letter-spacing: -0.2px;
+                letter-spacing: -0.15px;
             }}
 
             /* Full-width Workspace */
@@ -1277,7 +1347,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 max-width: 100vw;
                 box-sizing: border-box;
                 overflow-x: hidden;
-                padding: 16px 14px calc(80px + var(--safe-bottom)) 14px;
+                padding: 16px 14px calc(92px + var(--safe-bottom)) 14px;
                 gap: 16px;
             }}
 
@@ -1378,37 +1448,148 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             }}
 
             .table-card {{
-                border-radius: 12px;
+                border-radius: 14px;
+                overflow: hidden;
             }}
 
             .table-card-header {{
-                padding: 12px 14px;
+                padding: 13px 14px;
                 gap: 8px;
                 flex-wrap: wrap;
             }}
 
             .table-card-header h3 {{
-                font-size: 13.5px;
+                font-size: 14px;
             }}
 
-            th {{
-                padding: 10px 12px;
-                font-size: 11.5px;
+            .table-scroll-container {{
+                overflow-x: visible;
             }}
 
-            td {{
-                padding: 11px 12px;
-                font-size: 12px;
+            /* Transform wide desktop tables into crisp native iOS cards on mobile */
+            .responsive-table,
+            .responsive-table tbody {{
+                display: block;
+                width: 100%;
+                min-width: 0;
             }}
 
-            .btn-action {{
-                padding: 6px 10px;
-                font-size: 11.5px;
+            .responsive-table thead {{
+                display: none;
             }}
 
-            .btn-sm-action {{
-                padding: 5px 8px;
-                font-size: 11px;
+            .responsive-table tbody {{
+                padding: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }}
+
+            .responsive-table tr.data-row {{
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px 12px;
+                padding: 14px;
+                background: rgba(255, 255, 255, 0.025);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+            }}
+
+            .responsive-table tr.data-row td {{
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+                padding: 0;
+                border: none;
+                text-align: left !important;
+                white-space: normal !important;
+                min-width: 0;
+            }}
+
+            .responsive-table tr.data-row td[data-label]::before {{
+                content: attr(data-label);
+                font-size: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.45px;
+                color: var(--text-muted);
+            }}
+
+            .responsive-table tr.data-row td.td-user {{
+                grid-column: 1 / -1;
+                order: 1;
+                padding-bottom: 10px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            }}
+
+            .responsive-table tr.data-row td.td-user::before {{
+                display: none;
+            }}
+
+            .responsive-table tr.data-row td.td-plan {{ order: 2; }}
+            .responsive-table tr.data-row td.td-trx {{ order: 2; }}
+            .responsive-table tr.data-row td.td-status {{ order: 3; }}
+            .responsive-table tr.data-row td.td-expiry {{ order: 4; }}
+            .responsive-table tr.data-row td.td-time {{ order: 5; }}
+
+            .responsive-table tr.data-row td.td-ref {{
+                grid-column: 1 / -1;
+                order: 6;
+                flex-direction: row;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 6px;
+            }}
+
+            .responsive-table tr.data-row td.td-ref::before {{
+                width: 100%;
+            }}
+
+            .responsive-table tr.data-row td.td-actions {{
+                grid-column: 1 / -1;
+                order: 7;
+                padding-top: 10px;
+                border-top: 1px solid rgba(255, 255, 255, 0.06);
+            }}
+
+            #btn-refresh-chats {{
+                grid-column: 1 / -1;
+            }}
+
+            .responsive-table tr.data-row td.td-actions .row-actions-wrap {{
+                display: flex;
+                width: 100%;
+                gap: 8px;
+            }}
+
+            .responsive-table tr.data-row td.td-actions .btn-sm-action,
+            .responsive-table tr.data-row td.td-actions .btn-action {{
+                flex: 1;
+                width: 100%;
+                min-height: 38px;
+                padding: 9px 12px;
+                font-size: 13px;
+                font-weight: 600;
+                border-radius: 9px;
+                text-align: center;
+                justify-content: center;
+                display: inline-flex;
+                align-items: center;
+            }}
+
+            .responsive-table tr.empty-row {{
+                display: block;
+            }}
+
+            .responsive-table tr.empty-row td.empty-cell {{
+                display: block;
+                padding: 24px 12px;
+                text-align: center;
+            }}
+
+            .modal-overlay {{
+                padding: calc(16px + var(--safe-top)) 14px calc(16px + var(--safe-bottom)) 14px;
             }}
 
             .btn-wa {{
@@ -1448,6 +1629,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 font-size: 16px !important;
             }}
 
+            /* Native iOS Master-Detail Conversations View */
             .chat-viewer-shell {{
                 grid-template-columns: 1fr;
                 max-height: none;
@@ -1456,18 +1638,40 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
 
             .chat-list-pane {{
                 border-right: none;
-                border-bottom: 1px solid var(--border);
-                max-height: 260px;
+                border-bottom: none;
+                max-height: none;
+            }}
+
+            .chat-thread-pane {{
+                display: none;
+            }}
+
+            .chat-viewer-shell.mobile-thread-open .chat-list-pane {{
+                display: none;
+            }}
+
+            .chat-viewer-shell.mobile-thread-open .chat-thread-pane {{
+                display: flex;
+                min-height: 62dvh;
+            }}
+
+            .chat-mobile-back {{
+                display: inline-flex;
+            }}
+
+            .chat-thread-header {{
+                padding: 12px;
+                gap: 8px;
             }}
 
             .chat-thread-body {{
-                max-height: 55vh;
+                max-height: 62dvh;
                 padding: 14px 12px;
             }}
 
             .chat-msg {{
-                max-width: 92%;
-                font-size: 12.5px;
+                max-width: 90%;
+                font-size: 13px;
             }}
         }}
     </style>
@@ -1513,9 +1717,9 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
         </nav>
 
         <div class="sidebar-footer">
-            <div style="display:flex; align-items:center; gap:8px;">
+            <div style="display:flex; align-items:center; gap:7px;">
                 <span class="status-dot"></span>
-                <span>{_escape(db_backend)}</span>
+                <span class="mobile-db-label">{_escape(db_backend)}</span>
             </div>
             <span style="color:#ffffff; font-weight:600;">LIVE</span>
         </div>
@@ -1660,7 +1864,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                     <span class="code-pill" id="badge-pending-payments">{metrics['pending_payments']} Pending</span>
                 </div>
                 <div class="table-scroll-container">
-                    <table>
+                    <table class="responsive-table">
                         <thead>
                             <tr>
                                 <th>User (Phone / Email)</th>
@@ -1697,7 +1901,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                     <span class="code-pill" id="badge-total-users">{total_users} Total Registered</span>
                 </div>
                 <div class="table-scroll-container">
-                    <table>
+                    <table class="responsive-table">
                         <thead>
                             <tr>
                                 <th>User (Phone / Email)</th>
@@ -1732,7 +1936,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 </div>
             </div>
 
-            <div class="chat-viewer-shell">
+            <div id="chat-viewer-shell" class="chat-viewer-shell">
                 <div class="chat-list-pane">
                     <div class="chat-search-box">
                         <input id="chat-search-input" type="search" class="chat-search-input" placeholder="Search name, email, phone, or message..." oninput="renderConversationList()">
@@ -1765,7 +1969,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                     <span class="code-pill" id="badge-pending-payments-tab">{metrics['pending_payments']} Pending Approval</span>
                 </div>
                 <div class="table-scroll-container">
-                    <table>
+                    <table class="responsive-table">
                         <thead>
                             <tr>
                                 <th>User (Phone / Email)</th>
@@ -1823,7 +2027,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
     </main>
 
     <!-- Modal for Managing User (Activation / Extension / Full Deletion) -->
-    <div id="activate-modal" class="modal-overlay">
+    <div id="activate-modal" class="modal-overlay" onclick="if (event.target === this) closeActivateModal()">
         <div class="modal-dialog">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h3 id="modal-title" style="font-size:16px; font-weight:600;">Manage User</h3>
@@ -1927,12 +2131,21 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
         function selectConversation(userId) {{
             selectedConversationId = userId;
             renderConversationList();
+            const shell = document.getElementById('chat-viewer-shell');
+            if (shell) shell.classList.add('mobile-thread-open');
+        }}
+
+        function closeMobileConversationThread() {{
+            const shell = document.getElementById('chat-viewer-shell');
+            if (shell) shell.classList.remove('mobile-thread-open');
         }}
 
         function openUserConversation(userId) {{
             selectedConversationId = userId;
             switchTab('conversations');
             renderConversationList();
+            const shell = document.getElementById('chat-viewer-shell');
+            if (shell) shell.classList.add('mobile-thread-open');
         }}
 
         function renderConversationThread(conv) {{
@@ -1951,11 +2164,14 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             const activateTarget = conv.contact_phone || conv.email || conv.user_id;
 
             headerEl.innerHTML =
-                '<div>'
-                + '<div style="font-size:14px;font-weight:600;color:#ffffff;">' + escapeHtml(conv.name || 'User') + '</div>'
-                + '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">' + escapeHtml(subtitle) + ' · ' + (conv.message_count || 0) + ' messages</div>'
+                '<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">'
+                + '<button type="button" onclick="closeMobileConversationThread()" class="chat-mobile-back">← Chats</button>'
+                + '<div style="min-width:0;">'
+                + '<div style="font-size:14px;font-weight:600;color:#ffffff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(conv.name || 'User') + '</div>'
+                + '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(subtitle) + ' · ' + (conv.message_count || 0) + ' msgs</div>'
                 + '</div>'
-                + '<button type="button" data-target="' + escapeHtml(activateTarget) + '" onclick="openActivateModal(this.dataset.target)" class="btn-sm-action">Manage / Activate</button>';
+                + '</div>'
+                + '<button type="button" data-target="' + escapeHtml(activateTarget) + '" onclick="openActivateModal(this.dataset.target)" class="btn-sm-action">Manage</button>';
 
             const msgs = conv.messages || [];
             if (!msgs.length) {{
