@@ -516,18 +516,42 @@
         }
 
         .header-logo-box {
-            width: 38px;
-            height: 38px;
-            background: #ffffff;
-            color: #0b0b0d;
-            border-radius: 9px;
+            position: relative;
+            width: 40px;
+            height: 40px;
+            background: #18181b;
+            color: #ffffff;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255, 255, 255, 0.2);
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 800;
-            font-size: 15px;
-            box-shadow: 0 2px 8px rgba(255,255,255,0.15);
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
             flex-shrink: 0;
+        }
+
+        .header-logo-box img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            object-position: center 20%;
+            display: block;
+        }
+
+        .header-logo-box::after {
+            content: '';
+            position: absolute;
+            right: -1px;
+            bottom: -1px;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            border: 2px solid var(--bg-surface);
+            box-shadow: 0 0 6px rgba(34, 197, 94, 0.65);
         }
 
         .header-user-status {
@@ -749,16 +773,58 @@
         .msg-avatar {
             width: 34px;
             height: 34px;
-            border-radius: 10px;
+            border-radius: 50%;
             background: var(--bg-card);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(255, 255, 255, 0.14);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
             flex-shrink: 0;
             color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        .msg-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 20%;
+            display: block;
+        }
+
+        .modal-avatar-badge {
+            position: relative;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 2px solid rgba(34, 197, 94, 0.55);
+            box-shadow: 0 6px 22px rgba(34, 197, 94, 0.22);
+            margin-bottom: 4px;
+            flex-shrink: 0;
+            background: var(--bg-card);
+        }
+
+        .modal-avatar-badge img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            object-position: center 20%;
+            display: block;
+        }
+
+        .modal-avatar-badge::after {
+            content: '';
+            position: absolute;
+            right: 1px;
+            bottom: 1px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            border: 2.5px solid var(--bg-surface);
         }
 
         .msg-bubble {
@@ -1316,10 +1382,15 @@
             }
 
             .header-logo-box {
-                width: 34px;
-                height: 34px;
+                width: 36px;
+                height: 36px;
                 font-size: 13px;
-                border-radius: 8px;
+                border-radius: 50%;
+            }
+
+            .header-logo-box::after {
+                width: 10px;
+                height: 10px;
             }
 
             .header-brand-badge {
@@ -1513,6 +1584,12 @@
                 border-radius: 10px;
                 font-size: 18px;
                 margin-bottom: 0px;
+            }
+
+            .modal-avatar-badge {
+                width: 56px;
+                height: 56px;
+                margin-bottom: 2px;
             }
 
             .modal-title {
@@ -1901,10 +1978,12 @@
                 </button>
 
                 <div class="header-brand-badge">
-                    <div class="header-logo-box">HF</div>
+                    <div class="header-logo-box">
+                        <img src="/static/hassan_avatar.jpg" alt="Hassan Ali Farrukh" loading="eager" decoding="async" onerror="this.remove(); this.parentElement.textContent='HF';">
+                    </div>
                     <div class="header-user-status">
                         <div class="header-user-title">
-                            <span class="header-name-text">Hassan AI</span>
+                            <span class="header-name-text">Hassan Ali Farrukh AI</span>
                         </div>
                         <div class="header-subtitle-status">
                             <span class="live-dot" style="width: 6px; height: 6px;"></span>
@@ -1942,7 +2021,7 @@
 
         <!-- Typing Animation Row -->
         <div class="typing-row" id="chat-typing-box">
-            <div class="msg-avatar">HF</div>
+            <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="lazy"></div>
             <div class="typing-box">
                 <div class="typing-dot"></div>
                 <div class="typing-dot"></div>
@@ -1998,8 +2077,10 @@
 <div class="modal-overlay__ONBOARDING_MODAL_CLASS__" id="onboarding-modal-overlay">
     <div class="modal-card">
         <div class="modal-header">
-            <div class="modal-icon-badge">🎯</div>
-            <h2 class="modal-title">Join Hassan AI</h2>
+            <div class="modal-avatar-badge">
+                <img src="/static/hassan_avatar.jpg" alt="Hassan Ali Farrukh" loading="eager" decoding="async">
+            </div>
+            <h2 class="modal-title">Talk to Hassan AI</h2>
             <p class="modal-desc">
                 Unofficial AI mentor trained on Hassan Ali Farrukh's public reels &amp; talks. Sign in with Google to save your chat history, free trial, and membership across devices.
             </p>
@@ -2622,7 +2703,7 @@ function injectInitialWelcome(name) {
 
     const welcomeHtml = `
         <div class="msg-row ai">
-            <div class="msg-avatar">HF</div>
+            <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="eager"></div>
             <div class="msg-bubble">
                 <p>Assalamu Alaikum <strong>${escapeHtml(displayName)}</strong>!</p>
                 <p>Good to have you here. Seedhi baat karte hain — aaj kal kya chal raha hai? Career, routine, fitness, ya koi cheez dimagh mein atki hui hai?</p>
@@ -2760,7 +2841,7 @@ function appendMessageBubble(role, content) {
         </div>
     ` : `
         <div class="msg-row ai">
-            <div class="msg-avatar">HF</div>
+            <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="eager"></div>
             <div class="msg-bubble">
                 <div>${formattedContent}</div>
                 ${paywallButtonHtml}

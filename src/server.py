@@ -608,6 +608,7 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 ALLOWED_STATIC_FILES = {
     "demo_preview.mp4": "video/mp4",
     "demo_poster.jpg": "image/jpeg",
+    "hassan_avatar.jpg": "image/jpeg",
 }
 
 FAVICON_SVG = (
