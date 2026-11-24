@@ -6,6 +6,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 from src.config import (
+    CHAT_HISTORY_CONTEXT_MESSAGES,
     DATABASE_URL,
     DB_PATH,
     FREE_TRIAL_QUESTIONS,
@@ -1048,8 +1049,8 @@ def complete_chat_turn(user_id: str, user_text: str, ai_reply: str) -> dict:
     return get_or_create_user(user_id)
 
 
-def get_recent_chat_history(phone_number: str, limit: int = 6) -> list[dict]:
-    """Retrieves the recent conversation turns in chronological order in a single DB round trip."""
+def get_recent_chat_history(phone_number: str, limit: int = CHAT_HISTORY_CONTEXT_MESSAGES) -> list[dict]:
+    """Retrieves recent conversation turns in chronological order with UTC 'Z' timestamps."""
     try:
         with DBContext() as db:
             row = _find_user_row(db, phone_number)
@@ -1057,7 +1058,7 @@ def get_recent_chat_history(phone_number: str, limit: int = 6) -> list[dict]:
                 return []
             user_id = row["phone_number"]
             db.execute("""
-                SELECT role, content FROM chat_history
+                SELECT id, role, content, created_at FROM chat_history
                 WHERE phone_number = ?
                 ORDER BY id DESC
                 LIMIT ?
@@ -1065,10 +1066,77 @@ def get_recent_chat_history(phone_number: str, limit: int = 6) -> list[dict]:
             rows = db.fetchall()
             if not rows:
                 return []
-            return [dict(r) for r in reversed(rows)]
+            result = []
+            for r in reversed(rows):
+                d = dict(r)
+                result.append(
+                    {
+                        "id": d.get("id"),
+                        "role": d.get("role") or "user",
+                        "content": d.get("content") or "",
+                        "created_at": _to_utc_iso(d.get("created_at")),
+                    }
+                )
+            return result
     except Exception as e:
         print(f"[Warning] Failed to get chat history: {e}")
         return []
+
+
+def grant_bonus_messages(identifier: str, bonus_delta: int) -> tuple[bool, dict | str]:
+    """
+    Atomically adds (or subtracts, floored at 0) bonus_trial_questions for a user
+    resolved by canonical phone, any Pakistani phone format, email, or synthetic user ID.
+    """
+    ident = str(identifier or "").strip()
+    if not ident:
+        return False, "Please provide a valid phone number, email, or user ID."
+    try:
+        delta = int(bonus_delta)
+    except Exception:
+        return False, "Bonus message count must be a whole number."
+    if delta == 0:
+        return False, "Bonus message delta cannot be zero."
+
+    with DBContext() as db:
+        row = _find_user_row(db, ident)
+        if not row:
+            return False, f"User '{ident}' was not found in the database."
+        uid = str(row["phone_number"])
+
+        if db.is_pg:
+            db.execute(
+                """
+                UPDATE users
+                SET bonus_trial_questions = GREATEST(0, COALESCE(bonus_trial_questions, 0) + ?)
+                WHERE phone_number = ?
+                """,
+                (delta, uid),
+            )
+        else:
+            db.execute(
+                """
+                UPDATE users
+                SET bonus_trial_questions = MAX(0, COALESCE(bonus_trial_questions, 0) + ?)
+                WHERE phone_number = ?
+                """,
+                (delta, uid),
+            )
+
+        db.execute("SELECT * FROM users WHERE phone_number = ?", (uid,))
+        updated_row = db.fetchone()
+        serialized = _serialize_user_row(updated_row)
+        new_bonus = int(serialized.get("bonus_trial_questions") or 0)
+        return True, {
+            "user_id": uid,
+            "name": (serialized.get("name") or "").strip() or "User",
+            "email": (serialized.get("email") or "").strip(),
+            "bonus_delta": delta,
+            "bonus_trial_questions": new_bonus,
+            "max_free_trial": get_user_trial_limit(serialized),
+            "trial_questions_used": int(serialized.get("trial_questions_used") or 0),
+            "user": serialized,
+        }
 
 
 def get_chat_conversations(limit_users: int = 100, messages_per_user: int = 100) -> list[dict]:

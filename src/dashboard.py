@@ -172,22 +172,39 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 plan_label = "FREE TRIAL"
                 plan_style = "#a1a1aa"
                 used = u.get('trial_questions_used', 0) or 0
-                trial_cap = FREE_TRIAL_QUESTIONS + int(u.get('bonus_trial_questions') or 0)
+                bonus_q = int(u.get('bonus_trial_questions') or 0)
+                trial_cap = FREE_TRIAL_QUESTIONS + bonus_q
+                bonus_pill = (
+                    f""" <span class="status-pill" style="color: #38bdf8; background: rgba(56, 189, 248, 0.12);">+{bonus_q} bonus</span>"""
+                    if bonus_q > 0
+                    else ""
+                )
                 if used >= trial_cap:
-                    status_html = f"""<span class="status-pill" style="color: #f87171; background: rgba(248, 113, 113, 0.1);">PAYWALLED ({used}/{trial_cap})</span>"""
+                    status_html = f"""<span class="status-pill" style="color: #f87171; background: rgba(248, 113, 113, 0.1);">PAYWALLED ({used}/{trial_cap})</span>{bonus_pill}"""
                 else:
-                    status_html = f"""<span class="status-pill" style="color: #fbbf24; background: rgba(251, 191, 36, 0.1);">TRIAL ({used}/{trial_cap})</span>"""
+                    status_html = f"""<span class="status-pill" style="color: #fbbf24; background: rgba(251, 191, 36, 0.1);">TRIAL ({used}/{trial_cap})</span>{bonus_pill}"""
                 expiry_fmt = '<span style="color: #71717a;">Free Trial</span>'
 
             user_cell, activate_target, _ = _format_user_cell(u)
             raw_uid = str(u.get("phone_number") or "")
+            search_blob = " ".join(
+                str(p or "")
+                for p in (
+                    u.get("name"),
+                    u.get("email"),
+                    u.get("contact_phone"),
+                    raw_uid,
+                    u.get("referral_code"),
+                    plan_label,
+                )
+            ).lower()
             chats_btn = (
                 f"""<button type="button" data-uid="{_escape(raw_uid)}" onclick="openUserConversation(this.dataset.uid)" class="btn-sm-action btn-chats-action">💬 Chats</button>"""
                 if raw_uid in users_with_chats
                 else ""
             )
             rows += f"""
-            <tr class="data-row user-row">
+            <tr class="data-row user-row" data-search="{_escape(search_blob)}">
                 <td class="td-user" data-label="User">{user_cell}</td>
                 <td class="td-plan" data-label="Plan"><span class="plan-pill" style="color: {plan_style};">{plan_label}</span></td>
                 <td class="td-status" data-label="Status">{status_html}</td>
@@ -253,6 +270,8 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
     <meta name="theme-color" content="#0b0b0d">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
     <title>Hassan Ali Farrukh AI — Management Hub</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -329,16 +348,25 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
         .logo-box {{
             width: 36px;
             height: 36px;
-            background: #ffffff;
-            color: #0b0b0d;
-            border-radius: 9px;
+            background: #1c1c20;
+            color: #ffffff;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255, 255, 255, 0.16);
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 800;
-            font-size: 16px;
-            box-shadow: 0 2px 10px rgba(255, 255, 255, 0.15);
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
             flex-shrink: 0;
+        }}
+
+        .logo-box img {{
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }}
 
         .profile-info {{
@@ -971,6 +999,62 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             overflow-y: auto;
         }}
 
+        .modal-bonus-zone {{
+            margin-top: 2px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }}
+
+        .bonus-chip-row {{
+            display: flex;
+            gap: 6px;
+        }}
+
+        .bonus-chip {{
+            flex: 1;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #38bdf8;
+            border-radius: 7px;
+            padding: 6px 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }}
+
+        .bonus-chip:hover {{
+            background: rgba(56, 189, 248, 0.2);
+        }}
+
+        .btn-bonus {{
+            width: 100%;
+            background: rgba(56, 189, 248, 0.15);
+            color: #7dd3fc;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }}
+
+        .btn-bonus:hover {{
+            background: rgba(56, 189, 248, 0.25);
+            border-color: rgba(56, 189, 248, 0.6);
+            color: #ffffff;
+        }}
+
+        .btn-bonus:disabled {{
+            opacity: 0.55;
+            cursor: not-allowed;
+        }}
+
         .modal-danger-zone {{
             margin-top: 4px;
             padding-top: 14px;
@@ -1310,8 +1394,8 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             .logo-box {{
                 width: 32px;
                 height: 32px;
-                border-radius: 8px;
-                font-size: 15px;
+                border-radius: 50%;
+                font-size: 13px;
             }}
 
             .profile-info {{
@@ -1738,7 +1822,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
     <!-- Sidebar with Tab Buttons -->
     <aside class="sidebar">
         <div class="brand-logo">
-            <div class="logo-box">H</div>
+            <div class="logo-box"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" onerror="this.remove();this.parentElement.textContent='HF';"></div>
             <div class="profile-info">
                 <span class="profile-name">Hassan AI</span>
                 <span class="profile-badge">Admin Hub</span>
@@ -1898,11 +1982,11 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                     </div>
                     <div class="stat-item">
                         <span class="stat-number" id="stat-active-trials">{metrics['active_trials']}</span>
-                        <span class="stat-label">Active Free Trials {info_badge(f"Unsubscribed users with fewer than {FREE_TRIAL_QUESTIONS} trial questions used.")}</span>
+                        <span class="stat-label">Active Free Trials {info_badge(f"Unsubscribed users with remaining free questions (base {FREE_TRIAL_QUESTIONS} + any earned bonus).")}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-number" id="stat-paywalled-trials">{metrics['paywalled_trials']}</span>
-                        <span class="stat-label">Paywalled Trials {info_badge(f"Unsubscribed users who have used all {FREE_TRIAL_QUESTIONS} free questions.")}</span>
+                        <span class="stat-label">Paywalled Trials {info_badge(f"Unsubscribed users who have used all of their free + bonus questions.")}</span>
                     </div>
                 </div>
 
@@ -1953,9 +2037,12 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             </div>
 
             <div class="table-card">
-                <div class="table-card-header">
+                <div class="table-card-header" style="gap: 10px; flex-wrap: wrap;">
                     <h3>All Users (50 Most Active)</h3>
-                    <span class="code-pill" id="badge-total-users">{total_users} Total Registered</span>
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1; justify-content:flex-end; min-width:200px;">
+                        <input id="subscribers-search-input" type="search" class="chat-search-input" style="max-width:260px;" placeholder="Filter by name, email, phone, plan..." oninput="filterUsersTable()">
+                        <span class="code-pill" id="badge-total-users">{total_users} Total Registered</span>
+                    </div>
                 </div>
                 <div class="table-scroll-container">
                     <table class="responsive-table">
@@ -2104,6 +2191,17 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 <input id="modal-days" type="number" inputmode="numeric" class="input-field" value="30">
             </div>
             <button onclick="submitModalActivate()" class="btn-primary" style="margin-top:8px; padding:12px; font-size:14px;">Activate Full Access</button>
+
+            <div id="modal-bonus-zone" class="modal-bonus-zone" style="display:none;">
+                <span style="font-size: 12px; font-weight: 600; color: #e4e4e7;">🎁 Gift Bonus Free Messages</span>
+                <div class="bonus-chip-row">
+                    <button type="button" class="bonus-chip" onclick="setModalBonus(3)">+3 Msgs</button>
+                    <button type="button" class="bonus-chip" onclick="setModalBonus(5)">+5 Msgs</button>
+                    <button type="button" class="bonus-chip" onclick="setModalBonus(10)">+10 Msgs</button>
+                </div>
+                <input id="modal-bonus-count" type="number" inputmode="numeric" class="input-field" value="5" min="-50" max="100" placeholder="Bonus messages to add (e.g. 5)">
+                <button id="modal-bonus-btn" type="button" onclick="submitModalBonusMessages()" class="btn-bonus">Add Bonus Free Messages</button>
+            </div>
 
             <div id="modal-danger-zone" class="modal-danger-zone" style="display:none;">
                 <span style="font-size: 11.5px; color: #a1a1aa; line-height: 1.4;">
@@ -2437,9 +2535,34 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
         }}
 
         // Modal Helpers
+        function filterUsersTable() {{
+            const q = (document.getElementById('subscribers-search-input')?.value || '').trim().toLowerCase();
+            const tbody = document.getElementById('subscribers-users-tbody');
+            const badge = document.getElementById('badge-total-users');
+            if (!tbody) return;
+            const rows = Array.from(tbody.querySelectorAll('tr.user-row'));
+            let visibleCount = 0;
+            rows.forEach(tr => {{
+                const hay = (tr.dataset.search || tr.textContent || '').toLowerCase();
+                const show = !q || hay.includes(q);
+                tr.style.display = show ? '' : 'none';
+                if (show) visibleCount += 1;
+            }});
+            if (badge) {{
+                badge.textContent = q
+                    ? (visibleCount + ' Matching / {total_users} Total')
+                    : '{total_users} Total Registered';
+            }}
+        }}
+        function setModalBonus(n) {{
+            const inp = document.getElementById('modal-bonus-count');
+            if (inp) inp.value = String(n);
+        }}
         function syncModalDangerZone() {{
             const val = (document.getElementById('modal-phone')?.value || '').trim();
+            const bz = document.getElementById('modal-bonus-zone');
             const dz = document.getElementById('modal-danger-zone');
+            if (bz) bz.style.display = val ? 'flex' : 'none';
             if (dz) dz.style.display = val ? 'flex' : 'none';
         }}
         function openActivateModal(identifier) {{
@@ -2448,6 +2571,11 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             const titleEl = document.getElementById('modal-title');
             if (titleEl) {{
                 titleEl.textContent = cleanId ? 'Manage User' : 'Activate / Extend Subscription';
+            }}
+            const bonusBtn = document.getElementById('modal-bonus-btn');
+            if (bonusBtn) {{
+                bonusBtn.disabled = false;
+                bonusBtn.textContent = 'Add Bonus Free Messages';
             }}
             const delBtn = document.getElementById('modal-delete-btn');
             if (delBtn) {{
@@ -2459,6 +2587,42 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
         }}
         function closeActivateModal() {{
             document.getElementById('activate-modal').style.display = 'none';
+        }}
+        async function submitModalBonusMessages() {{
+            const identifier = document.getElementById('modal-phone').value.trim();
+            const bonus = parseInt(document.getElementById('modal-bonus-count').value || '5', 10);
+            if (!identifier) return alert('Please enter a user phone, email, or ID');
+            if (!bonus || isNaN(bonus)) return alert('Please enter a non-zero number of bonus messages');
+
+            const bonusBtn = document.getElementById('modal-bonus-btn');
+            if (bonusBtn) {{
+                bonusBtn.disabled = true;
+                bonusBtn.textContent = 'Updating...';
+            }}
+            try {{
+                const res = await fetch('/api/admin/bonus', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ identifier: identifier, bonus: bonus }})
+                }});
+                const data = await res.json().catch(() => ({{}}));
+                if (res.ok && data.status === 'ok') {{
+                    closeActivateModal();
+                    window.location.reload();
+                }} else {{
+                    if (bonusBtn) {{
+                        bonusBtn.disabled = false;
+                        bonusBtn.textContent = 'Add Bonus Free Messages';
+                    }}
+                    alert(data.message || 'Failed to update bonus messages');
+                }}
+            }} catch (e) {{
+                if (bonusBtn) {{
+                    bonusBtn.disabled = false;
+                    bonusBtn.textContent = 'Add Bonus Free Messages';
+                }}
+                alert('Network error while adding bonus messages');
+            }}
         }}
         async function submitModalActivate() {{
             const identifier = document.getElementById('modal-phone').value.trim();

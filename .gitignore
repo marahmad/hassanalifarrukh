@@ -47,6 +47,7 @@ instagram_archive/
 # Debug Images & Screenshots
 data/*.png
 *.png
+!static/apple-touch-icon.png
 
 # Local Databases, Vector Stores & Runtime Cache
 *.db

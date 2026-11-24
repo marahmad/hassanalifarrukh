@@ -704,6 +704,155 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
         self.assertIn("PKT (UTC+5)", html)
         self.assertIn("Today, ", html)
 
+    def test_deep_20_message_memory_window_and_persona_language_lock(self):
+        from src.persona import _detect_query_language, build_hassan_chat_messages
+
+        # 1. Language detection accuracy on real user messages (including ambiguous English "main")
+        for en_msg in [
+            "Hi",
+            "I've good communication skills",
+            "Ok great great but I'm a bit reluctant may be afraid of failure",
+            "But look i want someone to invest in me as a wife who provide me a house",
+            "Not for anyone",
+            "Moving alone",
+            "My main goal is to stay disciplined",
+        ]:
+            self.assertEqual(_detect_query_language(en_msg), "english", f"Expected english for: {en_msg}")
+
+        for ur_msg in [
+            "Bohot zyada overthinking hoti hai aaj kal",
+            "To phr agr mujhe khud e independent bnana hai to phr kaahy ki ser dardi",
+            "Bhai yaar me ACCA kar raha hu online",
+            "کامیابی کے لیے کیا کروں؟",
+        ]:
+            self.assertIn(_detect_query_language(ur_msg), ("roman_urdu", "urdu"), f"Expected urdu for: {ur_msg}")
+
+        # 2. 20-message memory window preserves early context (turn 1 still present on turn 10)
+        history = []
+        for i in range(1, 11):
+            history.append({"role": "user", "content": f"Turn {i}: I live in a small city with my mother"})
+            history.append({"role": "assistant", "content": f"Reply {i}: Understood, let us work with that."})
+
+        msgs_en = build_hassan_chat_messages(
+            "Moving alone",
+            retrieved_context=["Spoken Transcript: آپ نے کبھی ہار نہیں ماننی"],
+            tier="pro",
+            history=history,
+            user_name="Royal Deity",
+        )
+        # 1 system + 20 history + 1 current user = 22 messages
+        self.assertEqual(len(msgs_en), 22)
+        self.assertIn("Turn 1: I live in a small city with my mother", msgs_en[1]["content"])
+        sys_prompt_en = msgs_en[0]["content"]
+        self.assertIn("The user's latest message is in ENGLISH", sys_prompt_en)
+        # Language lock must appear AFTER the Urdu knowledge archive
+        self.assertGreater(
+            sys_prompt_en.index("The user's latest message is in ENGLISH"),
+            sys_prompt_en.index("RELEVANT KNOWLEDGE ARCHIVE"),
+        )
+
+        # 3. Roman Urdu lock enforces respectful tum/aap and bans tu/teri
+        msgs_ur = build_hassan_chat_messages("Mujhe samajh nahi aa raha kya karun", tier="trial", history=[])
+        self.assertIn("STRICT PRONOUN RULE", msgs_ur[0]["content"])
+        self.assertIn("NEVER use rough `tu`", msgs_ur[0]["content"])
+
+        # 4. Markdown sanitizer strips accidental **bold** and ### headers
+        self.assertEqual(
+            server._sanitize_ai_reply("### Plan\n**Step one**: stay consistent.\n\n\nKeep going."),
+            "Plan\nStep one: stay consistent.\n\nKeep going.",
+        )
+
+    def test_persistent_chat_history_hydration_and_api_endpoint(self):
+        # Unauthenticated history request must be rejected
+        self.assertEqual(self.client.get("/api/chat/history").status_code, 401)
+
+        u = database.get_or_create_google_user("g_hist_1", "returning@example.com", "Returning User")
+        uid = u["phone_number"]
+        database.complete_chat_turn(uid, "First msg </script><script>alert(1)</script>", "First reply")
+        database.complete_chat_turn(uid, "Second msg", "Second reply")
+
+        token = user_auth.generate_user_session_token(uid)
+        self.client.cookies.set(user_auth.USER_SESSION_COOKIE, token)
+
+        r_hist = self.client.get("/api/chat/history")
+        self.assertEqual(r_hist.status_code, 200)
+        body = r_hist.json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(len(body["messages"]), 4)
+        self.assertEqual(body["messages"][0]["role"], "user")
+        self.assertEqual(body["messages"][3]["content"], "Second reply")
+        self.assertTrue(body["messages"][3]["created_at"].endswith("Z"))
+
+        # GET / hydrates INITIAL_HISTORY inline and escapes </script>
+        r_home = self.client.get("/")
+        self.assertEqual(r_home.status_code, 200)
+        self.assertIn("const INITIAL_HISTORY =", r_home.text)
+        self.assertIn("Second reply", r_home.text)
+        self.assertNotIn("</script><script>alert(1)</script>", r_home.text)
+        self.assertIn("const PKT_TZ = 'Asia/Karachi';", r_home.text)
+        self.assertIn("267+ Public Reels", r_home.text)
+        self.assertNotIn("1,011 Knowledge Chunks Active", r_home.text)
+
+    def test_admin_bonus_messages_endpoint_and_dashboard_controls(self):
+        # Unauthenticated bonus call rejected
+        r_unauth = self.client.post("/api/admin/bonus", json={"identifier": "bonus@example.com", "bonus": 5})
+        self.assertEqual(r_unauth.status_code, 401)
+
+        u = database.get_or_create_google_user("g_bonus_1", "bonus@example.com", "Bonus Tester")
+        uid = u["phone_number"]
+
+        r_login = self.client.post("/api/admin/login", json={"passkey": server.ADMIN_PASSWORD})
+        self.assertEqual(r_login.status_code, 200)
+
+        # Grant +6 bonus messages -> cap becomes 5 + 6 = 11
+        r_add = self.client.post("/api/admin/bonus", json={"identifier": "bonus@example.com", "bonus": 6})
+        self.assertEqual(r_add.status_code, 200)
+        self.assertEqual(r_add.json()["bonus_trial_questions"], 6)
+        self.assertEqual(r_add.json()["max_free_trial"], config.FREE_TRIAL_QUESTIONS + 6)
+
+        # Dashboard displays +6 bonus pill, search filter, bonus controls, and Hassan avatar
+        r_dash = self.client.get("/admin/dashboard")
+        self.assertEqual(r_dash.status_code, 200)
+        self.assertIn("+6 bonus", r_dash.text)
+        self.assertIn("submitModalBonusMessages()", r_dash.text)
+        self.assertIn("filterUsersTable()", r_dash.text)
+        self.assertIn("/static/hassan_avatar.jpg", r_dash.text)
+        self.assertIn("/apple-touch-icon.png", r_dash.text)
+
+        # Negative adjustment floors cleanly at 0
+        r_sub = self.client.post("/api/admin/bonus", json={"identifier": uid, "bonus": -20})
+        self.assertEqual(r_sub.status_code, 200)
+        self.assertEqual(r_sub.json()["bonus_trial_questions"], 0)
+        self.assertEqual(r_sub.json()["max_free_trial"], config.FREE_TRIAL_QUESTIONS)
+
+        # Invalid bonus values & unknown user rejected cleanly
+        self.assertEqual(self.client.post("/api/admin/bonus", json={"identifier": uid, "bonus": 0}).status_code, 400)
+        self.assertEqual(self.client.post("/api/admin/bonus", json={"identifier": uid, "bonus": 500}).status_code, 400)
+        self.assertEqual(self.client.post("/api/admin/bonus", json={"identifier": "nobody@example.com", "bonus": 5}).status_code, 404)
+
+    def test_zero_404_production_endpoints_and_consistent_branding(self):
+        r_head = self.client.head("/")
+        self.assertEqual(r_head.status_code, 200)
+
+        r_icon = self.client.get("/apple-touch-icon.png")
+        self.assertEqual(r_icon.status_code, 200)
+        self.assertIn("image/png", r_icon.headers.get("content-type", ""))
+
+        r_icon_pre = self.client.get("/apple-touch-icon-precomposed.png")
+        self.assertEqual(r_icon_pre.status_code, 200)
+        self.assertIn("image/png", r_icon_pre.headers.get("content-type", ""))
+
+        r_robots = self.client.get("/robots.txt")
+        self.assertEqual(r_robots.status_code, 200)
+        self.assertIn("Disallow: /admin/", r_robots.text)
+        self.assertIn("Disallow: /api/", r_robots.text)
+
+        # Unauthenticated /admin/dashboard shows login gate with consistent avatar & touch icon
+        r_gate = self.client.get("/admin/dashboard")
+        self.assertEqual(r_gate.status_code, 200)
+        self.assertIn("/static/hassan_avatar.jpg", r_gate.text)
+        self.assertIn("/apple-touch-icon.png", r_gate.text)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

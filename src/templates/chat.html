@@ -9,12 +9,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Hassan AI — Unofficial AI Mentor</title>
     <meta name="description" content="Chat directly with an AI trained on Hassan Ali Farrukh's real reels and talks on discipline, career, mindset, and life in Pakistan.">
+    <meta property="og:site_name" content="Hassan AI">
     <meta property="og:title" content="Hassan AI — Unofficial AI Mentor">
     <meta property="og:description" content="Direct, no-BS mindset, career, fitness & life guidance trained on Hassan Ali Farrukh's reels. Try __FREE_TRIAL_QUESTIONS__ free messages.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://hassanalifarrukh.store/">
     <meta property="og:image" content="https://hassanalifarrukh.store/static/demo_poster.jpg">
     <meta name="twitter:card" content="summary_large_image">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b0b0d'/%3E%3Crect x='4' y='4' width='56' height='56' rx='13' fill='%23ffffff'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='-apple-system,sans-serif' font-size='28' font-weight='800' fill='%230b0b0d'%3EHF%3C/text%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1920,7 +1922,7 @@
             </p>
             <div class="knowledge-stats">
                 <div class="live-dot"></div>
-                <span>1,011 Knowledge Chunks Active</span>
+                <span>267+ Public Reels &amp; Talks Indexed</span>
             </div>
         </div>
 
@@ -1930,6 +1932,7 @@
                 <span class="membership-title">Full Access Pass</span>
                 <span class="membership-price">PKR __MONTHLY_PRICE__/mo</span>
             </div>
+            <div id="sidebar-active-sub-banner" style="display:none; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); border-radius:10px; padding:9px 11px; font-size:12px; color:#4ade80; font-weight:600; line-height:1.4;"></div>
             <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45;">
                 Everything included — unlimited chats, full reel archive, and deep step-by-step answers.
             </div>
@@ -1947,7 +1950,7 @@
                     <span class="copy-pill" onclick="copySnippet('__RAAST_ID_NUMBER__', this)">Copy</span>
                 </div>
             </div>
-            <button class="btn-link btn-primary-action" onclick="toggleDrawer(false); openPaywallModal();">
+            <button id="sidebar-membership-cta" class="btn-link btn-primary-action" onclick="toggleDrawer(false); openPaywallModal();">
                 💳 Submit Payment / Activate
             </button>
         </div>
@@ -1958,7 +1961,7 @@
                 ▶ Watch 35s Real Demo
             </button>
             <button class="btn-link" onclick="toggleDrawer(false); openReferralModal();" style="width: 100%;">
-                🎁 Referral Program (Get Free Months)
+                🎁 Invite Friends (+__SIGNUP_BONUS_QUESTIONS__ Free Msgs &amp; Free Months)
             </button>
         </div>
     </aside>
@@ -2089,7 +2092,7 @@
         <div id="inapp-browser-banner" class="inapp-banner">
             <div class="inapp-banner-row">
                 <div><strong>Opened in TikTok / Instagram?</strong><br>Tap <strong>⋯</strong> (top right) → <strong>Open in Safari</strong> (or Chrome) so Google Sign-In works smoothly.</div>
-                <button type="button" class="inapp-copy-btn" onclick="copySnippet(window.location.origin + '/', this)">Copy Link</button>
+                <button type="button" class="inapp-copy-btn" onclick="copySnippet(window.location.href, this)">Copy Link</button>
             </div>
         </div>
 
@@ -2265,6 +2268,8 @@ const GOOGLE_OAUTH_ENABLED = __GOOGLE_OAUTH_ENABLED__;
 const GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
 const SUPPORT_WHATSAPP_PHONE = "__SUPPORT_WHATSAPP_PHONE__";
 const INITIAL_AUTH = __INITIAL_AUTH_JSON__;
+const INITIAL_HISTORY = __INITIAL_HISTORY_JSON__;
+const PKT_TZ = 'Asia/Karachi';
 
 const APP_STATE = {
     authenticated: false,
@@ -2280,11 +2285,99 @@ const APP_STATE = {
     currentTier: 'trial',
     referralCode: 'HASSAN-XXXX',
     isSubscribed: false,
+    subscriptionExpiry: '',
     drawerOpen: false,
     googleEnabled: GOOGLE_OAUTH_ENABLED,
     welcomeInjected: false,
+    historyLoaded: false,
+    lastRenderedDateKey: '',
+    renderedMessageIds: new Set(),
     isSending: false
 };
+
+// ── Consistent PKT (Asia/Karachi, UTC+5) Time Helpers (Matches Admin Dashboard) ──
+function parseUtcTimestamp(iso) {
+    if (!iso) return null;
+    if (iso instanceof Date) return isNaN(iso.getTime()) ? null : iso;
+    let s = String(iso).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
+        s = s.replace(' ', 'T');
+    }
+    s = s.replace(/(\.\d{3})\d+/, '$1');
+    if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
+        s += 'Z';
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function getPktDateKey(dateObj) {
+    try {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: PKT_TZ,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(dateObj);
+        const map = {};
+        parts.forEach(p => { map[p.type] = p.value; });
+        return map.year + '-' + map.month + '-' + map.day;
+    } catch (e) {
+        return new Date(dateObj.getTime() + 5 * 3600 * 1000).toISOString().slice(0, 10);
+    }
+}
+
+function formatPktDateDivider(dateObj) {
+    const now = new Date();
+    const todayKey = getPktDateKey(now);
+    const yesterdayKey = getPktDateKey(new Date(now.getTime() - 86400000));
+    const targetKey = getPktDateKey(dateObj);
+    if (targetKey === todayKey) return 'Today';
+    if (targetKey === yesterdayKey) return 'Yesterday';
+    try {
+        const sameYear = targetKey.slice(0, 4) === todayKey.slice(0, 4);
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone: PKT_TZ,
+            month: 'short',
+            day: 'numeric',
+            ...(sameYear ? {} : { year: 'numeric' })
+        }).format(dateObj);
+    } catch (e) {
+        return targetKey;
+    }
+}
+
+function formatPktClockTime(dateObj) {
+    try {
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone: PKT_TZ,
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        }).format(dateObj);
+    } catch (e) {
+        const shifted = new Date(dateObj.getTime() + 5 * 3600 * 1000);
+        const h = shifted.getUTCHours();
+        const m = String(shifted.getUTCMinutes()).padStart(2, '0');
+        return ((h % 12) || 12) + ':' + m + ' ' + (h < 12 ? 'AM' : 'PM');
+    }
+}
+
+function formatPktExpiryDate(iso) {
+    const d = parseUtcTimestamp(iso);
+    if (!d) return '';
+    try {
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone: PKT_TZ,
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }).format(d);
+    } catch (e) {
+        return String(iso).slice(0, 10);
+    }
+}
 
 // ── Canonical Pakistani Mobile Normalization (Mirrors src/phone_utils.py) ──
 function normalizePkPhoneClient(raw) {
@@ -2483,7 +2576,8 @@ function applyInitialAuthPayload(data, signedInVia = null, authErrorParam = null
     APP_STATE.googleEnabled = !!data.google_enabled;
 
     if (data.authenticated && data.user) {
-        applyAuthenticatedUser(data.user, { showWelcomeToast: !!signedInVia });
+        const hydratedHistory = Array.isArray(INITIAL_HISTORY) ? INITIAL_HISTORY : [];
+        applyAuthenticatedUser(data.user, { showWelcomeToast: !!signedInVia, history: hydratedHistory });
         if (signedInVia === 'google') {
             showToast(`Welcome ${data.user.name}! Signed in via Google ✓`);
         }
@@ -2592,7 +2686,7 @@ async function handleGoogleCredentialResponse(response) {
         });
         const data = await res.json();
         if (res.ok && data.status === 'ok' && data.user) {
-            applyAuthenticatedUser(data.user, { showWelcomeToast: true });
+            applyAuthenticatedUser(data.user, { showWelcomeToast: true, fetchHistory: true });
         } else {
             showModalError('ob-auth-error', data.message || 'Google verification failed. Please try again.');
         }
@@ -2617,16 +2711,60 @@ function syncUserState(user) {
     APP_STATE.trialQuestionsUsed = user.trial_questions_used || 0;
     APP_STATE.maxFreeTrial = user.max_free_trial || APP_STATE.maxFreeTrial;
     APP_STATE.isSubscribed = !!user.is_subscribed;
+    APP_STATE.subscriptionExpiry = user.subscription_expiry || '';
 
     renderUserProfileUI();
     updateTrialIndicator();
     updateTierUI(APP_STATE.currentTier);
 }
 
-function applyAuthenticatedUser(user, { showWelcomeToast = false } = {}) {
+function renderHydratedHistory(messages) {
+    const messagesBox = document.getElementById('chat-messages-flow');
+    if (!messagesBox || !Array.isArray(messages) || !messages.length) return false;
+
+    messagesBox.innerHTML = '';
+    APP_STATE.lastRenderedDateKey = '';
+    APP_STATE.renderedMessageIds = new Set();
+
+    for (const m of messages) {
+        const uiRole = m.role === 'user' ? 'user' : 'ai';
+        appendMessageBubble(uiRole, m.content || '', m.created_at || null, m.id || null);
+    }
+    APP_STATE.historyLoaded = true;
+    APP_STATE.welcomeInjected = true;
+    const scrollToLatest = () => { messagesBox.scrollTop = messagesBox.scrollHeight; };
+    requestAnimationFrame(scrollToLatest);
+    setTimeout(scrollToLatest, 150);
+    return true;
+}
+
+async function fetchAndHydrateHistory() {
+    try {
+        const res = await fetch('/api/chat/history', { credentials: 'same-origin', cache: 'no-store' });
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (data.user) syncUserState(data.user);
+        if (data.status === 'ok' && Array.isArray(data.messages) && data.messages.length) {
+            return renderHydratedHistory(data.messages);
+        }
+    } catch (e) {}
+    return false;
+}
+
+function applyAuthenticatedUser(user, { showWelcomeToast = false, history = null, fetchHistory = false } = {}) {
     syncUserState(user);
     document.getElementById('onboarding-modal-overlay').classList.remove('active');
-    if (!APP_STATE.welcomeInjected) {
+
+    if (Array.isArray(history) && history.length) {
+        renderHydratedHistory(history);
+    } else if (fetchHistory) {
+        fetchAndHydrateHistory().then((loaded) => {
+            if (!loaded && !APP_STATE.welcomeInjected) {
+                injectInitialWelcome(APP_STATE.userName);
+                APP_STATE.welcomeInjected = true;
+            }
+        });
+    } else if (!APP_STATE.welcomeInjected) {
         injectInitialWelcome(APP_STATE.userName);
         APP_STATE.welcomeInjected = true;
     }
@@ -2695,10 +2833,14 @@ async function resetUserSession() {
 function injectInitialWelcome(name) {
     const messagesBox = document.getElementById('chat-messages-flow');
     messagesBox.innerHTML = '<div class="date-divider">Today</div>';
+    APP_STATE.lastRenderedDateKey = getPktDateKey(new Date());
 
     const displayName = (name || '').trim() || 'friend';
+    const expiryLabel = formatPktExpiryDate(APP_STATE.subscriptionExpiry);
     const trialNote = APP_STATE.isSubscribed
-        ? ''
+        ? (expiryLabel
+            ? `<p style="font-size: 12px; color: #4ade80; margin-top: 6px; font-weight: 600;">👑 Full Access Active — Unlimited chats until ${escapeHtml(expiryLabel)}.</p>`
+            : `<p style="font-size: 12px; color: #4ade80; margin-top: 6px; font-weight: 600;">👑 Full Access Active — Unlimited chats unlocked.</p>`)
         : `<p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">You have <strong>${APP_STATE.maxFreeTrial} free messages</strong> to try it out — unlimited access is PKR __MONTHLY_PRICE__/month.</p>`;
 
     const welcomeHtml = `
@@ -2711,7 +2853,7 @@ function injectInitialWelcome(name) {
                 ${trialNote}
 
                 <div class="msg-meta">
-                    <span>Hassan AI • Unofficial AI</span>
+                    <span>Hassan AI • Unofficial AI Mentor</span>
                     <span>Just now</span>
                 </div>
             </div>
@@ -2779,8 +2921,36 @@ async function handleSendAction() {
         }
 
     } catch (err) {
-        setTypingState(false);
-        appendMessageBubble('ai', 'Error connecting to Hassan AI server. Please verify your connection or try again in a moment.');
+        // Mobile lock-screen / app-switch recovery (handles Nginx 499 when server still saved the reply)
+        let recovered = false;
+        try {
+            await new Promise(r => setTimeout(r, 1800));
+            const hRes = await fetch('/api/chat/history', { credentials: 'same-origin', cache: 'no-store' });
+            if (hRes.ok) {
+                const hData = await hRes.json();
+                if (hData.user) syncUserState(hData.user);
+                const msgs = Array.isArray(hData.messages) ? hData.messages : [];
+                if (msgs.length >= 2) {
+                    const last = msgs[msgs.length - 1];
+                    const prev = msgs[msgs.length - 2];
+                    if (
+                        last.role === 'assistant'
+                        && prev.role === 'user'
+                        && (prev.content || '').trim() === text
+                        && (!last.id || !APP_STATE.renderedMessageIds.has(last.id))
+                    ) {
+                        setTypingState(false);
+                        appendMessageBubble('ai', last.content || '', last.created_at || null, last.id || null);
+                        recovered = true;
+                    }
+                }
+            }
+        } catch (recErr) {}
+
+        if (!recovered) {
+            setTypingState(false);
+            appendMessageBubble('ai', 'Connection was interrupted while waiting for a reply. Please check your internet or send your message again.');
+        }
     } finally {
         APP_STATE.isSending = false;
         if (sendBtn) sendBtn.disabled = false;
@@ -2794,9 +2964,19 @@ function handleChipClick(chipText) {
     handleSendAction();
 }
 
-function appendMessageBubble(role, content) {
+function appendMessageBubble(role, content, createdAtIso = null, msgId = null) {
     const messagesBox = document.getElementById('chat-messages-flow');
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (msgId) APP_STATE.renderedMessageIds.add(msgId);
+
+    const msgDate = parseUtcTimestamp(createdAtIso) || new Date();
+    const dateKey = getPktDateKey(msgDate);
+    if (dateKey && dateKey !== APP_STATE.lastRenderedDateKey) {
+        const dividerLabel = formatPktDateDivider(msgDate);
+        messagesBox.insertAdjacentHTML('beforeend', `<div class="date-divider">${escapeHtml(dividerLabel)}</div>`);
+        APP_STATE.lastRenderedDateKey = dateKey;
+    }
+
+    const timeStr = formatPktClockTime(msgDate);
 
     let formattedContent = formatMarkdown(content);
 
@@ -2906,12 +3086,24 @@ function updateTrialIndicator() {
 
 function updateTierUI(tier) {
     const badge = document.getElementById('plan-badge-pill');
+    const subBanner = document.getElementById('sidebar-active-sub-banner');
+    const memCta = document.getElementById('sidebar-membership-cta');
     if (APP_STATE.isSubscribed) {
         badge.className = 'badge-pill pro';
         badge.innerHTML = '👑 Full Access';
+        if (subBanner) {
+            const expLabel = formatPktExpiryDate(APP_STATE.subscriptionExpiry);
+            subBanner.textContent = expLabel
+                ? `👑 Full Access Active • Valid until ${expLabel}`
+                : '👑 Full Access Active • Unlimited Chats';
+            subBanner.style.display = 'block';
+        }
+        if (memCta) memCta.textContent = '👑 Extend / Renew Pass';
     } else {
         badge.className = 'badge-pill trial';
         badge.innerHTML = '⚡ Free Trial';
+        if (subBanner) subBanner.style.display = 'none';
+        if (memCta) memCta.textContent = '💳 Submit Payment / Activate';
     }
 }
 

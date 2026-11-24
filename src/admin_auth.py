@@ -54,6 +54,8 @@ def render_admin_login_html(error: str = "") -> str:
     <meta name="theme-color" content="#0b0b0d">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
     <title>Executive Passkey — Hassan Ali Farrukh</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -122,11 +124,13 @@ def render_admin_login_html(error: str = "") -> str:
         }}
 
         .logo-box {{
-            width: 48px;
-            height: 48px;
-            background: #ffffff;
-            color: #0b0b0d;
-            border-radius: 12px;
+            width: 58px;
+            height: 58px;
+            background: #1c1c20;
+            color: #ffffff;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.16);
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -134,7 +138,14 @@ def render_admin_login_html(error: str = "") -> str:
             font-weight: 800;
             margin: 0 auto 20px auto;
             letter-spacing: -0.5px;
-            box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        }}
+
+        .logo-box img {{
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }}
 
         .login-title {{
@@ -284,7 +295,7 @@ def render_admin_login_html(error: str = "") -> str:
 <body>
 
 <div class="login-card">
-    <div class="logo-box">HF</div>
+    <div class="logo-box"><img src="/static/hassan_avatar.jpg" alt="Hassan Ali Farrukh" onerror="this.remove();this.parentElement.textContent='HF';"></div>
     <h1 class="login-title">Executive Management Hub</h1>
     <p class="login-subtitle">
         Restricted to executive administration. Enter passkey to decrypt analytics, revenue, and subscriber telemetry.

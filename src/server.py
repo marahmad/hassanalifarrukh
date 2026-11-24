@@ -1,6 +1,8 @@
 import hmac
 import json
+import re
 import urllib.parse
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -20,6 +22,8 @@ from src.config import (
     ADMIN_PHONE,
     ALLIED_BANK,
     ALLIED_BANK_ACCOUNT,
+    CHAT_HISTORY_CONTEXT_MESSAGES,
+    CHAT_HISTORY_UI_LIMIT,
     EASYPAISA,
     EASYPAISA_NUMBER,
     FREE_TRIAL_QUESTIONS,
@@ -37,6 +41,7 @@ from src.config import (
 )
 from src.dashboard import render_dashboard_html
 from src.database import (
+    PKT_TZ,
     activate_user,
     apply_referral_code,
     can_user_chat,
@@ -52,6 +57,7 @@ from src.database import (
     get_system_metrics,
     get_user_by_identifier,
     get_user_trial_limit,
+    grant_bonus_messages,
     init_db,
     link_phone_to_user,
     mark_welcome_sent,
@@ -120,6 +126,22 @@ def _call_groq_model(messages: list[dict], model_id: str, max_completion: int, u
         )
 
 
+def _format_pkt_ymd(dt: datetime) -> str:
+    """Formats a naive-UTC or aware datetime as YYYY-MM-DD in Pakistan Standard Time (PKT)."""
+    aware = dt.astimezone(timezone.utc) if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+    return aware.astimezone(PKT_TZ).strftime("%Y-%m-%d")
+
+
+def _sanitize_ai_reply(text: str) -> str:
+    """Strips accidental markdown bolding or heading hashes so replies read like natural chat."""
+    if not text:
+        return text
+    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    cleaned = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 def _generate_ai_reply(messages: list[dict], status: str) -> str:
     """
     Generates a complete Hassan AI reply via Groq without mid-sentence truncation or 429 crashes.
@@ -152,8 +174,7 @@ def _generate_ai_reply(messages: list[dict], status: str) -> str:
                 except Exception:
                     pass
             if content:
-                # Strip accidental **markdown bolding** if any leaked through
-                return content
+                return _sanitize_ai_reply(content)
         except Exception as e:
             last_err = e
             print(f"[AI Failover] Model {model_id} failed ({type(e).__name__}): {e}")
@@ -609,7 +630,10 @@ ALLOWED_STATIC_FILES = {
     "demo_preview.mp4": "video/mp4",
     "demo_poster.jpg": "image/jpeg",
     "hassan_avatar.jpg": "image/jpeg",
+    "apple-touch-icon.png": "image/png",
 }
+
+ROBOTS_TXT = "User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\n"
 
 FAVICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
@@ -627,6 +651,64 @@ async def favicon():
         content=FAVICON_SVG,
         media_type="image/svg+xml",
         headers={"Cache-Control": "public, max-age=604800, immutable"},
+    )
+
+
+@app.get("/apple-touch-icon.png")
+@app.get("/apple-touch-icon-precomposed.png")
+async def apple_touch_icon():
+    """Serves 180x180 PNG touch icon for iOS Safari home screen & link previews."""
+    icon_path = STATIC_DIR / "apple-touch-icon.png"
+    if icon_path.is_file():
+        return FileResponse(
+            path=str(icon_path),
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=604800"},
+        )
+    return Response(
+        content=FAVICON_SVG,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
+
+
+@app.get("/robots.txt")
+async def robots_txt():
+    """Serves robots.txt allowing home indexing while keeping /admin and /api clean."""
+    return Response(
+        content=ROBOTS_TXT,
+        media_type="text/plain; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.head("/")
+async def customer_chat_head():
+    """Supports HEAD / for uptime monitors and social link preview crawlers (no 405s)."""
+    return Response(status_code=200, headers=PAGE_CACHE_HEADERS)
+
+
+@app.get("/api/chat/history")
+async def api_chat_history(request: Request):
+    """Returns the signed-in user's recent saved chat history (UTC 'Z' timestamps)."""
+    user_id = get_authenticated_user_id(request)
+    if not user_id:
+        return JSONResponse(
+            {"status": "error", "code": "unauthenticated", "message": "Please sign in first."},
+            status_code=401,
+        )
+    user = get_user_by_identifier(user_id)
+    if not user:
+        resp = JSONResponse(
+            {"status": "error", "code": "unauthenticated", "message": "Session expired."},
+            status_code=401,
+        )
+        clear_user_session_cookie(resp)
+        return resp
+    history = get_recent_chat_history(user["phone_number"], limit=CHAT_HISTORY_UI_LIMIT)
+    return JSONResponse(
+        {"status": "ok", "messages": history, "user": _public_user_payload(user)},
+        headers=NO_CACHE_HEADERS,
     )
 
 
@@ -648,14 +730,16 @@ async def serve_static_asset(filename: str):
 
 @app.get("/", response_class=HTMLResponse)
 async def customer_chat(request: Request):
-    """Customer-facing mobile chat UI — server-hydrates auth state to eliminate /api/auth/me waterfall."""
+    """Customer-facing mobile chat UI — server-hydrates auth & recent chat history on first paint."""
     auth_config = {"google_enabled": _is_google_oauth_enabled()}
     user_id = get_authenticated_user_id(request)
     clear_stale = False
+    initial_history: list[dict] = []
     if user_id:
         user = get_user_by_identifier(user_id)
         if user:
             initial_auth = {"authenticated": True, "user": _public_user_payload(user), **auth_config}
+            initial_history = get_recent_chat_history(user["phone_number"], limit=CHAT_HISTORY_UI_LIMIT)
         else:
             initial_auth = {"authenticated": False, "user": None, **auth_config}
             clear_stale = True
@@ -663,7 +747,7 @@ async def customer_chat(request: Request):
         initial_auth = {"authenticated": False, "user": None, **auth_config}
 
     resp = HTMLResponse(
-        content=render_chat_html(initial_auth=initial_auth),
+        content=render_chat_html(initial_auth=initial_auth, initial_history=initial_history),
         status_code=200,
         headers=PAGE_CACHE_HEADERS,
     )
@@ -714,13 +798,67 @@ async def api_admin_activate(request: Request):
         "status": "ok",
         "target": target_id,
         "tier": tier_activated,
-        "expiry": new_exp.strftime("%Y-%m-%d"),
+        "expiry": _format_pkt_ymd(new_exp),
         "referral_code": ref_code,
         "referrer_reward": {
             "referrer_phone": referrer_reward["referrer_phone"],
-            "new_expiry": referrer_reward["new_expiry"].strftime("%Y-%m-%d"),
+            "new_expiry": _format_pkt_ymd(referrer_reward["new_expiry"]),
         } if referrer_reward else None,
     }
+
+
+@app.post("/api/admin/bonus")
+async def api_admin_bonus(request: Request):
+    """Gifts (or adjusts) bonus free trial messages for a user. Requires Executive Passkey."""
+    if not is_admin_authenticated(request):
+        return JSONResponse(
+            {"status": "error", "message": "Unauthorized. Executive passkey required."},
+            status_code=401,
+        )
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid request payload."}, status_code=400)
+
+    raw_target = str(data.get("identifier") or data.get("user_id") or data.get("phone") or "").strip()
+    if not raw_target:
+        return JSONResponse(
+            {"status": "error", "message": "Please enter a user phone number, email, or ID."},
+            status_code=400,
+        )
+
+    try:
+        bonus_delta = int(data.get("bonus"))
+    except Exception:
+        return JSONResponse(
+            {"status": "error", "message": "Please enter a valid whole number of bonus messages."},
+            status_code=400,
+        )
+
+    if bonus_delta == 0 or bonus_delta < -50 or bonus_delta > 100:
+        return JSONResponse(
+            {"status": "error", "message": "Bonus message adjustment must be between -50 and +100 (non-zero)."},
+            status_code=400,
+        )
+
+    ok, result = grant_bonus_messages(raw_target, bonus_delta)
+    if not ok:
+        return JSONResponse({"status": "error", "message": str(result)}, status_code=404)
+
+    return JSONResponse(
+        {
+            "status": "ok",
+            "user_id": result["user_id"],
+            "name": result["name"],
+            "email": result["email"],
+            "bonus_delta": result["bonus_delta"],
+            "bonus_trial_questions": result["bonus_trial_questions"],
+            "max_free_trial": result["max_free_trial"],
+            "trial_questions_used": result["trial_questions_used"],
+            "user": _public_user_payload(result["user"]),
+        },
+        headers=NO_CACHE_HEADERS,
+    )
 
 
 @app.post("/api/admin/delete-user")
@@ -879,7 +1017,7 @@ async def receive_whatsapp(request: Request):
                     label = f"+{target_wa}" if target_wa else target_id
                     send_whatsapp_text(
                         sender_phone,
-                        f"✅ User {label} activated on Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) for {days} days until {new_exp.strftime('%Y-%m-%d')}!\nReferral Code: {ref_code}",
+                        f"✅ User {label} activated on Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) for {days} days until {_format_pkt_ymd(new_exp)}!\nReferral Code: {ref_code}",
                     )
 
                     if target_wa:
@@ -889,7 +1027,7 @@ async def receive_whatsapp(request: Request):
 
                     if referrer_reward and is_canonical_pk_phone(referrer_reward.get("referrer_phone")):
                         ref_phone = referrer_reward["referrer_phone"]
-                        ref_exp_fmt = referrer_reward["new_expiry"].strftime("%Y-%m-%d")
+                        ref_exp_fmt = _format_pkt_ymd(referrer_reward["new_expiry"])
                         ref_reward_msg = (
                             f"🎉 Congratulations!\n\n"
                             f"3 friends subscribed using your code.\n"
@@ -966,8 +1104,8 @@ async def receive_whatsapp(request: Request):
         retrieval_count = 6 if status == "subscribed" else 3
         matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
 
-        # 7. Retrieve Conversation History
-        history = get_recent_chat_history(sender_phone, limit=6)
+        # 7. Retrieve Conversation History (20 messages = 10 full turns)
+        history = get_recent_chat_history(sender_phone, limit=CHAT_HISTORY_CONTEXT_MESSAGES)
 
         # 8. Generate AI Response via Groq
         u_pre = get_or_create_user(sender_phone)
@@ -1087,7 +1225,7 @@ async def process_chat(request: Request):
             new_exp, tier_activated, ref_code, referrer_reward = activate_user(target_id, days=days, tier=tier)
             label = f"+{target_id}" if is_canonical_pk_phone(target_id) else target_id
             reply = (
-                f"✅ User {label} activated on Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) for {days} days until {new_exp.strftime('%Y-%m-%d')}!\n"
+                f"✅ User {label} activated on Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) for {days} days until {_format_pkt_ymd(new_exp)}!\n"
                 f"Referral Code: {ref_code}"
             )
             if referrer_reward:
@@ -1096,7 +1234,7 @@ async def process_chat(request: Request):
                     if is_canonical_pk_phone(referrer_reward["referrer_phone"])
                     else referrer_reward["referrer_phone"]
                 )
-                reply += f"\n🎉 Referrer {ref_label} unlocked 30 FREE DAYS! New expiry: {referrer_reward['new_expiry'].strftime('%Y-%m-%d')}"
+                reply += f"\n🎉 Referrer {ref_label} unlocked 30 FREE DAYS! New expiry: {_format_pkt_ymd(referrer_reward['new_expiry'])}"
             return {"status": "ok", "reply": reply}
 
     # 2. Authenticate Caller Identity (NEVER trust raw `sender` from unauthenticated browsers)
@@ -1208,8 +1346,8 @@ async def process_chat(request: Request):
     retrieval_count = 6 if status == "subscribed" else 3
     matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
 
-    # 8. Retrieve Conversation History for Multi-Turn Context
-    history = get_recent_chat_history(sender_id, limit=6)
+    # 8. Retrieve Conversation History for Multi-Turn Context (20 messages = 10 full turns)
+    history = get_recent_chat_history(sender_id, limit=CHAT_HISTORY_CONTEXT_MESSAGES)
 
     # 9. Generate AI Response (never deduct a trial question if upstream LLM fails)
     if groq_client:

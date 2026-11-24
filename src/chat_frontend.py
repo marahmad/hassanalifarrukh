@@ -72,8 +72,8 @@ def _get_base_template() -> str:
     return _TEMPLATE_BASE_HTML
 
 
-def render_chat_html(initial_auth: dict | None = None) -> str:
-    """Renders the chat UI with optional server-side hydrated auth state (eliminates /api/auth/me waterfall)."""
+def render_chat_html(initial_auth: dict | None = None, initial_history: list[dict] | None = None) -> str:
+    """Renders the chat UI with server-side hydrated auth & chat history (eliminates waterfall)."""
     base = _get_base_template()
     if initial_auth is None:
         initial_auth = {
@@ -82,9 +82,11 @@ def render_chat_html(initial_auth: dict | None = None) -> str:
             "google_enabled": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
         }
     auth_json = json.dumps(initial_auth, separators=(",", ":")).replace("</", "<\\/")
+    history_json = json.dumps(initial_history or [], separators=(",", ":")).replace("</", "<\\/")
     onboarding_cls = "" if initial_auth.get("authenticated") else " active"
     return (
         base
         .replace("__INITIAL_AUTH_JSON__", auth_json)
+        .replace("__INITIAL_HISTORY_JSON__", history_json)
         .replace("__ONBOARDING_MODAL_CLASS__", onboarding_cls)
     )

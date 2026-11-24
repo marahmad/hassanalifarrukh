@@ -14,6 +14,43 @@ Core Conversational Behavior:
 
 import re
 
+from src.config import CHAT_HISTORY_CONTEXT_MESSAGES
+
+# Unambiguous Roman Urdu / Pakistani conversational markers (excludes English words like "main", "to", "is", "me", "no", "hi")
+_ROMAN_URDU_MARKERS = frozenset({
+    "aaj", "aap", "aapka", "aapki", "aapke", "abhi", "agar", "agr", "agla", "agly",
+    "apna", "apni", "apne", "assalam", "assalamu", "aoa", "aur", "baat", "baatein",
+    "baten", "bahut", "bohot", "batao", "bataein", "btain", "behen", "bhai", "bhi",
+    "bilkul", "chahta", "chahti", "chahiye", "dekh", "dekho", "dimagh", "dost",
+    "ghar", "hai", "hain", "himmat", "hoon", "hun", "hu", "kaahy", "kaam", "kaise",
+    "kaisy", "kal", "karke", "karky", "karna", "karni", "karne", "karo", "karu",
+    "karun", "karuu", "khud", "khushi", "kushi", "kia", "kisi", "krna", "kuch",
+    "kya", "lekin", "log", "logon", "magar", "mard", "masla", "mehnat", "mein",
+    "mera", "mere", "meri", "mjhe", "mujh", "mujhe", "nahi", "nai", "nhi", "paise",
+    "pareshan", "pareshani", "parhai", "parhna", "phir", "phr", "rishta", "rishte",
+    "sab", "salam", "samajh", "shadi", "shaadi", "shukriya", "sirf", "sukoon",
+    "suno", "tayyar", "theek", "thik", "toh", "waise", "walaikum", "waqt", "yaar",
+    "yar", "zindagi", "ziyada", "zyada",
+})
+
+
+def _detect_query_language(user_query: str) -> str:
+    """
+    Deterministically classifies the user's latest message as:
+      - 'urdu' (Urdu/Arabic script)
+      - 'roman_urdu' (Pakistani Roman Urdu / mixed Roman Urdu + English)
+      - 'english' (pure English)
+    """
+    text = (user_query or "").strip()
+    if not text:
+        return "english"
+    if re.search(r"[\u0600-\u06FF]", text):
+        return "urdu"
+    tokens = re.findall(r"[a-zA-Z]+", text.lower())
+    if any(tok in _ROMAN_URDU_MARKERS for tok in tokens):
+        return "roman_urdu"
+    return "english"
+
 HASSAN_ALI_FARRUKH_SYSTEM_PROMPT = """You are talking 1-on-1 with someone on direct chat in the authentic voice, mindset, and personal style of Hassan Ali Farrukh (@hassanalifarrukh) — Head of Hataff Security Systems (ex-SSG personnel), fitness practitioner, and life/mindset mentor from Pakistan.
 
 ### 1. YOUR VOICE & CORE LIFE CONTEXT:
@@ -40,6 +77,8 @@ HASSAN_ALI_FARRUKH_SYSTEM_PROMPT = """You are talking 1-on-1 with someone on dir
     - For a **female user** in Roman Urdu: ALWAYS use **feminine Urdu verb forms** (`"sakti ho"`, `"kar rahi ho"`, `"soch rahi ho"`, `"karogi"`, `"rahogi"`, `"banaogi"`, `"tumhari"`) — NEVER masculine verbs (`"sakta hai"`, `"karega"`, `"rahega"`, `"kar raha tha"`) and NEVER `"Bhai"`.
     - For a **male user** (only if clearly male or they call you `"bhai"`/`"bro"`): `"Bhai"` and masculine verbs (`"kar sakte ho"`, `"kar rahe ho"`, `"karoge"`) are natural.
     - When gender is unclear: stay warm and gender-neutral using their first name or `"Hey"`, `"Salam"`, `"Dekho"`, `"Yar"`, `"aap"` — never guess `"Bhai"`.
+  - **Authentic Pakistani & Islamic Cultural Grounding:** Understand real Pakistani family life, respectability, and Islamic marriage values. A woman wanting a responsible, stable, provider husband (qawwam) who provides a home while she builds it is completely valid and honorable — NEVER lecture her against it, and NEVER use Western dating-app clichés like `"treat every date like a business interview"` or `"same game with dating"`.
+  - **Remember Everything & NEVER Loop:** Read the entire conversation history carefully. NEVER re-ask a question the user already answered earlier (such as their skills, city, or goals), NEVER contradict constraints they stated (such as living with family or being unable to relocate), and NEVER repeat the same generic advice pitch (e.g., `"30-minute freelance gig"`) twice in a row. When the user pushes back or changes angle, acknowledge their exact point directly and respond to what they JUST said.
   - Use their first name occasionally when it feels natural (not in every single reply). Remember and build on what they actually shared in earlier messages.
 - **BOUNDARIES:**
   - Never promise live 1-on-1 calls, in-person meetings, or personal phone numbers.
@@ -114,26 +153,59 @@ Keep your reply natural, personal, and punchy (2 short paragraphs max) — like 
 This is a Full Access member. Give them genuine personal attention, thoughtful real-world guidance, and clear next steps while keeping it 100% conversational and human (2 to 4 natural short paragraphs, never a robotic essay or list).
 """
 
+    detected_lang = _detect_query_language(user_query)
+    if detected_lang == "english":
+        language_lock_rule = (
+            "### FINAL LANGUAGE, TONE & MEMORY LOCK (HIGHEST PRIORITY — OVERRIDES ARCHIVE LANGUAGE):\n"
+            "- The user's latest message is in ENGLISH. Write your ENTIRE reply in 100% natural, grounded English with ZERO Roman Urdu words (even though the knowledge archive above contains Urdu transcripts).\n"
+            "- Read the full conversation history below before replying. Never re-ask something the user already told you, never ignore constraints they already mentioned, and never repeat the same advice from your previous message.\n"
+            "- Plain conversational text only — zero markdown bolding (`**`), zero bullet lists, zero headers."
+        )
+    else:
+        language_lock_rule = (
+            "### FINAL LANGUAGE, TONE & MEMORY LOCK (HIGHEST PRIORITY):\n"
+            "- Reply in natural Pakistani Roman Urdu matching the user's message.\n"
+            "- STRICT PRONOUN RULE: Always use respectful `tum` (`tum`, `tumhara`, `tumhari`, `tumhein`, `karo`, `banao`, `sakti ho` / `sakte ho`) or `aap` — NEVER use rough `tu`, `tera`, `teri`, `tere`, `tujhe`, or `kar le`, even if older replies in the history accidentally used them.\n"
+            "- Match gender accurately: use feminine Urdu verbs (`kar rahi ho`, `chahti ho`, `sakti ho`, `ho jaogi`) for female users and masculine verbs only when clearly male.\n"
+            "- Read the full conversation history below before replying. Never re-ask something the user already told you, never ignore constraints they already mentioned, and never repeat the same advice from your previous message.\n"
+            "- Plain conversational text only — zero markdown bolding (`**`), zero bullet lists, zero headers."
+        )
+
     sys_content = f"""{HASSAN_ALI_FARRUKH_SYSTEM_PROMPT}
 {user_context}
 {tier_instructions}
 
 ### RELEVANT KNOWLEDGE ARCHIVE (From Hassan's real reels and talks — weave ideas in naturally without sounding like you're reading notes):
 {context_text}
+
+{language_lock_rule}
 """
 
     messages = [{"role": "system", "content": sys_content}]
 
-    # Append recent conversation history if available (up to last 6 turns)
+    # Append recent conversation history (up to CHAT_HISTORY_CONTEXT_MESSAGES = 20 msgs / 10 full turns)
+    # Guard total history characters (~9,000 chars) so Groq free-tier TPM budget stays safe on long threads.
     if history:
-        for turn in history[-6:]:
+        cleaned_turns = []
+        for turn in history[-CHAT_HISTORY_CONTEXT_MESSAGES:]:
             role = turn.get("role")
-            content = turn.get("content", "").strip()
+            content = (turn.get("content") or "").strip()
             # Clean out any trailing metadata notes from stored content
             cleaned_content = re.sub(r"\n\n_\(Free Trial:.*?\)_", "", content)
             cleaned_content = re.sub(r"\n\n━━━━━━━━━━━━━━━━.*", "", cleaned_content, flags=re.DOTALL).strip()
             if role in ("user", "assistant") and cleaned_content:
-                messages.append({"role": role, "content": cleaned_content})
+                cleaned_turns.append({"role": role, "content": cleaned_content})
+
+        selected_turns = []
+        char_budget = 9000
+        used_chars = 0
+        for turn in reversed(cleaned_turns):
+            turn_len = len(turn["content"])
+            if selected_turns and (used_chars + turn_len) > char_budget:
+                break
+            selected_turns.append(turn)
+            used_chars += turn_len
+        messages.extend(reversed(selected_turns))
 
     # Append current user query
     messages.append({"role": "user", "content": user_query})
