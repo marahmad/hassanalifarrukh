@@ -10,7 +10,7 @@
     <title>Hassan AI — Unofficial AI Mentor</title>
     <meta name="description" content="Chat directly with an AI trained on Hassan Ali Farrukh's real reels and talks on discipline, career, mindset, and life in Pakistan.">
     <meta property="og:title" content="Hassan AI — Unofficial AI Mentor">
-    <meta property="og:description" content="Direct, no-BS mindset, career, fitness & life guidance trained on Hassan Ali Farrukh's reels. Try 3 free messages.">
+    <meta property="og:description" content="Direct, no-BS mindset, career, fitness & life guidance trained on Hassan Ali Farrukh's reels. Try __FREE_TRIAL_QUESTIONS__ free messages.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://hassanalifarrukh.store/">
     <meta property="og:image" content="https://hassanalifarrukh.store/static/demo_poster.jpg">
@@ -2058,7 +2058,7 @@
             <div class="plan-option-card selected" id="plan-card-full" style="cursor: default;">
                 <span class="plan-option-name">👑 Full Access — Monthly Pass</span>
                 <span class="plan-option-price">PKR __MONTHLY_PRICE__ / month</span>
-                <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Unlimited AI chats • Full 1,011-chunk archive • Deep step-by-step answers • Everything included</span>
+                <span style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">Unlimited AI chats • Full reel archive • Deep step-by-step answers • Everything included</span>
             </div>
         </div>
 
@@ -2079,6 +2079,14 @@
             </div>
         </div>
 
+        <button type="button" id="paywall-wa-btn" class="form-btn" onclick="openWhatsAppPaymentProof()" style="background: #25D366; color: #062814; font-weight: 700;">
+            💬 Send Screenshot on WhatsApp (Fastest Activation)
+        </button>
+
+        <div style="text-align: center; font-size: 11px; color: var(--text-muted); margin: -2px 0;">
+            — or submit Transaction ID directly below —
+        </div>
+
         <div class="form-group">
             <label class="form-label" for="paywall-phone-input">Your Pakistani Mobile / EasyPaisa Number</label>
             <input type="tel" id="paywall-phone-input" class="form-input" placeholder="0300 7560313 or +92 300 7560313" autocomplete="tel" oninput="updatePhonePreview('paywall-phone-input', 'paywall-phone-preview')">
@@ -2094,6 +2102,21 @@
             ✓ Submit Payment for Verification
         </button>
 
+        <div style="background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.22); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 700; color: #4ade80;">🎁 Want +__SIGNUP_BONUS_QUESTIONS__ Free Messages Right Now?</div>
+            <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+                Invite a friend with your link — the moment they sign up, you unlock <strong>+__SIGNUP_BONUS_QUESTIONS__ bonus free messages</strong> (up to +__MAX_BONUS_QUESTIONS__), plus <strong>1 Month FREE</strong> when 3 friends subscribe.
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" onclick="shareReferralOnWhatsApp()" style="flex: 1; background: rgba(37, 211, 102, 0.16); border: 1px solid rgba(37, 211, 102, 0.4); color: #4ade80; border-radius: 8px; padding: 9px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                    📲 Share on WhatsApp
+                </button>
+                <button type="button" onclick="copyReferralInvite()" style="flex: 1; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); color: var(--text-primary); border-radius: 8px; padding: 9px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                    📋 Copy Link
+                </button>
+            </div>
+        </div>
+
         <button class="modal-dismiss-link" onclick="closePaywallModal()">
             Continue Browsing
         </button>
@@ -2108,7 +2131,7 @@
             <div class="modal-icon-badge">🎁</div>
             <h2 class="modal-title">Your Referral Hub</h2>
             <p class="modal-desc">
-                Share your personal invite code. When 3 friends subscribe, you get <strong>1 Month FREE</strong> automatically.
+                <strong>+__SIGNUP_BONUS_QUESTIONS__ bonus free messages</strong> every time a friend signs up (up to +__MAX_BONUS_QUESTIONS__), plus <strong>1 Month FREE</strong> when 3 friends subscribe!
             </p>
         </div>
 
@@ -2119,7 +2142,11 @@
             </div>
         </div>
 
-        <button class="form-btn" onclick="copyReferralInvite()">
+        <button type="button" class="form-btn" onclick="shareReferralOnWhatsApp()" style="background: #25D366; color: #062814; font-weight: 700;">
+            📲 Share on WhatsApp (+__SIGNUP_BONUS_QUESTIONS__ Free Messages)
+        </button>
+
+        <button class="form-btn" onclick="copyReferralInvite()" style="background: rgba(255, 255, 255, 0.08); color: #ffffff; border: 1px solid var(--border);">
             📋 Copy Referral Link
         </button>
 
@@ -2150,6 +2177,7 @@
 // ── Application State (Server-Hydrated for Zero-Waterfall First Paint) ──
 const GOOGLE_OAUTH_ENABLED = __GOOGLE_OAUTH_ENABLED__;
 const GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
+const SUPPORT_WHATSAPP_PHONE = "__SUPPORT_WHATSAPP_PHONE__";
 const INITIAL_AUTH = __INITIAL_AUTH_JSON__;
 
 const APP_STATE = {
@@ -2973,13 +3001,38 @@ function copySnippet(text, el) {
     }
 }
 
-function copyReferralInvite() {
+function getReferralInviteText() {
     const code = (APP_STATE.referralCode || '').trim();
     const refUrl = code && code !== 'HASSAN-XXXX'
         ? `${window.location.origin}/?ref=${encodeURIComponent(code)}`
         : `${window.location.origin}/`;
-    const inviteText = `Talk to Hassan Ali Farrukh's AI Clone! Use my invite code ${code} to get started: ${refUrl}`;
-    copySnippet(inviteText);
+    return `Yar check out Hassan Ali Farrukh's AI Mentor — it answers career, mindset & life questions in his real style (__FREE_TRIAL_QUESTIONS__ free messages). Use my invite link: ${refUrl}`;
+}
+
+function copyReferralInvite() {
+    copySnippet(getReferralInviteText());
+}
+
+function shareReferralOnWhatsApp() {
+    const url = `https://wa.me/?text=${encodeURIComponent(getReferralInviteText())}`;
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!win) window.location.href = url;
+}
+
+function openWhatsAppPaymentProof() {
+    const phoneInput = (document.getElementById('paywall-phone-input')?.value || '').trim();
+    const trxInput = (document.getElementById('paywall-trx-input')?.value || '').trim();
+    const identity = APP_STATE.userEmail || APP_STATE.displayPhone || APP_STATE.userName || 'User';
+    const lines = [
+        `Assalamu Alaikum! I just paid PKR __MONTHLY_PRICE__ for Hassan AI Full Access.`,
+        `Account: ${identity}`,
+    ];
+    if (phoneInput) lines.push(`Phone: ${phoneInput}`);
+    if (trxInput) lines.push(`TRX ID: ${trxInput}`);
+    lines.push(`Sharing my payment screenshot below for activation:`);
+    const url = `https://wa.me/${SUPPORT_WHATSAPP_PHONE}?text=${encodeURIComponent(lines.join('\n'))}`;
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!win) window.location.href = url;
 }
 
 function showToast(msg) {

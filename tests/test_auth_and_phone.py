@@ -610,6 +610,52 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
             ok_j, _, _ = clean_and_validate_chunk(junk, "speech")
             self.assertFalse(ok_j, f"Expected junk chunk to be rejected: {junk[:60]}")
 
+    def test_five_free_trial_and_instant_signup_referral_bonus_and_wa_buttons(self):
+        # Verify default free trial is 5 and UI has WhatsApp screenshot + share buttons
+        self.assertEqual(config.FREE_TRIAL_QUESTIONS, 5)
+        r_home = self.client.get("/")
+        self.assertEqual(r_home.status_code, 200)
+        self.assertIn("openWhatsAppPaymentProof()", r_home.text)
+        self.assertIn("shareReferralOnWhatsApp()", r_home.text)
+        self.assertIn("Send Screenshot on WhatsApp", r_home.text)
+
+        # Create referrer and exhaust all 5 free trial messages -> paywalled
+        ref_user = database.get_or_create_google_user("g_ref_owner", "owner@example.com", "Owner")
+        ref_uid = ref_user["phone_number"]
+        ref_code = ref_user["referral_code"]
+        for _ in range(5):
+            database.record_user_query(ref_uid)
+        can_before, status_before, _ = database.can_user_chat(ref_uid)
+        self.assertFalse(can_before)
+        self.assertEqual(status_before, "paywall_required")
+
+        # Friend signs up and applies referrer's code -> referrer instantly unlocks +3 bonus messages (cap 8)
+        friend = database.get_or_create_google_user("g_ref_friend1", "friend1@example.com", "Friend One")
+        ok, msg = database.apply_referral_code(friend["phone_number"], ref_code)
+        self.assertTrue(ok)
+        self.assertIn("+3 bonus free messages", msg)
+
+        ref_after = database.get_user_by_identifier(ref_uid)
+        self.assertEqual(ref_after["bonus_trial_questions"], 3)
+        self.assertEqual(database.get_user_trial_limit(ref_after), 8)
+        can_after, status_after, _ = database.can_user_chat(ref_uid)
+        self.assertTrue(can_after)
+        self.assertEqual(status_after, "free_trial")
+
+        # Friend cannot double-apply to farm bonus messages
+        ok_dup, _ = database.apply_referral_code(friend["phone_number"], ref_code)
+        self.assertFalse(ok_dup)
+        self.assertEqual(database.get_user_by_identifier(ref_uid)["bonus_trial_questions"], 3)
+
+        # Bonus caps cleanly at MAX_REFERRAL_BONUS_QUESTIONS (15)
+        for i in range(2, 8):
+            f_extra = database.get_or_create_google_user(f"g_ref_f{i}", f"friend{i}@example.com", f"Friend {i}")
+            database.apply_referral_code(f_extra["phone_number"], ref_code)
+        self.assertEqual(
+            database.get_user_by_identifier(ref_uid)["bonus_trial_questions"],
+            config.MAX_REFERRAL_BONUS_QUESTIONS,
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -102,10 +102,11 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 plan_label = "FREE TRIAL"
                 plan_style = "#a1a1aa"
                 used = u.get('trial_questions_used', 0) or 0
-                if used >= FREE_TRIAL_QUESTIONS:
-                    status_html = f"""<span class="status-pill" style="color: #f87171; background: rgba(248, 113, 113, 0.1);">PAYWALLED ({used}/{FREE_TRIAL_QUESTIONS})</span>"""
+                trial_cap = FREE_TRIAL_QUESTIONS + int(u.get('bonus_trial_questions') or 0)
+                if used >= trial_cap:
+                    status_html = f"""<span class="status-pill" style="color: #f87171; background: rgba(248, 113, 113, 0.1);">PAYWALLED ({used}/{trial_cap})</span>"""
                 else:
-                    status_html = f"""<span class="status-pill" style="color: #fbbf24; background: rgba(251, 191, 36, 0.1);">TRIAL ({used}/{FREE_TRIAL_QUESTIONS})</span>"""
+                    status_html = f"""<span class="status-pill" style="color: #fbbf24; background: rgba(251, 191, 36, 0.1);">TRIAL ({used}/{trial_cap})</span>"""
                 expiry_fmt = '<span style="color: #71717a;">Free Trial</span>'
 
             user_cell, activate_target, _ = _format_user_cell(u)
@@ -1905,11 +1906,12 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
             listEl.innerHTML = filtered.map(c => {{
                 const activeCls = c.user_id === selectedConversationId ? ' active' : '';
                 const contact = c.email || c.contact_phone || c.user_id;
+                const maxTrial = c.max_free_trial || ({FREE_TRIAL_QUESTIONS} + (c.bonus_trial_questions || 0));
                 const badge = c.is_subscribed
                     ? '<span class="status-pill" style="color:#34d399;background:rgba(52,211,153,0.1);font-size:10px;padding:2px 6px;">PRO</span>'
-                    : (c.trial_questions_used >= {FREE_TRIAL_QUESTIONS}
+                    : (c.trial_questions_used >= maxTrial
                         ? '<span class="status-pill" style="color:#f87171;background:rgba(248,113,113,0.1);font-size:10px;padding:2px 6px;">PAYWALLED</span>'
-                        : '<span class="status-pill" style="color:#fbbf24;background:rgba(251,191,36,0.1);font-size:10px;padding:2px 6px;">TRIAL ' + (c.trial_questions_used || 0) + '/{FREE_TRIAL_QUESTIONS}</span>');
+                        : '<span class="status-pill" style="color:#fbbf24;background:rgba(251,191,36,0.1);font-size:10px;padding:2px 6px;">TRIAL ' + (c.trial_questions_used || 0) + '/' + maxTrial + '</span>');
                 return '<button type="button" class="chat-user-item' + activeCls + '" data-uid="' + escapeHtml(c.user_id) + '" onclick="selectConversation(this.dataset.uid)">'
                     + '<div class="chat-user-row"><span class="chat-user-name">' + escapeHtml(c.name || 'User') + '</span>' + badge + '</div>'
                     + '<div class="chat-user-row"><span class="chat-user-meta">' + escapeHtml(contact) + '</span><span class="chat-user-meta">' + (c.user_message_count || 0) + ' Qs</span></div>'

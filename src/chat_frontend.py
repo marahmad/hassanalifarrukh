@@ -8,10 +8,24 @@ mobile-native touch controls, interactive paywall, v4 video demo, and real-time 
 import json
 from pathlib import Path
 from src.config import (
-    MONTHLY_PRICE_PKR, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-    EASYPAISA, ALLIED_BANK, JAZZCASH, RAAST_ID, FREE_TRIAL_QUESTIONS,
-    ACCOUNT_TITLE, EASYPAISA_NUMBER, ALLIED_BANK_ACCOUNT, RAAST_ID_NUMBER
+    ACCOUNT_TITLE,
+    ADMIN_PHONE,
+    ALLIED_BANK,
+    ALLIED_BANK_ACCOUNT,
+    EASYPAISA,
+    EASYPAISA_NUMBER,
+    FREE_TRIAL_QUESTIONS,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    JAZZCASH,
+    MAX_REFERRAL_BONUS_QUESTIONS,
+    MONTHLY_PRICE_PKR,
+    RAAST_ID,
+    RAAST_ID_NUMBER,
+    SIGNUP_REFERRAL_BONUS_QUESTIONS,
+    SUPPORT_WHATSAPP_NUMBER,
 )
+from src.phone_utils import normalize_pk_phone_or_none
 
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "chat.html"
 
@@ -29,6 +43,12 @@ def _get_base_template() -> str:
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     google_oauth_enabled = "true" if (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET) else "false"
     formatted_price = f"{MONTHLY_PRICE_PKR:,}"
+    support_wa_phone = (
+        normalize_pk_phone_or_none(SUPPORT_WHATSAPP_NUMBER)
+        or normalize_pk_phone_or_none(ADMIN_PHONE)
+        or normalize_pk_phone_or_none(EASYPAISA_NUMBER)
+        or "923007560313"
+    )
     _TEMPLATE_BASE_HTML = (
         template
         .replace("__MONTHLY_PRICE__", formatted_price)
@@ -42,6 +62,9 @@ def _get_base_template() -> str:
         .replace("__JAZZCASH__", str(JAZZCASH))
         .replace("__RAAST_ID__", str(RAAST_ID))
         .replace("__FREE_TRIAL_QUESTIONS__", str(FREE_TRIAL_QUESTIONS))
+        .replace("__SIGNUP_BONUS_QUESTIONS__", str(SIGNUP_REFERRAL_BONUS_QUESTIONS))
+        .replace("__MAX_BONUS_QUESTIONS__", str(MAX_REFERRAL_BONUS_QUESTIONS))
+        .replace("__SUPPORT_WHATSAPP_PHONE__", str(support_wa_phone))
         .replace("__GOOGLE_CLIENT_ID__", str(GOOGLE_CLIENT_ID))
         .replace("__GOOGLE_OAUTH_ENABLED__", google_oauth_enabled)
     )

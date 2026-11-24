@@ -30,6 +30,7 @@ from src.config import (
     MONTHLY_PRICE_PKR,
     RAAST_ID,
     RAAST_ID_NUMBER,
+    SIGNUP_REFERRAL_BONUS_QUESTIONS,
     VERIFY_TOKEN,
     WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_TOKEN,
@@ -50,6 +51,7 @@ from src.database import (
     get_subscriber_phones,
     get_system_metrics,
     get_user_by_identifier,
+    get_user_trial_limit,
     init_db,
     link_phone_to_user,
     mark_welcome_sent,
@@ -180,7 +182,8 @@ def _public_user_payload(user: dict) -> dict:
         "monthly_price_pkr": MONTHLY_PRICE_PKR,
         "subscription_expiry": user.get("subscription_expiry"),
         "trial_questions_used": user.get("trial_questions_used") or 0,
-        "max_free_trial": FREE_TRIAL_QUESTIONS,
+        "bonus_trial_questions": int(user.get("bonus_trial_questions") or 0),
+        "max_free_trial": get_user_trial_limit(user),
         "referral_code": user.get("referral_code") or "",
         "referral_count": user.get("referral_count") or 0,
     }
@@ -190,12 +193,12 @@ def _is_google_oauth_enabled() -> bool:
     return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 
 
-PAYWALL_TEXT = f"""Your {FREE_TRIAL_QUESTIONS} free questions are up! 🎯
+PAYWALL_TEXT = f"""Your free questions are up! 🎯
 
 Unlock **Full Access — PKR {MONTHLY_PRICE_PKR:,}/month**:
 • Unlimited AI mentorship chats
 • Full knowledge archive & deep step-by-step answers
-• Refer 3 friends to get 1 month FREE
+• Refer 1 friend → +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages instantly (3 paid friends = 1 month FREE)
 
 ━━━━━━━━━━━━━━━━
 Send PKR {MONTHLY_PRICE_PKR:,} to:
@@ -203,7 +206,7 @@ Send PKR {MONTHLY_PRICE_PKR:,} to:
 • Allied Bank: {ALLIED_BANK}
 • Raast: {RAAST_ID}
 
-After paying, reply with your Transaction ID:"""
+After paying, send your screenshot on WhatsApp or reply with your Transaction ID:"""
 
 
 def build_welcome_message(tier: str, referral_code: str) -> str:
@@ -985,11 +988,11 @@ async def receive_whatsapp(request: Request):
         u_info = get_or_create_user(sender_phone)
 
         if status == "free_trial":
-            remaining = FREE_TRIAL_QUESTIONS - u_info["trial_questions_used"]
+            remaining = get_user_trial_limit(u_info) - (u_info.get("trial_questions_used") or 0)
             if remaining > 0:
                 ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
             else:
-                ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month to unlock unlimited full access.)_"
+                ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
 
         elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
             stats = get_referral_stats(sender_phone)
@@ -1145,9 +1148,11 @@ async def process_chat(request: Request):
             "reply": (
                 f"🎁 *Your Hassan AI Referral Hub*\n\n"
                 f"Your Referral Code: `{stats['code']}`\n"
+                f"Bonus Free Messages Earned: +{stats['bonus_questions']} (up to +{stats['max_bonus_questions']})\n"
                 f"Friends Subscribed: {stats['count']}\n"
                 f"Remaining for Next Free Month: {stats['needed']}\n\n"
-                f"Share your code with friends. When 3 friends subscribe with it, your account automatically gets 30 days added for FREE!"
+                f"• 1 friend signs up → you get +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages instantly\n"
+                f"• 3 friends subscribe → you automatically get 1 Month FREE!"
             )
         }
 
@@ -1238,11 +1243,11 @@ async def process_chat(request: Request):
         mark_welcome_sent(sender_id)
 
     if status == "free_trial":
-        remaining = FREE_TRIAL_QUESTIONS - u_info["trial_questions_used"]
+        remaining = get_user_trial_limit(u_info) - (u_info.get("trial_questions_used") or 0)
         if remaining > 0:
             ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
         else:
-            ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month to unlock unlimited full access.)_"
+            ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
 
     elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
         stats = get_referral_stats(sender_id)

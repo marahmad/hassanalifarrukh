@@ -5,7 +5,13 @@ import string
 import threading
 from datetime import datetime, timedelta
 
-from src.config import DB_PATH, FREE_TRIAL_QUESTIONS, DATABASE_URL
+from src.config import (
+    DATABASE_URL,
+    DB_PATH,
+    FREE_TRIAL_QUESTIONS,
+    MAX_REFERRAL_BONUS_QUESTIONS,
+    SIGNUP_REFERRAL_BONUS_QUESTIONS,
+)
 from src.phone_utils import (
     is_canonical_pk_phone,
     is_synthetic_user_id,
@@ -271,6 +277,8 @@ def init_db():
                     welcome_sent INTEGER DEFAULT 0,
                     coaching_pitch_sent INTEGER DEFAULT 0,
                     trial_questions_used INTEGER DEFAULT 0,
+                    bonus_trial_questions INTEGER DEFAULT 0,
+                    signup_referral_credited INTEGER DEFAULT 0,
                     subscription_expiry TIMESTAMP,
                     total_queries INTEGER DEFAULT 0,
                     email TEXT,
@@ -283,6 +291,8 @@ def init_db():
                 );
             """)
             db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_phone TEXT;")
+            db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_trial_questions INTEGER DEFAULT 0;")
+            db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_referral_credited INTEGER DEFAULT 0;")
             db.execute("CREATE INDEX IF NOT EXISTS users_contact_phone_idx ON users(contact_phone);")
             db.execute("CREATE INDEX IF NOT EXISTS users_email_lower_idx ON users(LOWER(email));")
 
@@ -328,6 +338,8 @@ def init_db():
                     welcome_sent INTEGER DEFAULT 0,
                     coaching_pitch_sent INTEGER DEFAULT 0,
                     trial_questions_used INTEGER DEFAULT 0,
+                    bonus_trial_questions INTEGER DEFAULT 0,
+                    signup_referral_credited INTEGER DEFAULT 0,
                     subscription_expiry TIMESTAMP,
                     total_queries INTEGER DEFAULT 0,
                     email TEXT,
@@ -343,6 +355,10 @@ def init_db():
             existing_cols = {r["name"] for r in db.fetchall()}
             if "contact_phone" not in existing_cols:
                 db.execute("ALTER TABLE users ADD COLUMN contact_phone TEXT")
+            if "bonus_trial_questions" not in existing_cols:
+                db.execute("ALTER TABLE users ADD COLUMN bonus_trial_questions INTEGER DEFAULT 0")
+            if "signup_referral_credited" not in existing_cols:
+                db.execute("ALTER TABLE users ADD COLUMN signup_referral_credited INTEGER DEFAULT 0")
 
             db.execute("CREATE INDEX IF NOT EXISTS users_contact_phone_idx ON users(contact_phone)")
             db.execute("CREATE INDEX IF NOT EXISTS users_email_idx ON users(email)")
@@ -545,6 +561,12 @@ def link_phone_to_google_user(identifier: str, phone: str) -> bool:
 
 # ── Business Logic (All Canonicalized via Resolved user_id) ───────────────
 
+def get_user_trial_limit(user: dict) -> int:
+    """Returns effective free trial question cap (base FREE_TRIAL_QUESTIONS + earned referral bonus)."""
+    bonus = max(0, int(user.get("bonus_trial_questions") or 0))
+    return FREE_TRIAL_QUESTIONS + bonus
+
+
 def apply_referral_code(phone_number: str, code: str) -> tuple[bool, str]:
     code_clean = code.strip().upper()
     user = get_or_create_user(phone_number)
@@ -556,14 +578,36 @@ def apply_referral_code(phone_number: str, code: str) -> tuple[bool, str]:
     if user.get("referred_by"):
         return False, f"You have already applied referral code {user['referred_by']}."
 
+    awarded_bonus = 0
     with DBContext() as db:
-        db.execute("SELECT phone_number FROM users WHERE UPPER(referral_code) = ?", (code_clean,))
+        db.execute(
+            "SELECT phone_number, COALESCE(bonus_trial_questions, 0) AS bonus_q FROM users WHERE UPPER(referral_code) = ?",
+            (code_clean,),
+        )
         referrer_row = db.fetchone()
         if not referrer_row:
             return False, f"Referral code '{code_clean}' was not found. Please verify and try again."
 
-        db.execute("UPDATE users SET referred_by = ? WHERE phone_number = ?", (code_clean, user_id))
+        referrer_uid = referrer_row["phone_number"]
+        current_bonus = int(referrer_row["bonus_q"] or 0)
+        headroom = max(0, MAX_REFERRAL_BONUS_QUESTIONS - current_bonus)
+        awarded_bonus = min(SIGNUP_REFERRAL_BONUS_QUESTIONS, headroom)
 
+        db.execute(
+            "UPDATE users SET referred_by = ?, signup_referral_credited = 1 WHERE phone_number = ?",
+            (code_clean, user_id),
+        )
+        if awarded_bonus > 0:
+            db.execute(
+                "UPDATE users SET bonus_trial_questions = COALESCE(bonus_trial_questions, 0) + ? WHERE phone_number = ?",
+                (awarded_bonus, referrer_uid),
+            )
+
+    if awarded_bonus > 0:
+        return (
+            True,
+            f"Referral code '{code_clean}' applied! Your friend just unlocked +{awarded_bonus} bonus free messages, and will also earn credit towards 1 FREE month when you subscribe.",
+        )
     return True, f"Referral code '{code_clean}' applied! Once your plan is activated, your friend will get credit towards 1 free month."
 
 
@@ -571,6 +615,7 @@ def get_referral_stats(phone_number: str) -> dict:
     user = get_or_create_user(phone_number)
     code = user.get("referral_code", "UNKNOWN")
     count = user.get("referral_count", 0) or 0
+    bonus = int(user.get("bonus_trial_questions") or 0)
     cycle_progress = count % 3
     needed = 3 - cycle_progress if cycle_progress != 0 else (0 if count > 0 else 3)
     return {
@@ -578,6 +623,8 @@ def get_referral_stats(phone_number: str) -> dict:
         "count": count,
         "needed": needed,
         "cycle_progress": cycle_progress,
+        "bonus_questions": bonus,
+        "max_bonus_questions": MAX_REFERRAL_BONUS_QUESTIONS,
     }
 
 
@@ -588,7 +635,7 @@ def evaluate_user_access(user: dict) -> tuple[bool, str, str]:
         return True, "subscribed", "pro"
 
     used = user.get("trial_questions_used", 0) or 0
-    if used < FREE_TRIAL_QUESTIONS:
+    if used < get_user_trial_limit(user):
         return True, "free_trial", "trial"
 
     return False, "paywall_required", "trial"
@@ -758,15 +805,15 @@ def get_system_metrics() -> dict:
         db.execute("SELECT COUNT(*) AS count FROM users WHERE subscription_expiry > ?", (now_ts,))
         active_subscribers = db.fetchone()["count"]
 
-        # 3. Trials
+        # 3. Trials (accounting for referral bonus_trial_questions)
         db.execute(
-            "SELECT COUNT(*) AS count FROM users WHERE (subscription_expiry IS NULL OR subscription_expiry <= ?) AND trial_questions_used < ?",
+            "SELECT COUNT(*) AS count FROM users WHERE (subscription_expiry IS NULL OR subscription_expiry <= ?) AND trial_questions_used < (? + COALESCE(bonus_trial_questions, 0))",
             (now_ts, FREE_TRIAL_QUESTIONS),
         )
         active_trials = db.fetchone()["count"]
 
         db.execute(
-            "SELECT COUNT(*) AS count FROM users WHERE (subscription_expiry IS NULL OR subscription_expiry <= ?) AND trial_questions_used >= ?",
+            "SELECT COUNT(*) AS count FROM users WHERE (subscription_expiry IS NULL OR subscription_expiry <= ?) AND trial_questions_used >= (? + COALESCE(bonus_trial_questions, 0))",
             (now_ts, FREE_TRIAL_QUESTIONS),
         )
         paywalled_trials = db.fetchone()["count"]
@@ -817,13 +864,15 @@ def get_system_metrics() -> dict:
         # 8. All Users list (up to 50 most active)
         db.execute("""
             SELECT phone_number, name, email, contact_phone, auth_provider, tier,
-                   trial_questions_used, subscription_expiry, total_queries,
+                   trial_questions_used, COALESCE(bonus_trial_questions, 0) AS bonus_trial_questions,
+                   subscription_expiry, total_queries,
                    referral_code, referral_count, created_at, last_active
             FROM users
             ORDER BY last_active DESC NULLS LAST LIMIT 50
         """ if db.is_pg else """
             SELECT phone_number, name, email, contact_phone, auth_provider, tier,
-                   trial_questions_used, subscription_expiry, total_queries,
+                   trial_questions_used, COALESCE(bonus_trial_questions, 0) AS bonus_trial_questions,
+                   subscription_expiry, total_queries,
                    referral_code, referral_count, created_at, last_active
             FROM users
             ORDER BY last_active DESC LIMIT 50
@@ -1017,7 +1066,9 @@ def get_chat_conversations(limit_users: int = 100, messages_per_user: int = 100)
             db.execute(
                 f"""
                 SELECT phone_number, name, email, contact_phone, auth_provider,
-                       tier, trial_questions_used, subscription_expiry,
+                       tier, trial_questions_used,
+                       COALESCE(bonus_trial_questions, 0) AS bonus_trial_questions,
+                       subscription_expiry,
                        total_queries, created_at, last_active
                 FROM users
                 WHERE phone_number IN ({placeholders})
@@ -1076,6 +1127,8 @@ def get_chat_conversations(limit_users: int = 100, messages_per_user: int = 100)
                         "auth_provider": u.get("auth_provider") or "phone",
                         "is_subscribed": bool(u.get("is_subscribed", False)),
                         "trial_questions_used": u.get("trial_questions_used", 0) or 0,
+                        "bonus_trial_questions": u.get("bonus_trial_questions", 0) or 0,
+                        "max_free_trial": get_user_trial_limit(u),
                         "total_queries": u.get("total_queries", 0) or 0,
                         "message_count": len(all_msgs),
                         "user_message_count": len(user_msgs),
