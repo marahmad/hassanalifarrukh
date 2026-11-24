@@ -16,9 +16,12 @@ from src.config import (
 )
 from src.phone_utils import format_pk_phone_display, normalize_pk_phone_or_none
 
-def render_dashboard_html(metrics: dict) -> str:
+def render_dashboard_html(metrics: dict, conversations: list | None = None) -> str:
     def _escape(val: str) -> str:
         return html_lib.escape(str(val or ""), quote=True)
+
+    conversations_list = conversations if conversations is not None else (metrics.get("conversations") or [])
+    users_with_chats = {str(c.get("user_id") or "") for c in conversations_list}
 
     def _format_user_cell(rec: dict) -> tuple[str, str, str]:
         """Returns (html_cell, primary_identifier_for_activate, canonical_wa_phone)."""
@@ -106,6 +109,12 @@ def render_dashboard_html(metrics: dict) -> str:
                 expiry_fmt = '<span style="color: #71717a;">Free Trial</span>'
 
             user_cell, activate_target, _ = _format_user_cell(u)
+            raw_uid = str(u.get("phone_number") or "")
+            chats_btn = (
+                f"""<button type="button" data-uid="{_escape(raw_uid)}" onclick="openUserConversation(this.dataset.uid)" class="btn-sm-action" style="margin-right:6px;">Chats</button>"""
+                if raw_uid in users_with_chats
+                else ""
+            )
             rows += f"""
             <tr>
                 <td style="font-weight: 500; color: #f4f4f5;">{user_cell}</td>
@@ -114,8 +123,8 @@ def render_dashboard_html(metrics: dict) -> str:
                 <td>{expiry_fmt}</td>
                 <td><code class="code-pill">{_escape(u.get('referral_code', 'N/A'))}</code> ({u.get('referral_count', 0)} refs)</td>
                 <td style="color: #71717a; font-size: 12px;">{_escape((u.get('last_active') or '')[:16])}</td>
-                <td style="text-align: right;">
-                    <button onclick="openActivateModal('{_escape(activate_target)}')" class="btn-sm-action">Manage</button>
+                <td style="text-align: right; white-space: nowrap;">
+                    {chats_btn}<button type="button" data-target="{_escape(activate_target)}" onclick="openActivateModal(this.dataset.target)" class="btn-sm-action">Manage</button>
                 </td>
             </tr>
             """
@@ -151,6 +160,9 @@ def render_dashboard_html(metrics: dict) -> str:
         "new_users": metrics.get("chart_new_users") or [0] * 14,
     }
     chart_data_json = json.dumps(chart_payload)
+    conversations_json = json.dumps(conversations_list).replace("</", "<\\/")
+    total_conv_users = len(conversations_list)
+    total_logged_msgs = sum(int(c.get("message_count") or 0) for c in conversations_list)
 
     wa_broadcast_badge = (
         "<span style='font-size: 12px; color: #34d399; font-weight: 600;'>● WhatsApp Cloud API Ready</span>"
@@ -889,6 +901,40 @@ def render_dashboard_html(metrics: dict) -> str:
             overflow-y: auto;
         }}
 
+        .modal-danger-zone {{
+            margin-top: 4px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }}
+
+        .btn-danger {{
+            width: 100%;
+            background: rgba(248, 113, 113, 0.12);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.32);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+            font-family: inherit;
+        }}
+
+        .btn-danger:hover {{
+            background: rgba(239, 68, 68, 0.22);
+            border-color: rgba(248, 113, 113, 0.6);
+            color: #fecaca;
+        }}
+
+        .btn-danger:disabled {{
+            opacity: 0.55;
+            cursor: not-allowed;
+        }}
+
         /* Tab Page Visibility */
         .tab-content {{
             display: none;
@@ -898,6 +944,187 @@ def render_dashboard_html(metrics: dict) -> str:
 
         .tab-content.active {{
             display: flex;
+        }}
+
+        /* Conversations Viewer */
+        .chat-viewer-shell {{
+            display: grid;
+            grid-template-columns: 330px 1fr;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            min-height: 560px;
+            max-height: calc(100vh - 200px);
+        }}
+
+        .chat-list-pane {{
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            background: rgba(255, 255, 255, 0.01);
+        }}
+
+        .chat-search-box {{
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }}
+
+        .chat-search-input {{
+            width: 100%;
+            box-sizing: border-box;
+            background: #141416;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            padding: 8px 11px;
+            font-size: 12.5px;
+            outline: none;
+            font-family: inherit;
+        }}
+
+        .chat-search-input:focus {{
+            border-color: rgba(255, 255, 255, 0.28);
+        }}
+
+        .chat-user-list {{
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+        }}
+
+        .chat-user-item {{
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 12px 14px;
+            cursor: pointer;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            transition: background 0.15s ease;
+            font-family: inherit;
+        }}
+
+        .chat-user-item:hover {{
+            background: rgba(255, 255, 255, 0.035);
+        }}
+
+        .chat-user-item.active {{
+            background: rgba(255, 255, 255, 0.075);
+            border-left: 3px solid #34d399;
+            padding-left: 11px;
+        }}
+
+        .chat-user-row {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }}
+
+        .chat-user-name {{
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
+        .chat-user-meta {{
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
+        .chat-user-preview {{
+            font-size: 12px;
+            color: #a1a1aa;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.4;
+        }}
+
+        .chat-thread-pane {{
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            background: #111113;
+        }}
+
+        .chat-thread-header {{
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            background: rgba(255, 255, 255, 0.02);
+        }}
+
+        .chat-thread-body {{
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }}
+
+        .chat-msg {{
+            max-width: 82%;
+            padding: 11px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }}
+
+        .chat-msg-user {{
+            align-self: flex-end;
+            background: rgba(56, 189, 248, 0.13);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            color: #f4f4f5;
+            border-bottom-right-radius: 4px;
+        }}
+
+        .chat-msg-assistant {{
+            align-self: flex-start;
+            background: #1a1a1e;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #e4e4e7;
+            border-bottom-left-radius: 4px;
+        }}
+
+        .chat-msg-label {{
+            font-size: 10.5px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+        }}
+
+        .chat-empty-state {{
+            margin: auto;
+            text-align: center;
+            color: var(--text-muted);
+            padding: 32px 20px;
+            font-size: 13px;
         }}
 
         .nav-label-mobile {{
@@ -1219,6 +1446,28 @@ def render_dashboard_html(metrics: dict) -> str:
             .input-field, .textarea-field, .select-field {{
                 font-size: 16px !important;
             }}
+
+            .chat-viewer-shell {{
+                grid-template-columns: 1fr;
+                max-height: none;
+                min-height: 0;
+            }}
+
+            .chat-list-pane {{
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                max-height: 260px;
+            }}
+
+            .chat-thread-body {{
+                max-height: 55vh;
+                padding: 14px 12px;
+            }}
+
+            .chat-msg {{
+                max-width: 92%;
+                font-size: 12.5px;
+            }}
         }}
     </style>
 </head>
@@ -1244,6 +1493,11 @@ def render_dashboard_html(metrics: dict) -> str:
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 <span class="nav-label-desktop">Subscribers &amp; Trials</span>
                 <span class="nav-label-mobile">Subs</span>
+            </button>
+            <button onclick="switchTab('conversations')" id="tab-btn-conversations" class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                <span class="nav-label-desktop">Conversations</span>
+                <span class="nav-label-mobile">Chats</span>
             </button>
             <button onclick="switchTab('payments')" id="tab-btn-payments" class="nav-item">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
@@ -1462,7 +1716,40 @@ def render_dashboard_html(metrics: dict) -> str:
             </div>
         </section>
 
-        <!-- TAB 3: PAYMENTS REVIEW -->
+        <!-- TAB 3: USER CONVERSATIONS -->
+        <section id="tab-conversations" class="tab-content">
+            <div class="header-bar">
+                <div class="header-title">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <h1>User Conversations</h1>
+                        <span class="code-pill" id="badge-conv-summary">{total_conv_users} Users · {total_logged_msgs} Messages</span>
+                    </div>
+                    <p>Inspect real messages people sent to Hassan AI and verify response quality live.</p>
+                </div>
+                <div class="header-actions">
+                    <button onclick="refreshConversations()" id="btn-refresh-chats" class="btn-refresh">↻ Refresh Chats</button>
+                </div>
+            </div>
+
+            <div class="chat-viewer-shell">
+                <div class="chat-list-pane">
+                    <div class="chat-search-box">
+                        <input id="chat-search-input" type="search" class="chat-search-input" placeholder="Search name, email, phone, or message..." oninput="renderConversationList()">
+                    </div>
+                    <div id="chat-user-list" class="chat-user-list"></div>
+                </div>
+                <div class="chat-thread-pane">
+                    <div id="chat-thread-header" class="chat-thread-header">
+                        <span style="color: var(--text-muted); font-size: 13px;">Select a user to view their conversation</span>
+                    </div>
+                    <div id="chat-thread-body" class="chat-thread-body">
+                        <div class="chat-empty-state">Select a conversation on the left to inspect messages.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: PAYMENTS REVIEW -->
         <section id="tab-payments" class="tab-content">
             <div class="header-bar">
                 <div class="header-title">
@@ -1534,11 +1821,11 @@ def render_dashboard_html(metrics: dict) -> str:
 
     </main>
 
-    <!-- Modal for Manual Activation / Extension -->
+    <!-- Modal for Managing User (Activation / Extension / Full Deletion) -->
     <div id="activate-modal" class="modal-overlay">
         <div class="modal-dialog">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="font-size:16px; font-weight:600;">Activate / Extend Subscription</h3>
+                <h3 id="modal-title" style="font-size:16px; font-weight:600;">Manage User</h3>
                 <button onclick="closeActivateModal()" style="background:none; border:none; color:#a1a1aa; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
             </div>
             <div style="background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;">
@@ -1546,21 +1833,162 @@ def render_dashboard_html(metrics: dict) -> str:
                 <span style="font-size: 13px; font-weight: 700; color: #ffffff;">PKR {MONTHLY_PRICE_PKR:,} / month</span>
             </div>
             <div class="input-group">
-                <label class="input-label">User Pakistani Phone or Email</label>
-                <input id="modal-phone" type="text" class="input-field" placeholder="e.g. 03007560313, +923007560313, or user@gmail.com">
+                <label class="input-label">User Pakistani Phone, Email, or ID</label>
+                <input id="modal-phone" type="text" class="input-field" placeholder="e.g. 03007560313, +923007560313, or user@gmail.com" oninput="syncModalDangerZone()">
             </div>
             <div class="input-group">
                 <label class="input-label">Days to Add</label>
                 <input id="modal-days" type="number" inputmode="numeric" class="input-field" value="30">
             </div>
             <button onclick="submitModalActivate()" class="btn-primary" style="margin-top:8px; padding:12px; font-size:14px;">Activate Full Access</button>
+
+            <div id="modal-danger-zone" class="modal-danger-zone" style="display:none;">
+                <span style="font-size: 11.5px; color: #a1a1aa; line-height: 1.4;">
+                    Danger Zone — permanently deletes this user, all their chat history, payments, and leads from the database.
+                </span>
+                <button id="modal-delete-btn" type="button" onclick="submitModalDeleteUser()" class="btn-danger">Delete User Permanently</button>
+            </div>
         </div>
     </div>
 
     <!-- Chart.js & Interactive Controller Scripts -->
     <script>
         const CHART_DATA = {chart_data_json};
+        let CONVERSATIONS_DATA = {conversations_json};
+        let selectedConversationId = CONVERSATIONS_DATA.length ? CONVERSATIONS_DATA[0].user_id : null;
         let analyticsChartInstance = null;
+
+        function escapeHtml(str) {{
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }}
+
+        function formatChatTime(iso) {{
+            if (!iso) return '';
+            return String(iso).replace('T', ' ').slice(0, 16);
+        }}
+
+        function renderConversationList() {{
+            const listEl = document.getElementById('chat-user-list');
+            const summaryBadge = document.getElementById('badge-conv-summary');
+            if (!listEl) return;
+
+            const totalMsgs = CONVERSATIONS_DATA.reduce((acc, c) => acc + (c.message_count || 0), 0);
+            if (summaryBadge) {{
+                summaryBadge.textContent = CONVERSATIONS_DATA.length + ' Users · ' + totalMsgs + ' Messages';
+            }}
+
+            const q = (document.getElementById('chat-search-input')?.value || '').trim().toLowerCase();
+            const filtered = CONVERSATIONS_DATA.filter(c => {{
+                if (!q) return true;
+                if ((c.name || '').toLowerCase().includes(q)) return true;
+                if ((c.email || '').toLowerCase().includes(q)) return true;
+                if ((c.contact_phone || '').toLowerCase().includes(q)) return true;
+                if ((c.user_id || '').toLowerCase().includes(q)) return true;
+                return (c.messages || []).some(m => (m.content || '').toLowerCase().includes(q));
+            }});
+
+            if (!filtered.length) {{
+                listEl.innerHTML = '<div class="chat-empty-state">No matching conversations yet.</div>';
+                renderConversationThread(null);
+                return;
+            }}
+
+            if (!filtered.some(c => c.user_id === selectedConversationId)) {{
+                selectedConversationId = filtered[0].user_id;
+            }}
+
+            listEl.innerHTML = filtered.map(c => {{
+                const activeCls = c.user_id === selectedConversationId ? ' active' : '';
+                const contact = c.email || c.contact_phone || c.user_id;
+                const badge = c.is_subscribed
+                    ? '<span class="status-pill" style="color:#34d399;background:rgba(52,211,153,0.1);font-size:10px;padding:2px 6px;">PRO</span>'
+                    : (c.trial_questions_used >= {FREE_TRIAL_QUESTIONS}
+                        ? '<span class="status-pill" style="color:#f87171;background:rgba(248,113,113,0.1);font-size:10px;padding:2px 6px;">PAYWALLED</span>'
+                        : '<span class="status-pill" style="color:#fbbf24;background:rgba(251,191,36,0.1);font-size:10px;padding:2px 6px;">TRIAL ' + (c.trial_questions_used || 0) + '/{FREE_TRIAL_QUESTIONS}</span>');
+                return '<button type="button" class="chat-user-item' + activeCls + '" data-uid="' + escapeHtml(c.user_id) + '" onclick="selectConversation(this.dataset.uid)">'
+                    + '<div class="chat-user-row"><span class="chat-user-name">' + escapeHtml(c.name || 'User') + '</span>' + badge + '</div>'
+                    + '<div class="chat-user-row"><span class="chat-user-meta">' + escapeHtml(contact) + '</span><span class="chat-user-meta">' + (c.user_message_count || 0) + ' Qs</span></div>'
+                    + '<div class="chat-user-preview">' + escapeHtml(c.last_user_preview || '') + '</div>'
+                    + '<div class="chat-user-meta">' + escapeHtml(formatChatTime(c.last_message_at)) + '</div>'
+                    + '</button>';
+            }}).join('');
+
+            const selected = filtered.find(c => c.user_id === selectedConversationId) || filtered[0];
+            renderConversationThread(selected);
+        }}
+
+        function selectConversation(userId) {{
+            selectedConversationId = userId;
+            renderConversationList();
+        }}
+
+        function openUserConversation(userId) {{
+            selectedConversationId = userId;
+            switchTab('conversations');
+            renderConversationList();
+        }}
+
+        function renderConversationThread(conv) {{
+            const headerEl = document.getElementById('chat-thread-header');
+            const bodyEl = document.getElementById('chat-thread-body');
+            if (!headerEl || !bodyEl) return;
+
+            if (!conv) {{
+                headerEl.innerHTML = '<span style="color: var(--text-muted); font-size: 13px;">No conversation selected</span>';
+                bodyEl.innerHTML = '<div class="chat-empty-state">When users chat with Hassan AI, their full conversations will appear here.</div>';
+                return;
+            }}
+
+            const contactParts = [conv.email, conv.contact_phone].filter(Boolean);
+            const subtitle = contactParts.length ? contactParts.join(' · ') : conv.user_id;
+            const activateTarget = conv.contact_phone || conv.email || conv.user_id;
+
+            headerEl.innerHTML =
+                '<div>'
+                + '<div style="font-size:14px;font-weight:600;color:#ffffff;">' + escapeHtml(conv.name || 'User') + '</div>'
+                + '<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">' + escapeHtml(subtitle) + ' · ' + (conv.message_count || 0) + ' messages</div>'
+                + '</div>'
+                + '<button type="button" data-target="' + escapeHtml(activateTarget) + '" onclick="openActivateModal(this.dataset.target)" class="btn-sm-action">Manage / Activate</button>';
+
+            const msgs = conv.messages || [];
+            if (!msgs.length) {{
+                bodyEl.innerHTML = '<div class="chat-empty-state">No saved messages for this user.</div>';
+                return;
+            }}
+
+            bodyEl.innerHTML = msgs.map(m => {{
+                const isUser = m.role === 'user';
+                const cls = isUser ? 'chat-msg chat-msg-user' : 'chat-msg chat-msg-assistant';
+                const who = isUser ? (conv.name || 'User') : 'Hassan AI';
+                return '<div class="' + cls + '">'
+                    + '<div class="chat-msg-label"><span>' + escapeHtml(who) + '</span><span>' + escapeHtml(formatChatTime(m.created_at)) + '</span></div>'
+                    + '<div>' + escapeHtml(m.content || '') + '</div>'
+                    + '</div>';
+            }}).join('');
+            bodyEl.scrollTop = bodyEl.scrollHeight;
+        }}
+
+        async function refreshConversations() {{
+            const btn = document.getElementById('btn-refresh-chats');
+            if (btn) btn.textContent = 'Refreshing...';
+            try {{
+                const res = await fetch('/api/admin/conversations', {{ cache: 'no-store' }});
+                const data = await res.json();
+                if (res.ok && data.status === 'ok') {{
+                    CONVERSATIONS_DATA = data.conversations || [];
+                    renderConversationList();
+                }}
+            }} catch (e) {{
+                console.error('Failed to refresh conversations:', e);
+            }} finally {{
+                if (btn) btn.textContent = '↻ Refresh Chats';
+            }}
+        }}
 
         // Tab switching with URL hash & localStorage persistence
         function switchTab(tabId) {{
@@ -1662,8 +2090,24 @@ def render_dashboard_html(metrics: dict) -> str:
         }}
 
         // Modal Helpers
+        function syncModalDangerZone() {{
+            const val = (document.getElementById('modal-phone')?.value || '').trim();
+            const dz = document.getElementById('modal-danger-zone');
+            if (dz) dz.style.display = val ? 'flex' : 'none';
+        }}
         function openActivateModal(identifier) {{
-            document.getElementById('modal-phone').value = identifier;
+            const cleanId = String(identifier || '').trim();
+            document.getElementById('modal-phone').value = cleanId;
+            const titleEl = document.getElementById('modal-title');
+            if (titleEl) {{
+                titleEl.textContent = cleanId ? 'Manage User' : 'Activate / Extend Subscription';
+            }}
+            const delBtn = document.getElementById('modal-delete-btn');
+            if (delBtn) {{
+                delBtn.disabled = false;
+                delBtn.textContent = 'Delete User Permanently';
+            }}
+            syncModalDangerZone();
             document.getElementById('activate-modal').style.display = 'flex';
         }}
         function closeActivateModal() {{
@@ -1685,6 +2129,47 @@ def render_dashboard_html(metrics: dict) -> str:
                 window.location.reload();
             }} else {{
                 alert(data.message || 'Activation error');
+            }}
+        }}
+        async function submitModalDeleteUser() {{
+            const identifier = document.getElementById('modal-phone').value.trim();
+            if (!identifier) return alert('Please enter a user phone, email, or ID to delete');
+
+            const confirmed = window.confirm(
+                'Permanently delete user "' + identifier + '"?\\n\\n'
+                + 'This will completely erase their account, ALL chat history, payment requests, and leads from the database. This action cannot be undone.'
+            );
+            if (!confirmed) return;
+
+            const delBtn = document.getElementById('modal-delete-btn');
+            if (delBtn) {{
+                delBtn.disabled = true;
+                delBtn.textContent = 'Deleting...';
+            }}
+
+            try {{
+                const res = await fetch('/api/admin/delete-user', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ identifier: identifier }})
+                }});
+                const data = await res.json().catch(() => ({{}}));
+                if (res.ok && data.status === 'ok') {{
+                    closeActivateModal();
+                    window.location.reload();
+                }} else {{
+                    if (delBtn) {{
+                        delBtn.disabled = false;
+                        delBtn.textContent = 'Delete User Permanently';
+                    }}
+                    alert(data.message || 'Failed to delete user');
+                }}
+            }} catch (e) {{
+                if (delBtn) {{
+                    delBtn.disabled = false;
+                    delBtn.textContent = 'Delete User Permanently';
+                }}
+                alert('Network error while deleting user');
             }}
         }}
 
@@ -1826,6 +2311,7 @@ def render_dashboard_html(metrics: dict) -> str:
             }} catch (e) {{}}
 
             bindTooltips();
+            renderConversationList();
         }});
     </script>
 </body>

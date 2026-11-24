@@ -990,6 +990,163 @@ def get_recent_chat_history(phone_number: str, limit: int = 6) -> list[dict]:
         return []
 
 
+def get_chat_conversations(limit_users: int = 100, messages_per_user: int = 100) -> list[dict]:
+    """
+    Returns users with saved chat_history threads ordered by most recent message first.
+    Works identically on both Supabase PostgreSQL and local SQLite in 3 lightweight queries.
+    """
+    try:
+        with DBContext() as db:
+            db.execute(
+                """
+                SELECT phone_number, MAX(id) AS last_id, COUNT(*) AS msg_count
+                FROM chat_history
+                GROUP BY phone_number
+                ORDER BY last_id DESC
+                LIMIT ?
+                """,
+                (limit_users,),
+            )
+            thread_rows = [dict(r) for r in db.fetchall()]
+            if not thread_rows:
+                return []
+
+            user_ids = [r["phone_number"] for r in thread_rows]
+            placeholders = ", ".join(["?"] * len(user_ids))
+
+            db.execute(
+                f"""
+                SELECT phone_number, name, email, contact_phone, auth_provider,
+                       tier, trial_questions_used, subscription_expiry,
+                       total_queries, created_at, last_active
+                FROM users
+                WHERE phone_number IN ({placeholders})
+                """,
+                tuple(user_ids),
+            )
+            user_map = {}
+            for ur in db.fetchall():
+                serialized = _serialize_user_row(ur)
+                user_map[serialized["phone_number"]] = serialized
+
+            db.execute(
+                f"""
+                SELECT id, phone_number, role, content, created_at
+                FROM chat_history
+                WHERE phone_number IN ({placeholders})
+                ORDER BY id ASC
+                """,
+                tuple(user_ids),
+            )
+            msgs_by_user: dict[str, list[dict]] = {uid: [] for uid in user_ids}
+            for mr in db.fetchall():
+                md = dict(mr)
+                if isinstance(md.get("created_at"), datetime):
+                    md["created_at"] = md["created_at"].isoformat()
+                else:
+                    md["created_at"] = str(md.get("created_at") or "")
+                msgs_by_user.setdefault(md["phone_number"], []).append(
+                    {
+                        "id": md["id"],
+                        "role": md.get("role") or "user",
+                        "content": md.get("content") or "",
+                        "created_at": md["created_at"],
+                    }
+                )
+
+            conversations = []
+            for tr in thread_rows:
+                uid = tr["phone_number"]
+                u = user_map.get(uid, {})
+                all_msgs = msgs_by_user.get(uid, [])
+                trimmed_msgs = all_msgs[-messages_per_user:] if messages_per_user else all_msgs
+                user_msgs = [m for m in all_msgs if m["role"] == "user"]
+                last_msg = all_msgs[-1] if all_msgs else None
+                last_user_msg = user_msgs[-1] if user_msgs else last_msg
+
+                canon_phone = u.get("contact_phone") or (
+                    uid if is_canonical_pk_phone(uid) else ""
+                )
+                conversations.append(
+                    {
+                        "user_id": uid,
+                        "name": (u.get("name") or "").strip() or "User",
+                        "email": (u.get("email") or "").strip(),
+                        "contact_phone": canon_phone,
+                        "auth_provider": u.get("auth_provider") or "phone",
+                        "is_subscribed": bool(u.get("is_subscribed", False)),
+                        "trial_questions_used": u.get("trial_questions_used", 0) or 0,
+                        "total_queries": u.get("total_queries", 0) or 0,
+                        "message_count": len(all_msgs),
+                        "user_message_count": len(user_msgs),
+                        "last_message_at": (last_msg.get("created_at") if last_msg else "") or (u.get("last_active") or ""),
+                        "last_user_preview": (last_user_msg.get("content") if last_user_msg else "")[:140],
+                        "messages": trimmed_msgs,
+                    }
+                )
+            return conversations
+    except Exception as e:
+        print(f"[Warning] Failed to get chat conversations: {e}")
+        return []
+
+
+def delete_user_completely(identifier: str) -> tuple[bool, dict | str]:
+    """
+    Permanently deletes a user and ALL associated records across `chat_history`,
+    `payment_requests`, `coaching_leads`, `email_otps` (if present), and `users`.
+    Accepts canonical phone, any Pakistani mobile format, email, or synthetic user ID.
+    """
+    ident = str(identifier or "").strip()
+    if not ident:
+        return False, "Please provide a valid phone number, email, or user ID."
+
+    with DBContext() as db:
+        row = _find_user_row(db, ident)
+        if not row:
+            return False, f"User '{ident}' was not found in the database."
+
+        user_dict = dict(row)
+        uid = str(user_dict["phone_number"])
+        contact_phone = normalize_pk_phone_or_none(user_dict.get("contact_phone"))
+        email = normalize_email(user_dict.get("email") or "")
+        name = (user_dict.get("name") or "").strip() or "User"
+
+        # Collect all keys under which child rows could exist
+        child_keys = [uid]
+        if contact_phone and contact_phone != uid:
+            child_keys.append(contact_phone)
+        placeholders = ", ".join(["?"] * len(child_keys))
+
+        deleted_counts: dict[str, int] = {}
+        for child_tbl in ("chat_history", "payment_requests", "coaching_leads"):
+            db.execute(
+                f"DELETE FROM {child_tbl} WHERE phone_number IN ({placeholders})",
+                tuple(child_keys),
+            )
+            deleted_counts[child_tbl] = max(0, db.cursor.rowcount or 0)
+
+        # Clean up legacy email_otps if that table exists in this database
+        otp_deleted = 0
+        if email:
+            try:
+                db.execute("DELETE FROM email_otps WHERE LOWER(email) = ?", (email,))
+                otp_deleted = max(0, db.cursor.rowcount or 0)
+            except Exception:
+                otp_deleted = 0
+        deleted_counts["email_otps"] = otp_deleted
+
+        db.execute("DELETE FROM users WHERE phone_number = ?", (uid,))
+        deleted_counts["users"] = max(0, db.cursor.rowcount or 0)
+
+        return True, {
+            "user_id": uid,
+            "name": name,
+            "email": email,
+            "contact_phone": contact_phone or "",
+            "deleted_counts": deleted_counts,
+        }
+
+
 # ── Idempotent Migration & Deduplication ───────────────────────────────────
 
 def migrate_and_deduplicate_phones() -> dict:

@@ -39,7 +39,9 @@ from src.database import (
     apply_referral_code,
     can_user_chat,
     complete_chat_turn,
+    delete_user_completely,
     evaluate_user_access,
+    get_chat_conversations,
     get_or_create_google_user,
     get_or_create_user,
     get_recent_chat_history,
@@ -86,6 +88,49 @@ init_db()
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 PENDING_REF_COOKIE = "pending_ref"
+
+
+def _generate_ai_reply(messages: list[dict], status: str) -> str:
+    """
+    Generates a complete Hassan AI reply via Groq without mid-sentence truncation.
+    `openai/gpt-oss-120b` is a reasoning model whose token cap covers BOTH hidden
+    reasoning tokens and visible reply tokens; setting `reasoning_effort="low"` and
+    generous `max_completion_tokens` headroom prevents mid-sentence cutoffs.
+    """
+    max_completion = 2000 if status == "subscribed" else 1200
+    try:
+        chat = groq_client.chat.completions.create(
+            messages=messages,
+            model="openai/gpt-oss-120b",
+            temperature=0.75,
+            max_completion_tokens=max_completion,
+            reasoning_effort="low",
+        )
+    except TypeError:
+        chat = groq_client.chat.completions.create(
+            messages=messages,
+            model="openai/gpt-oss-120b",
+            temperature=0.75,
+            max_tokens=max_completion,
+        )
+
+    choice = chat.choices[0]
+    content = (choice.message.content or "").strip()
+    if not content or getattr(choice, "finish_reason", None) == "length":
+        try:
+            retry_chat = groq_client.chat.completions.create(
+                messages=messages,
+                model="openai/gpt-oss-120b",
+                temperature=0.7,
+                max_completion_tokens=max_completion + 1000,
+                reasoning_effort="low",
+            )
+            retry_content = (retry_chat.choices[0].message.content or "").strip()
+            if retry_content:
+                content = retry_content
+        except Exception:
+            pass
+    return content or "Yar thoda technical glitch aa gaya tha — apna message dobara bhej do, seedhi baat karte hain."
 
 
 def _public_user_payload(user: dict) -> dict:
@@ -472,6 +517,18 @@ async def get_metrics(request: Request):
     return get_system_metrics()
 
 
+@app.get("/api/admin/conversations")
+async def get_admin_conversations(request: Request):
+    """Returns logged user conversations from chat_history for the Executive Dashboard."""
+    if not is_admin_authenticated(request):
+        return JSONResponse(
+            {"status": "error", "message": "Unauthorized. Executive passkey required."},
+            status_code=401,
+        )
+    conversations = get_chat_conversations(limit_users=100, messages_per_user=100)
+    return JSONResponse({"status": "ok", "conversations": conversations}, headers=NO_CACHE_HEADERS)
+
+
 @app.post("/api/admin/login")
 async def api_admin_login(request: Request):
     """Validates the Executive Passkey and sets a 7-day signed session cookie."""
@@ -588,7 +645,8 @@ async def admin_dashboard(request: Request):
     if not is_admin_authenticated(request):
         return HTMLResponse(content=render_admin_login_html(), status_code=200, headers=NO_CACHE_HEADERS)
     m = get_system_metrics()
-    return HTMLResponse(content=render_dashboard_html(m), status_code=200, headers=NO_CACHE_HEADERS)
+    convs = get_chat_conversations(limit_users=100, messages_per_user=100)
+    return HTMLResponse(content=render_dashboard_html(m, conversations=convs), status_code=200, headers=NO_CACHE_HEADERS)
 
 
 @app.post("/api/admin/activate")
@@ -630,6 +688,33 @@ async def api_admin_activate(request: Request):
             "new_expiry": referrer_reward["new_expiry"].strftime("%Y-%m-%d"),
         } if referrer_reward else None,
     }
+
+
+@app.post("/api/admin/delete-user")
+async def api_admin_delete_user(request: Request):
+    """Permanently deletes a user and all associated chats, payments, and leads. Requires passkey."""
+    if not is_admin_authenticated(request):
+        return JSONResponse(
+            {"status": "error", "message": "Unauthorized. Executive passkey required."},
+            status_code=401,
+        )
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid request payload."}, status_code=400)
+
+    raw_target = str(data.get("identifier") or data.get("user_id") or data.get("phone") or "").strip()
+    if not raw_target:
+        return JSONResponse(
+            {"status": "error", "message": "Please specify a user phone number, email, or ID to delete."},
+            status_code=400,
+        )
+
+    ok, result = delete_user_completely(raw_target)
+    if not ok:
+        return JSONResponse({"status": "error", "message": str(result)}, status_code=404)
+
+    return JSONResponse({"status": "ok", "deleted": result}, headers=NO_CACHE_HEADERS)
 
 
 @app.post("/api/admin/broadcast")
@@ -861,14 +946,7 @@ async def receive_whatsapp(request: Request):
                 history=history,
                 user_name=u_pre.get("name", ""),
             )
-            max_tokens = 700 if status == "subscribed" else 450
-            chat = groq_client.chat.completions.create(
-                messages=messages,
-                model="openai/gpt-oss-120b",
-                temperature=0.75,
-                max_tokens=max_tokens,
-            )
-            ai_reply = chat.choices[0].message.content
+            ai_reply = _generate_ai_reply(messages, status)
         else:
             ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
 
@@ -1107,14 +1185,7 @@ async def process_chat(request: Request):
             history=history,
             user_name=current_user.get("name", ""),
         )
-        max_tokens = 700 if status == "subscribed" else 450
-        chat = groq_client.chat.completions.create(
-            messages=messages,
-            model="openai/gpt-oss-120b",
-            temperature=0.75,
-            max_tokens=max_tokens,
-        )
-        ai_reply = chat.choices[0].message.content
+        ai_reply = _generate_ai_reply(messages, status)
     else:
         ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
 

@@ -417,6 +417,124 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
             u_victim = database.get_user_by_identifier("923005554444")
             self.assertTrue(u_victim is None or not u_victim["is_subscribed"])
 
+    def test_generate_ai_reply_uses_reasoning_effort_and_retries_on_length(self):
+        from types import SimpleNamespace
+
+        calls = []
+
+        def fake_create(**kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                return SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(
+                            finish_reason="length",
+                            message=SimpleNamespace(content="Truncated mid senten"),
+                        )
+                    ]
+                )
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        finish_reason="stop",
+                        message=SimpleNamespace(content="Complete reply. Samajh aayi baat?"),
+                    )
+                ]
+            )
+
+        fake_client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+        )
+        with patch.object(server, "groq_client", fake_client):
+            reply = server._generate_ai_reply([{"role": "user", "content": "test"}], "free_trial")
+
+        self.assertEqual(reply, "Complete reply. Samajh aayi baat?")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0]["max_completion_tokens"], 1200)
+        self.assertEqual(calls[0]["reasoning_effort"], "low")
+        self.assertEqual(calls[1]["max_completion_tokens"], 2200)
+
+    def test_admin_conversations_endpoint_and_dashboard_viewer(self):
+        # Unauthenticated request must be rejected
+        r_unauth = self.client.get("/api/admin/conversations")
+        self.assertEqual(r_unauth.status_code, 401)
+
+        # Save a conversation including a script-closing payload to verify XSS escaping
+        u = database.get_or_create_google_user("g_chat_1", "reader@example.com", "Test Reader")
+        database.complete_chat_turn(
+            u["phone_number"],
+            "Hello </script><script>alert(1)</script>",
+            "Hey Test! Good to hear from you.",
+        )
+
+        # Login as admin
+        r_login = self.client.post("/api/admin/login", json={"passkey": server.ADMIN_PASSWORD})
+        self.assertEqual(r_login.status_code, 200)
+
+        r_convs = self.client.get("/api/admin/conversations")
+        self.assertEqual(r_convs.status_code, 200)
+        body = r_convs.json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(len(body["conversations"]), 1)
+        conv = body["conversations"][0]
+        self.assertEqual(conv["email"], "reader@example.com")
+        self.assertEqual(conv["message_count"], 2)
+        self.assertEqual(conv["messages"][0]["role"], "user")
+        self.assertEqual(conv["messages"][1]["role"], "assistant")
+
+        # Dashboard renders Conversations tab and safely escapes </script>
+        r_dash = self.client.get("/admin/dashboard")
+        self.assertEqual(r_dash.status_code, 200)
+        self.assertIn('id="tab-conversations"', r_dash.text)
+        self.assertIn("CONVERSATIONS_DATA =", r_dash.text)
+        self.assertIn("submitModalDeleteUser()", r_dash.text)
+        self.assertNotIn("</script><script>alert(1)</script>", r_dash.text)
+
+    def test_admin_delete_user_wipes_all_tables(self):
+        # Unauthenticated delete must be rejected
+        r_unauth = self.client.post("/api/admin/delete-user", json={"identifier": "victim@example.com"})
+        self.assertEqual(r_unauth.status_code, 401)
+
+        # Create a full user with linked phone, chat history, payment request, and coaching lead
+        u = database.get_or_create_google_user("g_del_1", "victim@example.com", "Delete Me")
+        uid = u["phone_number"]
+        ok_link, canon, _ = database.link_phone_to_user(uid, "03004445555")
+        self.assertTrue(ok_link)
+        database.complete_chat_turn(uid, "Hi there", "Hey Delete!")
+        database.submit_trx_id(uid, "TRX-DEL-999")
+        database.record_coaching_lead(uid)
+
+        # Verify data exists across all tables before deletion
+        self.assertIsNotNone(database.get_user_by_identifier("victim@example.com"))
+        self.assertEqual(len(database.get_recent_chat_history(uid, limit=10)), 2)
+
+        # Login as admin and delete user via linked phone format
+        r_login = self.client.post("/api/admin/login", json={"passkey": server.ADMIN_PASSWORD})
+        self.assertEqual(r_login.status_code, 200)
+
+        r_del = self.client.post("/api/admin/delete-user", json={"identifier": "03004445555"})
+        self.assertEqual(r_del.status_code, 200)
+        body = r_del.json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["deleted"]["user_id"], uid)
+        self.assertEqual(body["deleted"]["deleted_counts"]["users"], 1)
+        self.assertEqual(body["deleted"]["deleted_counts"]["chat_history"], 2)
+        self.assertEqual(body["deleted"]["deleted_counts"]["payment_requests"], 1)
+        self.assertEqual(body["deleted"]["deleted_counts"]["coaching_leads"], 1)
+
+        # Confirm user and all child records are completely gone
+        self.assertIsNone(database.get_user_by_identifier("victim@example.com"))
+        self.assertIsNone(database.get_user_by_identifier("03004445555"))
+        self.assertIsNone(database.get_user_by_identifier(uid))
+        with database.DBContext() as db:
+            for tbl in ("users", "chat_history", "payment_requests", "coaching_leads"):
+                db.execute(f"SELECT COUNT(*) AS c FROM {tbl} WHERE phone_number IN (?, ?)", (uid, canon))
+                self.assertEqual(db.fetchone()["c"], 0, f"Leftover rows in {tbl}")
+
+        # Deleting again returns 404
+        r_again = self.client.post("/api/admin/delete-user", json={"identifier": "victim@example.com"})
+        self.assertEqual(r_again.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
