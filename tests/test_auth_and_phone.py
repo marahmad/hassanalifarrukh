@@ -450,9 +450,36 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
 
         self.assertEqual(reply, "Complete reply. Samajh aayi baat?")
         self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0]["max_completion_tokens"], 1200)
+        self.assertEqual(calls[0]["max_completion_tokens"], 750)
         self.assertEqual(calls[0]["reasoning_effort"], "low")
-        self.assertEqual(calls[1]["max_completion_tokens"], 2200)
+        self.assertEqual(calls[1]["max_completion_tokens"], 1350)
+
+    def test_generate_ai_reply_fails_over_on_429_rate_limit(self):
+        from types import SimpleNamespace
+
+        models_tried = []
+
+        def fake_create(**kwargs):
+            models_tried.append(kwargs["model"])
+            if kwargs["model"] == "openai/gpt-oss-120b":
+                raise RuntimeError("429 rate_limit_exceeded TPM")
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        finish_reason="stop",
+                        message=SimpleNamespace(content="Failover reply worked cleanly."),
+                    )
+                ]
+            )
+
+        fake_client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+        )
+        with patch.object(server, "groq_client", fake_client):
+            reply = server._generate_ai_reply([{"role": "user", "content": "hi"}], "free_trial")
+
+        self.assertEqual(reply, "Failover reply worked cleanly.")
+        self.assertEqual(models_tried, ["openai/gpt-oss-120b", "openai/gpt-oss-20b"])
 
     def test_admin_conversations_endpoint_and_dashboard_viewer(self):
         # Unauthenticated request must be rejected
@@ -534,6 +561,54 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
         # Deleting again returns 404
         r_again = self.client.post("/api/admin/delete-user", json={"identifier": "victim@example.com"})
         self.assertEqual(r_again.status_code, 404)
+
+    def test_groq_error_returns_503_without_burning_trial_question(self):
+        u = database.get_or_create_google_user("g_err_1", "erruser@example.com", "Err User")
+        uid = u["phone_number"]
+
+        # Set signed user session cookie
+        token = user_auth.generate_user_session_token(uid)
+        self.client.cookies.set(user_auth.USER_SESSION_COOKIE, token)
+
+        def boom(**kwargs):
+            raise RuntimeError("Groq 429 rate limit")
+
+        from types import SimpleNamespace
+        fake_client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=boom))
+        )
+        with patch.object(server, "groq_client", fake_client), \
+             patch.object(server, "search_knowledge", return_value=[]):
+            r = self.client.post("/api/chat", json={"message": "Salam bhai"})
+
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["status"], "error")
+        # Trial question count must STILL be 0!
+        u_after = database.get_user_by_identifier(uid)
+        self.assertEqual(u_after["trial_questions_used"], 0)
+        self.assertEqual(u_after["total_queries"], 0)
+
+    def test_knowledge_chunk_cleaner_filters_noise_and_keeps_real_speech(self):
+        from src.knowledge_base import clean_and_validate_chunk
+
+        # Keeps genuine Urdu speech & strips Whisper tail
+        ok, cleaned, _ = clean_and_validate_chunk(
+            "Caption: Kindness\nSpoken Transcript: آپ نے kindness and generosity پہ کبھی give up نہیں کرنا، ہمیشہ محنت کرو۔ Thank you for watching!",
+            "speech",
+        )
+        self.assertTrue(ok)
+        self.assertNotIn("Thank you for watching", cleaned)
+
+        # Rejects Devanagari/Gurmukhi songs, Chinese hallucinations, and music-only clips
+        for junk in [
+            "Caption: \nSpoken Transcript: जिसे ढूँदता हूं मैं हर कहीं जो कभी मिली मुझे है नहीं मुझे",
+            "Caption: GOAT\nSpoken Transcript: ਰਾਤਾਂ ਜਾਗ ਜਾਗ ਕੇ ਮੇਨ ਤਾਂ ਆਂ ਕੀ ਤੀਆ ਕਰਾ ਸਦੀ ਗਾਲ",
+            "Caption: \nSpoken Transcript: 请不吝点赞 订阅 转发 打赏支持明镜与点点栏目",
+            "Caption: \nSpoken Transcript: 🎵",
+            "Speech: [Visual reel without audio track]",
+        ]:
+            ok_j, _, _ = clean_and_validate_chunk(junk, "speech")
+            self.assertFalse(ok_j, f"Expected junk chunk to be rejected: {junk[:60]}")
 
 
 if __name__ == "__main__":

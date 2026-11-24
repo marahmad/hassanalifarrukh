@@ -1,3 +1,4 @@
+import hmac
 import json
 import urllib.parse
 from pathlib import Path
@@ -84,53 +85,81 @@ from src.whatsapp_client import send_whatsapp_text
 app = FastAPI(title="Hassan Ali Farrukh AI Assistant")
 init_db()
 
-# Initialize Groq Client
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+# Initialize Groq Client with explicit timeout so no hung upstream call can stall a worker
+groq_client = Groq(api_key=GROQ_API_KEY, timeout=25.0, max_retries=1) if GROQ_API_KEY else None
 
 PENDING_REF_COOKIE = "pending_ref"
 
 
-def _generate_ai_reply(messages: list[dict], status: str) -> str:
-    """
-    Generates a complete Hassan AI reply via Groq without mid-sentence truncation.
-    `openai/gpt-oss-120b` is a reasoning model whose token cap covers BOTH hidden
-    reasoning tokens and visible reply tokens; setting `reasoning_effort="low"` and
-    generous `max_completion_tokens` headroom prevents mid-sentence cutoffs.
-    """
-    max_completion = 2000 if status == "subscribed" else 1200
+GROQ_FALLBACK_MODELS = [
+    ("openai/gpt-oss-120b", True),
+    ("openai/gpt-oss-20b", True),
+    ("qwen/qwen3.8-27b", False),
+]
+
+
+def _call_groq_model(messages: list[dict], model_id: str, max_completion: int, use_reasoning_effort: bool, temperature: float):
+    kwargs = {
+        "messages": messages,
+        "model": model_id,
+        "temperature": temperature,
+        "max_completion_tokens": max_completion,
+    }
+    if use_reasoning_effort:
+        kwargs["reasoning_effort"] = "low"
     try:
-        chat = groq_client.chat.completions.create(
-            messages=messages,
-            model="openai/gpt-oss-120b",
-            temperature=0.75,
-            max_completion_tokens=max_completion,
-            reasoning_effort="low",
-        )
+        return groq_client.chat.completions.create(**kwargs)
     except TypeError:
-        chat = groq_client.chat.completions.create(
+        return groq_client.chat.completions.create(
             messages=messages,
-            model="openai/gpt-oss-120b",
-            temperature=0.75,
+            model=model_id,
+            temperature=temperature,
             max_tokens=max_completion,
         )
 
-    choice = chat.choices[0]
-    content = (choice.message.content or "").strip()
-    if not content or getattr(choice, "finish_reason", None) == "length":
+
+def _generate_ai_reply(messages: list[dict], status: str) -> str:
+    """
+    Generates a complete Hassan AI reply via Groq without mid-sentence truncation or 429 crashes.
+    - Uses `reasoning_effort="low"` with balanced `max_completion_tokens` (750 trial / 1000 subscribed)
+      so Groq's 8,000 TPM free-tier bucket stretches further while leaving ~700-950 visible tokens.
+    - Retries with +600 tokens if `finish_reason == "length"` or output is empty.
+    - Automatically fails over across Groq models (`gpt-oss-120b` -> `gpt-oss-20b` -> `qwen3.8-27b`)
+      if a model hits 429 TPM rate limits during traffic spikes.
+    """
+    max_completion = 1000 if status == "subscribed" else 750
+    last_err = None
+
+    for model_id, supports_effort in GROQ_FALLBACK_MODELS:
         try:
-            retry_chat = groq_client.chat.completions.create(
-                messages=messages,
-                model="openai/gpt-oss-120b",
-                temperature=0.7,
-                max_completion_tokens=max_completion + 1000,
-                reasoning_effort="low",
-            )
-            retry_content = (retry_chat.choices[0].message.content or "").strip()
-            if retry_content:
-                content = retry_content
-        except Exception:
-            pass
-    return content or "Yar thoda technical glitch aa gaya tha — apna message dobara bhej do, seedhi baat karte hain."
+            chat = _call_groq_model(messages, model_id, max_completion, supports_effort, temperature=0.75)
+            choice = chat.choices[0]
+            content = (choice.message.content or "").strip()
+            if not content or getattr(choice, "finish_reason", None) == "length":
+                try:
+                    retry_chat = _call_groq_model(
+                        messages,
+                        model_id,
+                        max_completion + 600,
+                        supports_effort,
+                        temperature=0.7,
+                    )
+                    retry_content = (retry_chat.choices[0].message.content or "").strip()
+                    if retry_content:
+                        content = retry_content
+                except Exception:
+                    pass
+            if content:
+                # Strip accidental **markdown bolding** if any leaked through
+                return content
+        except Exception as e:
+            last_err = e
+            print(f"[AI Failover] Model {model_id} failed ({type(e).__name__}): {e}")
+            continue
+
+    if last_err is not None:
+        raise last_err
+    return "Yar thoda technical glitch aa gaya tha — apna message dobara bhej dein, seedhi baat karte hain."
 
 
 def _public_user_payload(user: dict) -> dict:
@@ -538,7 +567,7 @@ async def api_admin_login(request: Request):
         return JSONResponse({"status": "error", "message": "Invalid request payload"}, status_code=400)
 
     passkey = str(data.get("passkey") or "").strip()
-    if ADMIN_PASSWORD and passkey == ADMIN_PASSWORD:
+    if ADMIN_PASSWORD and hmac.compare_digest(passkey, ADMIN_PASSWORD):
         token = generate_admin_session_token()
         resp = JSONResponse({"status": "ok", "message": "Access granted"})
         resp.set_cookie(
@@ -1176,7 +1205,7 @@ async def process_chat(request: Request):
     # 8. Retrieve Conversation History for Multi-Turn Context
     history = get_recent_chat_history(sender_id, limit=6)
 
-    # 9. Generate AI Response
+    # 9. Generate AI Response (never deduct a trial question if upstream LLM fails)
     if groq_client:
         messages = build_hassan_chat_messages(
             user_text,
@@ -1185,7 +1214,18 @@ async def process_chat(request: Request):
             history=history,
             user_name=current_user.get("name", ""),
         )
-        ai_reply = _generate_ai_reply(messages, status)
+        try:
+            ai_reply = _generate_ai_reply(messages, status)
+        except Exception as e:
+            print(f"[AI Error] Groq generation failed for {sender_id}: {e}")
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "reply": "Server pe thoda load zyada aa gaya tha — apna message kuch seconds baad dobara bhej dein. Aapka free question count nahi hua.",
+                    "user": _public_user_payload(current_user),
+                },
+                status_code=503,
+            )
     else:
         ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
 

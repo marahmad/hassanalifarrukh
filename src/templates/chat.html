@@ -8,6 +8,13 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Hassan AI — Unofficial AI Mentor</title>
+    <meta name="description" content="Chat directly with an AI trained on Hassan Ali Farrukh's real reels and talks on discipline, career, mindset, and life in Pakistan.">
+    <meta property="og:title" content="Hassan AI — Unofficial AI Mentor">
+    <meta property="og:description" content="Direct, no-BS mindset, career, fitness & life guidance trained on Hassan Ali Farrukh's reels. Try 3 free messages.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://hassanalifarrukh.store/">
+    <meta property="og:image" content="https://hassanalifarrukh.store/static/demo_poster.jpg">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b0b0d'/%3E%3Crect x='4' y='4' width='56' height='56' rx='13' fill='%23ffffff'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='-apple-system,sans-serif' font-size='28' font-weight='800' fill='%230b0b0d'%3EHF%3C/text%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2161,7 +2168,8 @@ const APP_STATE = {
     isSubscribed: false,
     drawerOpen: false,
     googleEnabled: GOOGLE_OAUTH_ENABLED,
-    welcomeInjected: false
+    welcomeInjected: false,
+    isSending: false
 };
 
 // ── Canonical Pakistani Mobile Normalization (Mirrors src/phone_utils.py) ──
@@ -2318,6 +2326,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const signedInVia = urlParams.get('signed_in');
     const authErrorParam = urlParams.get('auth_error');
+    const refParam = (urlParams.get('ref') || '').trim().toUpperCase();
+    if (refParam) {
+        const refInput = document.getElementById('ob-input-ref');
+        if (refInput && !refInput.value) {
+            refInput.value = refParam;
+        }
+    }
     if (signedInVia || authErrorParam) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -2593,7 +2608,9 @@ function injectInitialWelcome(name) {
 
 // ── Send & Message Flow (Cookie-Authenticated) ─────────────────
 async function handleSendAction() {
+    if (APP_STATE.isSending) return;
     const textarea = document.getElementById('user-chat-input');
+    const sendBtn = document.getElementById('send-msg-btn');
     const text = textarea.value.trim();
 
     if (!text) return;
@@ -2601,6 +2618,9 @@ async function handleSendAction() {
         openAuthModal();
         return;
     }
+
+    APP_STATE.isSending = true;
+    if (sendBtn) sendBtn.disabled = true;
 
     appendMessageBubble('user', text);
     textarea.value = '';
@@ -2638,7 +2658,7 @@ async function handleSendAction() {
         const reply = data.reply || 'No response received. Please try again.';
         appendMessageBubble('ai', reply);
 
-        if (data.paywalled || reply.includes('free questions are up') || (reply.includes('PKR') && reply.includes('EasyPaisa'))) {
+        if (data.paywalled || reply.includes('free questions are up')) {
             APP_STATE.trialQuestionsUsed = APP_STATE.maxFreeTrial;
             updateTrialIndicator();
             setTimeout(() => openPaywallModal(), 1200);
@@ -2647,10 +2667,14 @@ async function handleSendAction() {
     } catch (err) {
         setTypingState(false);
         appendMessageBubble('ai', 'Error connecting to Hassan AI server. Please verify your connection or try again in a moment.');
+    } finally {
+        APP_STATE.isSending = false;
+        if (sendBtn) sendBtn.disabled = false;
     }
 }
 
 function handleChipClick(chipText) {
+    if (APP_STATE.isSending) return;
     const input = document.getElementById('user-chat-input');
     input.value = chipText;
     handleSendAction();
@@ -2950,7 +2974,11 @@ function copySnippet(text, el) {
 }
 
 function copyReferralInvite() {
-    const inviteText = `Talk to Hassan Ali Farrukh's AI Clone! Use my invite code ${APP_STATE.referralCode} to get started: ${window.location.origin}/`;
+    const code = (APP_STATE.referralCode || '').trim();
+    const refUrl = code && code !== 'HASSAN-XXXX'
+        ? `${window.location.origin}/?ref=${encodeURIComponent(code)}`
+        : `${window.location.origin}/`;
+    const inviteText = `Talk to Hassan Ali Farrukh's AI Clone! Use my invite code ${code} to get started: ${refUrl}`;
     copySnippet(inviteText);
 }
 
