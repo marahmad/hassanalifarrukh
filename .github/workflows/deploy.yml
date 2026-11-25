@@ -35,14 +35,14 @@ jobs:
 
       - name: Deploy updated files & restart hassan-ai on Oracle VM
         env:
-          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
-          ORACLE_HOST: ${{ vars.ORACLE_HOST || '157.151.163.109' }}
-          ORACLE_USER: ${{ vars.ORACLE_USER || 'ubuntu' }}
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY || secrets.SSH_PRIVATE_KEY || vars.ORACLE_SSH_KEY }}
+          ORACLE_HOST: ${{ vars.ORACLE_HOST || secrets.SERVER_HOST || '157.151.163.109' }}
+          ORACLE_USER: ${{ vars.ORACLE_USER || secrets.SERVER_USER || 'ubuntu' }}
           DEPLOY_SHA: ${{ github.sha }}
         run: |
           if [ -z "$ORACLE_SSH_KEY" ]; then
-            echo "::warning::Secret ORACLE_SSH_KEY is not set yet in GitHub Settings -> Secrets and variables -> Actions. Skipping SSH deploy until added."
-            exit 0
+            echo "::error::ORACLE_SSH_KEY secret was empty! Please verify it is saved under Repository secrets at https://github.com/marahmad/hassanalifarrukh/settings/secrets/actions"
+            exit 1
           fi
 
           mkdir -p ~/.ssh
