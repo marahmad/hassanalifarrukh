@@ -1,0 +1,85 @@
+name: Deploy to Oracle Cloud VM
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "static/**"
+      - "tools/**"
+      - "data/transcripts/**"
+      - "requirements.txt"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: production-oracle-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Validate & Deploy to Oracle VM
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Safety check Python syntax & templates before touching live server
+        run: |
+          python3 -m py_compile src/*.py tools/*.py
+          test -s src/templates/chat.html
+          echo "Syntax & template checks passed."
+
+      - name: Deploy updated files & restart hassan-ai on Oracle VM
+        env:
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          ORACLE_HOST: ${{ vars.ORACLE_HOST || '157.151.163.109' }}
+          ORACLE_USER: ${{ vars.ORACLE_USER || 'ubuntu' }}
+        run: |
+          if [ -z "$ORACLE_SSH_KEY" ]; then
+            echo "::warning::Secret ORACLE_SSH_KEY is not set yet in GitHub Settings -> Secrets and variables -> Actions. Skipping SSH deploy until added."
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          trap 'rm -f ~/.ssh/oracle_deploy_key' EXIT
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/oracle_deploy_key
+          chmod 600 ~/.ssh/oracle_deploy_key
+          ssh-keyscan -H "$ORACLE_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          echo "Streaming lightweight runtime bundle to Oracle VM..."
+          tar czf - src static tools data/transcripts requirements.txt .env.example | \
+            ssh -i ~/.ssh/oracle_deploy_key -o StrictHostKeyChecking=accept-new "${ORACLE_USER}@${ORACLE_HOST}" '
+              set -e
+              cd /home/ubuntu/hassanalifarrukh
+              tar xzf -
+
+              # Only run pip install if requirements.txt actually changed (saves RAM & CPU on Micro VM)
+              NEW_REQ_HASH=$(sha256sum requirements.txt | cut -d" " -f1)
+              OLD_REQ_HASH=$(cut -d" " -f1 .requirements.sha256 2>/dev/null || echo "")
+              if [ "$NEW_REQ_HASH" != "$OLD_REQ_HASH" ]; then
+                echo "requirements.txt changed — updating Python packages..."
+                ./venv/bin/pip install --no-cache-dir -r requirements.txt
+                sha256sum requirements.txt > .requirements.sha256
+              fi
+
+              sudo systemctl restart hassan-ai.service
+
+              # Verify live HTTP 200 health check
+              for i in $(seq 1 15); do
+                STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/ || true)
+                if [ "$STATUS" = "200" ]; then
+                  echo "Live server healthy (HTTP 200) on attempt $i."
+                  exit 0
+                fi
+                sleep 1
+              done
+
+              echo "ERROR: Service did not return HTTP 200 within 15s!"
+              sudo systemctl status hassan-ai.service --no-pager -l | tail -n 30
+              exit 1
+            '
