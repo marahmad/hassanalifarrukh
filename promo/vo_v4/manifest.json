@@ -1,0 +1,20 @@
+[
+  {
+    "id": "02_typing",
+    "voice": "Puck",
+    "file": "d:\\hassanalifarrukh\\promo\\vo_v4\\02_typing.wav",
+    "duration": 9.866
+  },
+  {
+    "id": "03_mentor_reply",
+    "voice": "ur-pk-podcaster-1",
+    "file": "d:\\hassanalifarrukh\\promo\\vo_v4\\03_mentor_reply.wav",
+    "duration": 15.265
+  },
+  {
+    "id": "04_personal_close",
+    "voice": "Puck",
+    "file": "d:\\hassanalifarrukh\\promo\\vo_v4\\04_personal_close.wav",
+    "duration": 8.241
+  }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "01_confession",
+    "voice": "Puck",
+    "file": "D:\\hassanalifarrukh\\promo\\vo_v3\\01_confession.wav",
+    "duration": 4.999,
+    "text": "Sach bataun, raat ke do baje jab sab so rahe hote hain, tab asal tension shuru hoti hai."
+  },
+  {
+    "id": "02_typing",
+    "voice": "Puck",
+    "file": "D:\\hassanalifarrukh\\promo\\vo_v3\\02_typing.wav",
+    "duration": 8.284,
+    "text": "Aaj maine bina soche Hassan Ali Farrukh ke bot ko message kar diya \u2014 yar samajh nahi aa raha life kidhar ja rahi hai, teen din baad routine toot jati hai."
+  },
+  {
+    "id": "03_mentor_reply",
+    "voice": "Algenib",
+    "file": "D:\\hassanalifarrukh\\promo\\vo_v3\\03_mentor_reply.wav",
+    "duration": 21.61,
+    "text": "Tu weak nahi hai yar. Bas perfect ban'ne ke chakkar mein khud ko thaka deta hai. Kal subah sirf bees minute ka ek wada khud se kar, aur kisi haal mein mat tod. Pehle apni zubaan ka pakka ban, zindagi khud line pe aa jayegi."
+  },
+  {
+    "id": "04_personal_close",
+    "voice": "Puck",
+    "file": "D:\\hassanalifarrukh\\promo\\vo_v3\\04_personal_close.wav",
+    "duration": 7.436,
+    "text": "Pehli baar kisi ne jhooti tasalli nahi di, seedha aaina dikha diya. Agar tumhare saath bhi raat ko aisa hota hai, neeche ME comment karo."
+  }
+]

@@ -1116,8 +1116,15 @@
         }
 
         @keyframes micPulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); }
-            50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35);
+            }
+
+            50% {
+                box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+            }
         }
 
         .voice-recording-bar {
@@ -1182,7 +1189,9 @@
         }
 
         @keyframes blinkCursor {
-            50% { opacity: 0; }
+            50% {
+                opacity: 0;
+            }
         }
 
         .guest-inline-cta {
@@ -2266,7 +2275,8 @@
             <!-- In-App Browser Rescue Strip (Visible in TikTok/IG WebView when chatting as guest) -->
             <div id="guest-inapp-top-banner" class="guest-inapp-strip">
                 <span>Opened in TikTok / IG? Tap <strong>⋯ → Open in Safari/Chrome</strong> to sign in smoothly.</span>
-                <button type="button" class="inapp-copy-btn" onclick="copySnippet(window.location.href, this)">Copy Link</button>
+                <button type="button" class="inapp-copy-btn" onclick="copySnippet(window.location.href, this)">Copy
+                    Link</button>
             </div>
 
             <!-- Messages Flow Area -->
@@ -2312,17 +2322,20 @@
             <footer class="chat-footer">
                 <div class="input-dock-wrapper">
                     <div class="input-box">
-                        <textarea id="user-chat-input" class="chat-textarea"
-                            placeholder="Write or tap 🎙️ to speak..." rows="1"></textarea>
+                        <textarea id="user-chat-input" class="chat-textarea" placeholder="Write or tap 🎙️ to speak..."
+                            rows="1"></textarea>
                         <div id="voice-recording-bar" class="voice-recording-bar">
                             <div class="voice-rec-status">
                                 <span class="voice-rec-dot"></span>
                                 <span id="voice-rec-timer">Recording 0:00</span>
                             </div>
-                            <button type="button" class="voice-cancel-btn" onclick="cancelVoiceRecording()">✕ Cancel</button>
+                            <button type="button" class="voice-cancel-btn" onclick="cancelVoiceRecording()">✕
+                                Cancel</button>
                         </div>
-                        <button type="button" id="mic-record-btn" class="mic-button" onclick="toggleVoiceRecording()" title="Send voice message (Urdu / English)">
-                            <svg id="mic-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                        <button type="button" id="mic-record-btn" class="mic-button" onclick="toggleVoiceRecording()"
+                            title="Send voice message (Urdu / English)">
+                            <svg id="mic-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                                 <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -2405,7 +2418,8 @@
                 <span>Continue with Google</span>
                 <span class="fast-badge">1-Tap</span>
             </button>
-            <button id="ob-try-preview-btn" type="button" class="modal-preview-link" onclick="closeAuthModalForPreview()" style="display:none;">
+            <button id="ob-try-preview-btn" type="button" class="modal-preview-link"
+                onclick="closeAuthModalForPreview()" style="display:none;">
                 ✨ Try 1 Free Question First (No Sign-In)
             </button>
         </div>
@@ -3319,7 +3333,7 @@
             for (const c of candidates) {
                 try {
                     if (MediaRecorder.isTypeSupported(c)) return c;
-                } catch (e) {}
+                } catch (e) { }
             }
             return '';
         }
@@ -3341,7 +3355,7 @@
             if (textarea) textarea.style.display = '';
             if (sendBtn && !APP_STATE.isSending) sendBtn.disabled = false;
             if (_voiceAudioStream) {
-                try { _voiceAudioStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+                try { _voiceAudioStream.getTracks().forEach(t => t.stop()); } catch (e) { }
                 _voiceAudioStream = null;
             }
         }
@@ -3349,7 +3363,7 @@
         function cancelVoiceRecording() {
             _voiceCancelled = true;
             if (_voiceMediaRecorder && _voiceMediaRecorder.state !== 'inactive') {
-                try { _voiceMediaRecorder.stop(); } catch (e) {}
+                try { _voiceMediaRecorder.stop(); } catch (e) { }
             }
             _resetVoiceUI();
             showToast('Voice recording cancelled');
@@ -3365,7 +3379,7 @@
             if (APP_STATE.isRecording) {
                 _voiceCancelled = false;
                 if (_voiceMediaRecorder && _voiceMediaRecorder.state !== 'inactive') {
-                    try { _voiceMediaRecorder.stop(); } catch (e) {}
+                    try { _voiceMediaRecorder.stop(); } catch (e) { }
                 }
                 return;
             }
@@ -3657,7 +3671,7 @@
                                         user_text: text,
                                         ai_reply: finalReply
                                     }));
-                                } catch (e) {}
+                                } catch (e) { }
                                 streamBubble.extraEl.innerHTML = _buildGuestSignupCardHtml();
                             } else {
                                 streamBubble.extraEl.innerHTML = _buildPaywallActionHtml(finalReply);
