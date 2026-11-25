@@ -31,7 +31,7 @@ jobs:
         run: |
           python3 -m py_compile src/*.py tools/*.py
           test -s src/templates/chat.html
-          echo "Syntax & template checks passed."
+          echo "All syntax & template checks passed."
 
       - name: Deploy updated files & restart hassan-ai on Oracle VM
         env:
