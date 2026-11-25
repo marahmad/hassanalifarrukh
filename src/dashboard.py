@@ -15,6 +15,7 @@ from src.config import (
     WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_TOKEN,
 )
+from src.emailer import is_email_notifications_enabled
 from src.phone_utils import format_pk_phone_display, normalize_pk_phone_or_none
 
 PKT_TZ = timezone(timedelta(hours=5))
@@ -247,6 +248,24 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
         if tg_alerts_ready
         else ''
     )
+
+    email_alerts_ready = is_email_notifications_enabled()
+    email_status_pill = (
+        '<span class="code-pill" style="color:#34d399;border:1px solid rgba(52,211,153,0.25);">✉ Auto-Email ON</span>'
+        if email_alerts_ready
+        else '<span class="code-pill" style="color:#71717a;" title="Set RESEND_API_KEY or SMTP_USER/SMTP_PASSWORD in .env to email users on activation &amp; bonus gifts">✉ Auto-Email OFF</span>'
+    )
+
+    fb_up = int(metrics.get("feedback_up") or 0)
+    fb_down = int(metrics.get("feedback_down") or 0)
+    fb_total = fb_up + fb_down
+    fb_pct = metrics.get("feedback_satisfaction_pct")
+    if fb_total > 0 and fb_pct is not None:
+        feedback_pill_text = f"👍 {fb_up} · 👎 {fb_down} ({fb_pct}%)"
+        feedback_stat_value = f"{fb_pct}%"
+    else:
+        feedback_pill_text = "👍 0 · 👎 0"
+        feedback_stat_value = "—"
 
     chart_payload = {
         "dates": metrics.get("chart_dates") or default_dates,
@@ -1823,6 +1842,65 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 font-size: 13px;
             }}
         }}
+
+        /* AI Chat Insights Executive Digest Panel */
+        .insights-card {{
+            background: linear-gradient(145deg, rgba(24, 24, 27, 0.96) 0%, rgba(18, 22, 20, 0.98) 100%);
+            border: 1px solid rgba(52, 211, 153, 0.24);
+            border-radius: 14px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }}
+
+        .insights-header {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }}
+
+        .btn-insights {{
+            background: rgba(52, 211, 153, 0.14);
+            border: 1px solid rgba(52, 211, 153, 0.4);
+            color: #4ade80;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s ease;
+        }}
+
+        .btn-insights:hover {{
+            background: rgba(52, 211, 153, 0.24);
+            color: #ffffff;
+        }}
+
+        .btn-insights:disabled {{
+            opacity: 0.6;
+            cursor: not-allowed;
+        }}
+
+        .insights-output {{
+            display: none;
+            background: rgba(11, 11, 13, 0.72);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #e4e4e7;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }}
+
+        .insights-output.visible {{
+            display: block;
+        }}
     </style>
 </head>
 <body>
@@ -1884,6 +1962,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         <h1>Executive Overview</h1>
                         <span class="live-badge">● LIVE DATA</span>
+                        {email_status_pill}
                     </div>
                     <p>Real-time {_escape(db_backend)} metrics for registered users, EasyPaisa/Bank payments, and AI activity.</p>
                 </div>
@@ -1997,6 +2076,10 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                         <span class="stat-number" id="stat-paywalled-trials">{metrics['paywalled_trials']}</span>
                         <span class="stat-label">Paywalled Trials {info_badge(f"Unsubscribed users who have used all of their free + bonus questions.")}</span>
                     </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="stat-feedback-pct">{feedback_stat_value}</span>
+                        <span class="stat-label">Reply Satisfaction ({fb_up} 👍 / {fb_down} 👎) {info_badge("Live 👍 / 👎 satisfaction ratio rated by users directly on Hassan AI replies.")}</span>
+                    </div>
                 </div>
 
                 <div class="chart-container">
@@ -2081,6 +2164,7 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         <h1>User Conversations</h1>
                         <span class="code-pill" id="badge-conv-summary">{total_conv_users} Users · {total_logged_msgs} Messages</span>
+                        <span class="code-pill" id="badge-feedback-summary" style="color: #4ade80;">{feedback_pill_text}</span>
                         <span class="code-pill" style="color: #a1a1aa;">PKT (UTC+5)</span>
                     </div>
                     <p>Inspect real messages people sent to Hassan AI and verify response quality live (all times in Pakistan Standard Time).</p>
@@ -2088,6 +2172,22 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 <div class="header-actions">
                     <button onclick="refreshConversations()" id="btn-refresh-chats" class="btn-refresh">↻ Refresh Chats</button>
                 </div>
+            </div>
+
+            <!-- AI Chat Insights Executive Digest -->
+            <div class="insights-card">
+                <div class="insights-header">
+                    <div>
+                        <div style="font-size: 14px; font-weight: 700; color: #ffffff;">✨ AI Chat Insights &amp; Reel Hooks</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                            Instant executive digest of top user struggles, drop-off signals, and 3 TikTok/Reel hooks to film next.
+                        </div>
+                    </div>
+                    <button type="button" id="btn-generate-insights" onclick="generateChatInsights()" class="btn-insights">
+                        ✨ Analyze Recent Chats
+                    </button>
+                </div>
+                <div id="insights-output-box" class="insights-output"></div>
             </div>
 
             <div id="chat-viewer-shell" class="chat-viewer-shell">
@@ -2445,6 +2545,48 @@ def render_dashboard_html(metrics: dict, conversations: list | None = None) -> s
                 console.error('Failed to refresh conversations:', e);
             }} finally {{
                 if (btn) btn.textContent = '↻ Refresh Chats';
+            }}
+        }}
+
+        async function generateChatInsights() {{
+            const btn = document.getElementById('btn-generate-insights');
+            const outEl = document.getElementById('insights-output-box');
+            const fbBadge = document.getElementById('badge-feedback-summary');
+            if (btn) {{
+                btn.disabled = true;
+                btn.textContent = 'Analyzing chats...';
+            }}
+            if (outEl) {{
+                outEl.classList.add('visible');
+                outEl.textContent = 'Analyzing recent user conversations and feedback...';
+            }}
+            try {{
+                const res = await fetch('/api/admin/insights', {{ method: 'POST' }});
+                const data = await res.json().catch(() => ({{}}));
+                if (res.ok && data.status === 'ok') {{
+                    const fb = data.feedback || {{}};
+                    const up = Number(fb.up || 0);
+                    const down = Number(fb.down || 0);
+                    const pctStr = fb.satisfaction_pct !== null && fb.satisfaction_pct !== undefined
+                        ? ' (' + fb.satisfaction_pct + '%)'
+                        : '';
+                    if (fbBadge) {{
+                        fbBadge.textContent = '👍 ' + up + ' · 👎 ' + down + pctStr;
+                    }}
+                    if (outEl) {{
+                        const metaLine = 'Analyzed ' + (data.threads_analyzed || 0) + ' active thread(s) · Ratings: 👍 ' + up + ' / 👎 ' + down + pctStr + '\\n\\n';
+                        outEl.textContent = metaLine + (data.insights || '');
+                    }}
+                }} else if (outEl) {{
+                    outEl.textContent = data.message || 'Could not generate AI insights right now.';
+                }}
+            }} catch (e) {{
+                if (outEl) outEl.textContent = 'Network error while generating AI insights.';
+            }} finally {{
+                if (btn) {{
+                    btn.disabled = false;
+                    btn.textContent = '✨ Re-Analyze Chats';
+                }}
             }}
         }}
 

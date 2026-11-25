@@ -33,11 +33,26 @@ WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip() or (
+    hashlib.sha256(f"tg_webhook:{TELEGRAM_BOT_TOKEN}".encode("utf-8")).hexdigest()[:32]
+    if TELEGRAM_BOT_TOKEN
+    else ""
+)
+
+# Optional User Email Notifications (Resend API or SMTP e.g. Gmail App Password)
+APP_BASE_URL = os.getenv("APP_BASE_URL", "https://hassanalifarrukh.store").strip().rstrip("/")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
+EMAIL_FROM = os.getenv("EMAIL_FROM", "").strip() or (f"Hassan AI <{SMTP_USER}>" if SMTP_USER else "Hassan AI <noreply@hassanalifarrukh.store>")
 
 # Business Settings (Single All-Access Monthly Plan)
 FREE_TRIAL_QUESTIONS = int(os.getenv("FREE_TRIAL_QUESTIONS", "5"))
 SIGNUP_REFERRAL_BONUS_QUESTIONS = int(os.getenv("SIGNUP_REFERRAL_BONUS_QUESTIONS", "3"))
 MAX_REFERRAL_BONUS_QUESTIONS = int(os.getenv("MAX_REFERRAL_BONUS_QUESTIONS", "15"))
+PENDING_TRX_GRACE_QUESTIONS = int(os.getenv("PENDING_TRX_GRACE_QUESTIONS", "2"))
 CHAT_HISTORY_CONTEXT_MESSAGES = int(os.getenv("CHAT_HISTORY_CONTEXT_MESSAGES", "20"))
 CHAT_HISTORY_UI_LIMIT = int(os.getenv("CHAT_HISTORY_UI_LIMIT", "40"))
 MONTHLY_PRICE_PKR = int(os.getenv("MONTHLY_SUBSCRIPTION_PKR", "1000"))

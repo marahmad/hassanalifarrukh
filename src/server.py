@@ -18,6 +18,8 @@ from src.admin_auth import (
     render_admin_login_html,
 )
 from src.alerts import (
+    answer_telegram_callback,
+    edit_telegram_message,
     is_telegram_alerts_enabled,
     notify_new_signup,
     notify_payment_submitted,
@@ -41,9 +43,12 @@ from src.config import (
     GROQ_API_KEY,
     JAZZCASH,
     MONTHLY_PRICE_PKR,
+    PENDING_TRX_GRACE_QUESTIONS,
     RAAST_ID,
     RAAST_ID_NUMBER,
     SIGNUP_REFERRAL_BONUS_QUESTIONS,
+    TELEGRAM_CHAT_ID,
+    TELEGRAM_WEBHOOK_SECRET,
     VERIFY_TOKEN,
     WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_TOKEN,
@@ -58,23 +63,34 @@ from src.database import (
     delete_user_completely,
     evaluate_user_access,
     get_chat_conversations,
+    get_feedback_summary,
     get_or_create_google_user,
     get_or_create_user,
+    get_payment_by_trx,
     get_recent_chat_history,
     get_referral_stats,
     get_subscriber_phones,
     get_system_metrics,
     get_user_by_identifier,
+    get_user_streak,
     get_user_trial_limit,
     grant_bonus_messages,
+    grant_pending_trx_grace,
     import_guest_preview_turn,
     init_db,
     link_phone_to_user,
     mark_welcome_sent,
+    record_chat_feedback,
     record_user_query,
+    reject_payment_by_trx,
     save_chat_message,
     submit_trx_id,
     update_user_memory_summary,
+)
+from src.emailer import (
+    is_email_notifications_enabled,
+    notify_user_activated_email,
+    notify_user_bonus_email,
 )
 from src.knowledge_base import build_rag_search_query, search_knowledge
 from src.persona import build_hassan_chat_messages, build_hassan_prompt
@@ -374,11 +390,12 @@ def _generate_ai_reply(messages: list[dict], status: str) -> str:
     return "Yar thoda technical glitch aa gaya tha — apna message dobara bhej dein, seedhi baat karte hain."
 
 
-def _public_user_payload(user: dict) -> dict:
+def _public_user_payload(user: dict, streak: dict | None = None) -> dict:
     contact_phone = user.get("contact_phone") or (
         user["phone_number"] if is_canonical_pk_phone(user.get("phone_number")) else ""
     )
     is_sub = bool(user.get("is_subscribed", False))
+    st = streak if isinstance(streak, dict) else {}
     return {
         "id": user.get("phone_number", ""),
         "name": user.get("name") or "User",
@@ -396,7 +413,86 @@ def _public_user_payload(user: dict) -> dict:
         "max_free_trial": get_user_trial_limit(user),
         "referral_code": user.get("referral_code") or "",
         "referral_count": user.get("referral_count") or 0,
+        "current_streak": int(st.get("current_streak") or 0),
+        "longest_streak": int(st.get("longest_streak") or 0),
+        "checked_in_today": bool(st.get("checked_in_today", False)),
     }
+
+
+def _transcribe_audio_bytes(audio_bytes: bytes, raw_ct: str = "audio/webm") -> tuple[str | None, str | None, int]:
+    """
+    Shared Groq Whisper voice-to-text helper used by Web Chat mic, Baileys bridge, and Meta WhatsApp Cloud API.
+    Returns (transcribed_text_or_None, error_message_or_None, http_status).
+    """
+    if not groq_client:
+        return None, "Voice transcription is not configured on this server.", 503
+    if not audio_bytes or len(audio_bytes) < 200:
+        return None, "Voice clip was too short or silent. Hold or tap to speak clearly.", 400
+    if len(audio_bytes) > MAX_AUDIO_UPLOAD_BYTES:
+        return None, "Voice clip is too long (max 5 MB). Keep voice notes under 2 minutes.", 413
+
+    clean_ct = (raw_ct or "audio/webm").split(";")[0].strip().lower()
+    ext_map = {
+        "audio/webm": ("voice.webm", "audio/webm"),
+        "audio/mp4": ("voice.m4a", "audio/mp4"),
+        "audio/x-m4a": ("voice.m4a", "audio/mp4"),
+        "audio/m4a": ("voice.m4a", "audio/mp4"),
+        "audio/aac": ("voice.m4a", "audio/mp4"),
+        "audio/ogg": ("voice.ogg", "audio/ogg"),
+        "audio/opus": ("voice.ogg", "audio/ogg"),
+        "audio/wav": ("voice.wav", "audio/wav"),
+        "audio/mpeg": ("voice.mp3", "audio/mpeg"),
+    }
+    filename, clean_mime = ext_map.get(clean_ct, ("voice.webm", "audio/webm"))
+
+    whisper_prompt = (
+        "Pakistani Urdu, Roman Urdu, and English personal mentorship question about "
+        "career, discipline, mindset, gym, fitness, family, business, shadi, paisa."
+    )
+    last_err = None
+    for model_id in GROQ_WHISPER_MODELS:
+        try:
+            tr = groq_client.audio.transcriptions.create(
+                file=(filename, audio_bytes, clean_mime),
+                model=model_id,
+                prompt=whisper_prompt,
+                response_format="json",
+                temperature=0.0,
+            )
+            text = (getattr(tr, "text", None) or (tr.get("text") if isinstance(tr, dict) else "") or "").strip()
+            if text:
+                return text, None, 200
+        except Exception as e:
+            last_err = e
+            print(f"[Voice Transcribe Warning] {model_id} failed ({type(e).__name__}): {e}")
+            continue
+
+    if last_err is not None:
+        return None, "Could not transcribe voice note right now. Please try again or type your message.", 503
+    return None, "No clear speech detected in the recording. Please speak closer to the mic.", 400
+
+
+def _download_whatsapp_media(media_id: str) -> tuple[bytes | None, str]:
+    """Downloads a WhatsApp Cloud API media object (e.g. OGG voice note) using WHATSAPP_TOKEN."""
+    if not WHATSAPP_TOKEN or not media_id:
+        return None, ""
+    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
+    try:
+        meta_resp = requests.get(f"https://graph.facebook.com/v19.0/{media_id}", headers=headers, timeout=10)
+        if meta_resp.status_code != 200:
+            return None, ""
+        meta = meta_resp.json()
+        media_url = meta.get("url")
+        mime_type = meta.get("mime_type") or "audio/ogg"
+        if not media_url:
+            return None, ""
+        bin_resp = requests.get(media_url, headers=headers, timeout=15)
+        if bin_resp.status_code != 200:
+            return None, ""
+        return bin_resp.content, mime_type
+    except Exception as e:
+        print(f"[WhatsApp Media Warning] Failed downloading media {media_id}: {e}")
+        return None, ""
 
 
 def _is_google_oauth_enabled() -> bool:
@@ -624,7 +720,7 @@ async def api_auth_me(request: Request):
 
     return {
         "authenticated": True,
-        "user": _public_user_payload(user),
+        "user": _public_user_payload(user, streak=get_user_streak(user["phone_number"])),
         **auth_config,
     }
 
@@ -951,6 +1047,29 @@ async def apple_touch_icon():
     )
 
 
+@app.get("/manifest.json")
+async def pwa_manifest():
+    """Serves PWA Web App Manifest so Android & iOS visitors can install Hassan AI to their Home Screen."""
+    manifest = {
+        "name": "Hassan AI — Unofficial AI Mentor",
+        "short_name": "Hassan AI",
+        "description": "Direct mindset, career, discipline & life mentor trained on Hassan Ali Farrukh's real reels.",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0b0b0d",
+        "theme_color": "#0b0b0d",
+        "orientation": "portrait",
+        "icons": [
+            {"src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any maskable"},
+        ],
+    }
+    return JSONResponse(
+        manifest,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/robots.txt")
 async def robots_txt():
     """Serves robots.txt allowing home indexing while keeping /admin and /api clean."""
@@ -969,7 +1088,7 @@ async def customer_chat_head():
 
 @app.get("/api/chat/history")
 async def api_chat_history(request: Request):
-    """Returns the signed-in user's recent saved chat history (UTC 'Z' timestamps)."""
+    """Returns the signed-in user's recent saved chat history (UTC 'Z' timestamps) and daily streak."""
     user_id = get_authenticated_user_id(request)
     if not user_id:
         return JSONResponse(
@@ -985,10 +1104,34 @@ async def api_chat_history(request: Request):
         clear_user_session_cookie(resp)
         return resp
     history = get_recent_chat_history(user["phone_number"], limit=CHAT_HISTORY_UI_LIMIT)
+    streak = get_user_streak(user["phone_number"])
     return JSONResponse(
-        {"status": "ok", "messages": history, "user": _public_user_payload(user)},
+        {"status": "ok", "messages": history, "user": _public_user_payload(user, streak=streak)},
         headers=NO_CACHE_HEADERS,
     )
+
+
+@app.post("/api/chat/feedback")
+async def api_chat_feedback(request: Request):
+    """Records a user's 👍 ('up') or 👎 ('down') rating on an AI reply."""
+    user_id = get_authenticated_user_id(request)
+    if not user_id:
+        return JSONResponse({"status": "error", "message": "Please sign in to rate replies."}, status_code=401)
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "Invalid request payload."}, status_code=400)
+
+    rating = str(data.get("rating") or "").strip().lower()
+    if rating not in ("up", "down"):
+        return JSONResponse({"status": "error", "message": "Rating must be 'up' or 'down'."}, status_code=400)
+
+    msg_id_raw = data.get("message_id")
+    msg_id = int(msg_id_raw) if isinstance(msg_id_raw, int) or (isinstance(msg_id_raw, str) and msg_id_raw.isdigit()) else None
+    snippet = str(data.get("snippet") or "")[:300]
+
+    ok = record_chat_feedback(user_id, rating=rating, message_id=msg_id, snippet=snippet)
+    return JSONResponse({"status": "ok" if ok else "error", "rating": rating}, headers=NO_CACHE_HEADERS)
 
 
 @app.get("/static/{filename}")
@@ -1009,7 +1152,7 @@ async def serve_static_asset(filename: str):
 
 @app.get("/", response_class=HTMLResponse)
 async def customer_chat(request: Request):
-    """Customer-facing mobile chat UI — server-hydrates auth & recent chat history on first paint."""
+    """Customer-facing mobile chat UI — server-hydrates auth, streak & recent chat history on first paint."""
     auth_config = {
         "google_enabled": _is_google_oauth_enabled(),
         "guest_preview_used": has_used_guest_preview(request),
@@ -1020,7 +1163,8 @@ async def customer_chat(request: Request):
     if user_id:
         user = get_user_by_identifier(user_id)
         if user:
-            initial_auth = {"authenticated": True, "user": _public_user_payload(user), **auth_config}
+            streak = get_user_streak(user["phone_number"])
+            initial_auth = {"authenticated": True, "user": _public_user_payload(user, streak=streak), **auth_config}
             initial_history = get_recent_chat_history(user["phone_number"], limit=CHAT_HISTORY_UI_LIMIT)
         else:
             initial_auth = {"authenticated": False, "user": None, **auth_config}
@@ -1076,12 +1220,19 @@ async def api_admin_activate(request: Request):
         return JSONResponse({"status": "error", "message": err}, status_code=400)
 
     new_exp, tier_activated, ref_code, referrer_reward = activate_user(target_id, days=days_parsed, tier=tier_parsed)
+    expiry_fmt = _format_pkt_ymd(new_exp)
+    activated_user = get_user_by_identifier(target_id)
+    email_sent = False
+    if activated_user:
+        email_sent = notify_user_activated_email(activated_user, days=days_parsed, expiry_str=expiry_fmt, referral_code=ref_code)
+
     return {
         "status": "ok",
         "target": target_id,
         "tier": tier_activated,
-        "expiry": _format_pkt_ymd(new_exp),
+        "expiry": expiry_fmt,
         "referral_code": ref_code,
+        "email_notified": email_sent,
         "referrer_reward": {
             "referrer_phone": referrer_reward["referrer_phone"],
             "new_expiry": _format_pkt_ymd(referrer_reward["new_expiry"]),
@@ -1091,7 +1242,7 @@ async def api_admin_activate(request: Request):
 
 @app.post("/api/admin/bonus")
 async def api_admin_bonus(request: Request):
-    """Gifts (or adjusts) bonus free trial messages for a user. Requires Executive Passkey."""
+    """Gifts (or adjusts) bonus free trial messages for a user and notifies them by email if positive."""
     if not is_admin_authenticated(request):
         return JSONResponse(
             {"status": "error", "message": "Unauthorized. Executive passkey required."},
@@ -1127,6 +1278,10 @@ async def api_admin_bonus(request: Request):
     if not ok:
         return JSONResponse({"status": "error", "message": str(result)}, status_code=404)
 
+    email_sent = False
+    if bonus_delta > 0:
+        email_sent = notify_user_bonus_email(result["user"], bonus_delta, result["max_free_trial"])
+
     return JSONResponse(
         {
             "status": "ok",
@@ -1137,6 +1292,7 @@ async def api_admin_bonus(request: Request):
             "bonus_trial_questions": result["bonus_trial_questions"],
             "max_free_trial": result["max_free_trial"],
             "trial_questions_used": result["trial_questions_used"],
+            "email_notified": email_sent,
             "user": _public_user_payload(result["user"]),
         },
         headers=NO_CACHE_HEADERS,
@@ -1170,6 +1326,182 @@ async def api_admin_delete_user(request: Request):
     return JSONResponse({"status": "ok", "deleted": result}, headers=NO_CACHE_HEADERS)
 
 
+@app.post("/api/admin/insights")
+async def api_admin_insights(request: Request):
+    """
+    Generates an executive AI digest of recent real user conversations:
+      - Top recurring user struggles
+      - Drop-off & conversion friction
+      - 3 ready-to-film TikTok / Instagram Reel promo hooks based on real questions
+    """
+    if not is_admin_authenticated(request):
+        return JSONResponse(
+            {"status": "error", "message": "Unauthorized. Executive passkey required."},
+            status_code=401,
+        )
+
+    convs = get_chat_conversations(limit_users=50, messages_per_user=12)
+    fb = get_feedback_summary(limit_recent=15)
+    user_samples = []
+    for c in convs:
+        u_msgs = [m["content"].strip()[:200] for m in (c.get("messages") or []) if m.get("role") == "user" and (m.get("content") or "").strip()]
+        if not u_msgs:
+            continue
+        status_tag = "PAID" if c.get("is_subscribed") else f"TRIAL({c.get('trial_questions_used', 0)}/{c.get('max_free_trial', 5)})"
+        user_samples.append(f"- [{status_tag}] " + " | ".join(u_msgs[-4:]))
+
+    if not user_samples:
+        return JSONResponse(
+            {
+                "status": "ok",
+                "insights": "No user conversations recorded yet. Once visitors chat, tap Analyze again for live struggle clusters and TikTok hooks.",
+                "feedback": fb,
+                "threads_analyzed": 0,
+            },
+            headers=NO_CACHE_HEADERS,
+        )
+
+    if not groq_client:
+        fallback = (
+            f"Analyzed {len(user_samples)} active conversation thread(s) "
+            f"(👍 {fb['up']} / 👎 {fb['down']}). Configure GROQ_API_KEY for full AI struggle clustering & TikTok hook ideas."
+        )
+        return JSONResponse(
+            {"status": "ok", "insights": fallback, "feedback": fb, "threads_analyzed": len(user_samples)},
+            headers=NO_CACHE_HEADERS,
+        )
+
+    neg_snippets = [f"- {r['snippet'][:140]}" for r in fb.get("recent", []) if r.get("rating") == "down"][:5]
+    neg_block = "\n".join(neg_snippets) if neg_snippets else "(none)"
+    prompt = (
+        "You are a sharp growth strategist analyzing anonymized user chats from Hassan Ali Farrukh's AI Mentor app (Pakistan).\n"
+        "Return a crisp, scannable executive brief with EXACTLY these 3 plain-text sections (no markdown **bold**):\n\n"
+        "1. TOP 3 USER STRUGGLES:\n(3 concise bullets summarizing what real people are actually asking about)\n\n"
+        "2. DROP-OFF & CONVERSION SIGNALS:\n(2-3 sharp observations on why trial users stopped early or what would make them subscribe for PKR 1,000/mo)\n\n"
+        "3. 3 VIRAL TIKTOK / REEL HOOKS TO FILM NEXT:\n(3 punchy Roman Urdu/English opening lines directly inspired by real user pain points below)\n\n"
+        f"Feedback Score: 👍 {fb['up']} / 👎 {fb['down']} ({fb['satisfaction_pct']}%)\n"
+        f"Recent Disliked Replies:\n{neg_block}\n\n"
+        f"Recent User Threads ({len(user_samples)} users):\n" + "\n".join(user_samples[:30])
+    )
+
+    for model_id, supports_effort in GROQ_MEMORY_MODELS:
+        try:
+            kwargs = {
+                "model": model_id,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.4,
+                "max_completion_tokens": 700 if supports_effort else 550,
+            }
+            if supports_effort:
+                kwargs["reasoning_effort"] = "low"
+            resp = groq_client.chat.completions.create(**kwargs)
+            txt = _sanitize_ai_reply((resp.choices[0].message.content or "").strip())
+            if txt:
+                return JSONResponse(
+                    {
+                        "status": "ok",
+                        "insights": txt,
+                        "feedback": fb,
+                        "threads_analyzed": len(user_samples),
+                    },
+                    headers=NO_CACHE_HEADERS,
+                )
+        except Exception as e:
+            print(f"[Insights Warning] {model_id} failed: {e}")
+            continue
+
+    return JSONResponse(
+        {"status": "error", "message": "Could not generate AI insights right now. Please try again shortly."},
+        status_code=503,
+    )
+
+
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(request: Request):
+    """
+    Handles 1-tap inline Telegram approval buttons (`approve:<trx_id>` / `reject:<trx_id>`).
+    Secured by Telegram's `X-Telegram-Bot-Api-Secret-Token` header AND strict `TELEGRAM_CHAT_ID` check.
+    """
+    if not TELEGRAM_WEBHOOK_SECRET or not TELEGRAM_CHAT_ID:
+        return JSONResponse({"status": "error", "message": "Telegram webhook not configured."}, status_code=503)
+
+    supplied_secret = (request.headers.get("x-telegram-bot-api-secret-token") or "").strip()
+    if not supplied_secret or not hmac.compare_digest(supplied_secret, TELEGRAM_WEBHOOK_SECRET):
+        return JSONResponse({"status": "error", "message": "Forbidden"}, status_code=403)
+
+    try:
+        update = await request.json()
+    except Exception:
+        return {"ok": True}
+
+    cb = update.get("callback_query")
+    if not isinstance(cb, dict):
+        return {"ok": True}
+
+    cb_id = str(cb.get("id") or "")
+    cb_data = str(cb.get("data") or "").strip()
+    msg_obj = cb.get("message") or {}
+    chat_id = str((msg_obj.get("chat") or {}).get("id") or "")
+    msg_id = msg_obj.get("message_id")
+
+    if not chat_id or chat_id != str(TELEGRAM_CHAT_ID).strip():
+        answer_telegram_callback(cb_id, "Unauthorized chat.", show_alert=True)
+        return JSONResponse({"status": "error", "message": "Unauthorized chat"}, status_code=403)
+
+    if cb_data.startswith("approve:"):
+        trx_id = cb_data.split(":", 1)[1].strip()
+        pay = get_payment_by_trx(trx_id)
+        if not pay:
+            answer_telegram_callback(cb_id, f"TRX {trx_id} not found.", show_alert=True)
+            return {"ok": True, "action": "not_found"}
+
+        uid = pay["phone_number"]
+        new_exp, tier_act, ref_code, _ = activate_user(uid, days=30, tier="pro")
+        expiry_fmt = _format_pkt_ymd(new_exp)
+        user_obj = get_user_by_identifier(uid) or {}
+        notify_user_activated_email(user_obj, days=30, expiry_str=expiry_fmt, referral_code=ref_code)
+
+        wa_target = user_obj.get("contact_phone") or (uid if is_canonical_pk_phone(uid) else "")
+        if wa_target and WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID:
+            send_whatsapp_text(wa_target, build_welcome_message(tier_act, ref_code))
+            mark_welcome_sent(uid)
+
+        who_label = user_obj.get("name") or user_obj.get("email") or uid
+        answer_telegram_callback(cb_id, f"✅ Activated {who_label} until {expiry_fmt}!")
+        if msg_id:
+            edit_telegram_message(
+                chat_id,
+                msg_id,
+                f"✅ <b>APPROVED — Full Access Active (30 Days)</b>\n\n"
+                f"👤 <b>User:</b> {who_label}\n"
+                f"🧾 <b>TRX ID:</b> <code>{trx_id}</code>\n"
+                f"📅 <b>Valid Until:</b> {expiry_fmt}",
+            )
+        return {"ok": True, "action": "approved", "trx_id": trx_id, "expiry": expiry_fmt}
+
+    if cb_data.startswith("reject:"):
+        trx_id = cb_data.split(":", 1)[1].strip()
+        ok_rej, res_rej = reject_payment_by_trx(trx_id)
+        if not ok_rej:
+            answer_telegram_callback(cb_id, str(res_rej), show_alert=True)
+            return {"ok": True, "action": "reject_failed"}
+
+        revoked = int(res_rej.get("grace_revoked") or 0)
+        answer_telegram_callback(cb_id, f"❌ Rejected TRX {trx_id}.")
+        if msg_id:
+            grace_note = f"\n🔒 Revoked {revoked} temporary grace message(s)." if revoked else ""
+            edit_telegram_message(
+                chat_id,
+                msg_id,
+                f"❌ <b>REJECTED Payment Request</b>\n\n"
+                f"🧾 <b>TRX ID:</b> <code>{trx_id}</code>{grace_note}",
+            )
+        return {"ok": True, "action": "rejected", "trx_id": trx_id, "grace_revoked": revoked}
+
+    answer_telegram_callback(cb_id, "Unknown action.")
+    return {"ok": True}
+
+
 @app.post("/api/admin/test-alert")
 async def api_admin_test_alert(request: Request):
     """Sends a live test Telegram notification to verify admin phone alerts."""
@@ -1185,7 +1517,7 @@ async def api_admin_test_alert(request: Request):
         )
     ok, msg = send_telegram_alert(
         "✅ <b>Hassan AI Telegram Alerts Connected!</b>\n\n"
-        "You will now get instant pings for new signups, paywall hits, and TRX payment submissions.",
+        "You will now get instant pings for new signups, paywall hits, and 1-tap Approve/Reject TRX buttons.",
         sync=True,
     )
     if ok:
@@ -1261,12 +1593,27 @@ async def receive_whatsapp(request: Request):
         sender_phone = normalize_pk_phone_or_none(raw_sender) or raw_sender.replace("+", "").strip()
         msg_type = message.get("type")
 
-        if msg_type != "text":
-            send_whatsapp_text(sender_phone, "Please send a text message. Voice notes and media messages are not supported yet.")
+        if msg_type == "text":
+            user_text = message.get("text", {}).get("body", "").strip()
+        elif msg_type == "audio":
+            audio_meta = message.get("audio") or {}
+            media_id = str(audio_meta.get("id") or "").strip()
+            audio_bytes, mime_type = _download_whatsapp_media(media_id)
+            if not audio_bytes:
+                send_whatsapp_text(sender_phone, "Voice note download nahi ho saka — dobara bhej dein ya text likh dein.")
+                return {"status": "ok"}
+            transcribed, tr_err, _ = _transcribe_audio_bytes(audio_bytes, mime_type or "audio/ogg")
+            if not transcribed:
+                send_whatsapp_text(sender_phone, tr_err or "Voice note samajh nahi aaya — thoda saaf bol ke dobara bhej dein.")
+                return {"status": "ok"}
+            user_text = transcribed
+            print(f"Incoming VOICE from +{sender_phone}: {user_text}")
+        else:
+            send_whatsapp_text(sender_phone, "Please send a text or voice message. Photos and other media are not supported yet.")
             return {"status": "ok"}
 
-        user_text = message.get("text", {}).get("body", "").strip()
-        print(f"Incoming from +{sender_phone}: {user_text}")
+        if msg_type == "text":
+            print(f"Incoming from +{sender_phone}: {user_text}")
 
         norm_admin_phone = normalize_pk_phone_or_none(ADMIN_PHONE) if ADMIN_PHONE else None
         is_wa_admin = bool(norm_admin_phone and sender_phone == norm_admin_phone)
@@ -1380,10 +1727,21 @@ async def receive_whatsapp(request: Request):
 
             saved = submit_trx_id(sender_phone, trx_clean, plan_selected=plan_chosen)
             if saved:
-                notify_payment_submitted(get_or_create_user(sender_phone), trx_clean, ref_code=ref_code_in_trx)
+                grace_granted, u_after_grace = grant_pending_trx_grace(sender_phone)
+                notify_payment_submitted(
+                    u_after_grace or get_or_create_user(sender_phone),
+                    trx_clean,
+                    ref_code=ref_code_in_trx,
+                    grace_granted=grace_granted,
+                )
+                grace_msg = (
+                    f"\n\n⚡ We unlocked +{PENDING_TRX_GRACE_QUESTIONS} instant messages right now so you can keep chatting while we verify!"
+                    if grace_granted
+                    else ""
+                )
                 ack_msg = (
                     f"Thank you! Your payment verification request for Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) has been received.{ref_note}\n"
-                    "Admin will verify and activate your pass within 10-15 minutes."
+                    f"Admin will verify and activate your pass within 10-15 minutes.{grace_msg}"
                 )
                 send_whatsapp_text(sender_phone, ack_msg)
                 if norm_admin_phone:
@@ -1643,13 +2001,21 @@ async def process_chat(request: Request):
 
         saved = submit_trx_id(sender_id, trx_clean, plan_selected=plan_chosen)
         if saved:
-            notify_payment_submitted(u_curr, trx_clean, ref_code=ref_code_in_trx)
+            grace_granted, u_after_grace = grant_pending_trx_grace(sender_id)
+            u_final = u_after_grace or u_curr
+            notify_payment_submitted(u_final, trx_clean, ref_code=ref_code_in_trx, grace_granted=grace_granted)
+            grace_msg = (
+                f"\n\n⚡ We've unlocked +{PENDING_TRX_GRACE_QUESTIONS} instant messages right now so you can keep chatting while we verify!"
+                if grace_granted
+                else ""
+            )
             return {
                 "reply": (
                     f"✅ Thank you! Your payment verification request for Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) has been received (TRX: {trx_clean}).{ref_note}\n\n"
-                    "Admin will verify and activate your pass within 10-15 minutes."
+                    f"Admin will verify and activate your pass within 10-15 minutes.{grace_msg}"
                 ),
-                "user": _public_user_payload(u_curr),
+                "grace_granted": grace_granted,
+                "user": _public_user_payload(u_final, streak=get_user_streak(sender_id)),
             }
         return {"reply": "This Transaction ID has already been registered or submitted for review."}
 
@@ -1732,7 +2098,7 @@ async def process_chat(request: Request):
     return {
         "reply": welcome_prefix + ai_reply,
         "trial_exhausted": trial_exhausted,
-        "user": _public_user_payload(u_info),
+        "user": _public_user_payload(u_info, streak=get_user_streak(sender_id)),
     }
 
 
@@ -1741,86 +2107,32 @@ async def process_chat(request: Request):
 @app.post("/api/chat/transcribe")
 async def api_chat_transcribe(request: Request):
     """
-    Transcribes a mobile/desktop voice note (Urdu / Roman Urdu / English) via Groq Whisper.
+    Transcribes a mobile/desktop or WhatsApp Bridge voice note (Urdu / Roman Urdu / English) via Groq Whisper.
     Accepts raw binary audio bytes (audio/webm, audio/mp4, audio/ogg, audio/wav, audio/mpeg)
     so no python-multipart dependency is required.
     """
+    is_bridge = is_valid_bridge_request(request)
     session_user_id = get_authenticated_user_id(request)
-    if not session_user_id and has_used_guest_preview(request):
+    if not is_bridge and not session_user_id and has_used_guest_preview(request):
         return JSONResponse(
             {"status": "error", "code": "unauthenticated", "message": "Please sign in with Google to use voice messages."},
             status_code=401,
         )
 
-    ip = _client_ip(request)
-    if not _allow_rate_limited(_TRANSCRIBE_HITS, ip, TRANSCRIBE_MAX_PER_IP_1H, 3600):
-        return JSONResponse(
-            {"status": "error", "message": "Too many voice recordings in a short time. Please try again shortly."},
-            status_code=429,
-        )
-
-    if not groq_client:
-        return JSONResponse(
-            {"status": "error", "message": "Voice transcription is not configured on this server."},
-            status_code=503,
-        )
+    if not is_bridge:
+        ip = _client_ip(request)
+        if not _allow_rate_limited(_TRANSCRIBE_HITS, ip, TRANSCRIBE_MAX_PER_IP_1H, 3600):
+            return JSONResponse(
+                {"status": "error", "message": "Too many voice recordings in a short time. Please try again shortly."},
+                status_code=429,
+            )
 
     audio_bytes = await request.body()
-    if not audio_bytes or len(audio_bytes) < 200:
-        return JSONResponse(
-            {"status": "error", "message": "Voice clip was too short or silent. Hold or tap to speak clearly."},
-            status_code=400,
-        )
-    if len(audio_bytes) > MAX_AUDIO_UPLOAD_BYTES:
-        return JSONResponse(
-            {"status": "error", "message": "Voice clip is too long (max 5 MB). Keep voice notes under 2 minutes."},
-            status_code=413,
-        )
-
-    raw_ct = (request.headers.get("content-type") or "audio/webm").split(";")[0].strip().lower()
-    ext_map = {
-        "audio/webm": ("voice.webm", "audio/webm"),
-        "audio/mp4": ("voice.m4a", "audio/mp4"),
-        "audio/x-m4a": ("voice.m4a", "audio/mp4"),
-        "audio/m4a": ("voice.m4a", "audio/mp4"),
-        "audio/aac": ("voice.m4a", "audio/mp4"),
-        "audio/ogg": ("voice.ogg", "audio/ogg"),
-        "audio/wav": ("voice.wav", "audio/wav"),
-        "audio/mpeg": ("voice.mp3", "audio/mpeg"),
-    }
-    filename, clean_mime = ext_map.get(raw_ct, ("voice.webm", "audio/webm"))
-
-    whisper_prompt = (
-        "Pakistani Urdu, Roman Urdu, and English personal mentorship question about "
-        "career, discipline, mindset, gym, fitness, family, business, shadi, paisa."
-    )
-    last_err = None
-    for model_id in GROQ_WHISPER_MODELS:
-        try:
-            tr = groq_client.audio.transcriptions.create(
-                file=(filename, audio_bytes, clean_mime),
-                model=model_id,
-                prompt=whisper_prompt,
-                response_format="json",
-                temperature=0.0,
-            )
-            text = (getattr(tr, "text", None) or (tr.get("text") if isinstance(tr, dict) else "") or "").strip()
-            if text:
-                return JSONResponse({"status": "ok", "text": text}, headers=NO_CACHE_HEADERS)
-        except Exception as e:
-            last_err = e
-            print(f"[Voice Transcribe Warning] {model_id} failed ({type(e).__name__}): {e}")
-            continue
-
-    if last_err is not None:
-        return JSONResponse(
-            {"status": "error", "message": "Could not transcribe voice note right now. Please try again or type your message."},
-            status_code=503,
-        )
-    return JSONResponse(
-        {"status": "error", "message": "No clear speech detected in the recording. Please speak closer to the mic."},
-        status_code=400,
-    )
+    raw_ct = request.headers.get("content-type") or "audio/webm"
+    text, err_msg, status_code = _transcribe_audio_bytes(audio_bytes, raw_ct)
+    if text:
+        return JSONResponse({"status": "ok", "text": text}, headers=NO_CACHE_HEADERS)
+    return JSONResponse({"status": "error", "message": err_msg or "Transcription failed."}, status_code=status_code)
 
 
 # ── 1-Message Guest Preview (Try Before Signing In) ────────────────────────
@@ -2080,16 +2392,30 @@ async def process_chat_stream(request: Request):
                 if ok_ref:
                     ref_note = f"\n(Referral code {ref_code_in_trx} recorded!)"
             saved = submit_trx_id(sender_id, trx_clean, plan_selected=plan_chosen)
+            u_final = current_user
+            grace_granted = False
             if saved:
-                notify_payment_submitted(current_user, trx_clean, ref_code=ref_code_in_trx)
+                grace_granted, u_after_grace = grant_pending_trx_grace(sender_id)
+                u_final = u_after_grace or current_user
+                notify_payment_submitted(u_final, trx_clean, ref_code=ref_code_in_trx, grace_granted=grace_granted)
+                grace_msg = (
+                    f"\n\n⚡ We've unlocked +{PENDING_TRX_GRACE_QUESTIONS} instant messages right now so you can keep chatting while we verify!"
+                    if grace_granted
+                    else ""
+                )
                 trx_reply = (
                     f"✅ Thank you! Your payment verification request for Full Access (PKR {MONTHLY_PRICE_PKR:,}/mo) has been received (TRX: {trx_clean}).{ref_note}\n\n"
-                    "Admin will verify and activate your pass within 10-15 minutes."
+                    f"Admin will verify and activate your pass within 10-15 minutes.{grace_msg}"
                 )
             else:
                 trx_reply = "This Transaction ID has already been registered or submitted for review."
             return StreamingResponse(
-                iter([_sse_event({"type": "done", "reply": trx_reply, "user": _public_user_payload(current_user)})]),
+                iter([_sse_event({
+                    "type": "done",
+                    "reply": trx_reply,
+                    "grace_granted": grace_granted,
+                    "user": _public_user_payload(u_final, streak=get_user_streak(sender_id)),
+                })]),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
@@ -2177,7 +2503,7 @@ async def process_chat_stream(request: Request):
             "type": "done",
             "reply": welcome_prefix + final_display,
             "trial_exhausted": trial_exhausted,
-            "user": _public_user_payload(u_info),
+            "user": _public_user_payload(u_info, streak=get_user_streak(sender_id)),
         })
 
     return StreamingResponse(

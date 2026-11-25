@@ -1,5 +1,6 @@
 import makeWASocket, {
   DisconnectReason,
+  downloadMediaMessage,
   useMultiFileAuthState
 } from "@whiskeysockets/baileys";
 import qrcodeTerminal from "qrcode-terminal";
@@ -9,6 +10,7 @@ import path from "path";
 import pino from "pino";
 
 const PYTHON_API_URL = "http://127.0.0.1:8080/api/chat";
+const PYTHON_TRANSCRIBE_URL = "http://127.0.0.1:8080/api/chat/transcribe";
 const QR_HTML_PATH = path.resolve("./qr.html");
 
 function loadBridgeSecret() {
@@ -120,10 +122,47 @@ async function startWhatsAppBot() {
       if (remoteJid.endsWith("@g.us")) return;
 
       const senderNumber = remoteJid.replace("@s.whatsapp.net", "");
-      const incomingText =
+      let incomingText =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||
         "";
+
+      // Support WhatsApp Voice Notes via existing Groq Whisper /api/chat/transcribe endpoint
+      if (!incomingText.trim() && msg.message.audioMessage) {
+        try {
+          const audioBuffer = await downloadMediaMessage(
+            msg,
+            "buffer",
+            {},
+            { logger: pino({ level: "silent" }), reuploadRequest: sock.updateMediaMessage }
+          );
+          const mime = (msg.message.audioMessage.mimetype || "audio/ogg").split(";")[0];
+          const trRes = await fetch(PYTHON_TRANSCRIBE_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": mime,
+              "X-Bridge-Secret": BRIDGE_SECRET
+            },
+            body: audioBuffer
+          });
+          if (trRes.ok) {
+            const trData = await trRes.json();
+            incomingText = (trData.text || "").trim();
+            console.log(`\n[WHATSAPP VOICE TRANSCRIBED] +${senderNumber}: "${incomingText}"`);
+          } else {
+            await sock.sendMessage(remoteJid, {
+              text: "Voice note samajh nahi aaya — thoda saaf bol ke dobara bhej dein ya text likh dein."
+            });
+            return;
+          }
+        } catch (audioErr) {
+          console.error("Voice note download/transcribe error:", audioErr);
+          await sock.sendMessage(remoteJid, {
+            text: "Voice note process nahi ho saka — dobara bhej dein ya text likh dein."
+          });
+          return;
+        }
+      }
 
       if (!incomingText.trim()) return;
 

@@ -21,6 +21,7 @@
     <meta property="og:image" content="https://hassanalifarrukh.store/static/demo_poster.jpg">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b0b0d'/%3E%3Crect x='4' y='4' width='56' height='56' rx='13' fill='%23ffffff'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='-apple-system,sans-serif' font-size='28' font-weight='800' fill='%230b0b0d'%3EHF%3C/text%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2110,6 +2111,100 @@
             object-fit: contain;
             background: #050507;
         }
+
+        /* ─── PHASE 2: STREAK PILL, AI ACTION BAR & SHARE QUOTE CARD ── */
+        .streak-pill {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fbbf24;
+            border-color: rgba(245, 158, 11, 0.3);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .streak-pill:hover {
+            background: rgba(245, 158, 11, 0.2);
+        }
+
+        .msg-actions-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .msg-action-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            border-radius: 7px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+            line-height: 1.2;
+        }
+
+        .msg-action-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+
+        .msg-action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .msg-action-btn.active-up {
+            background: rgba(34, 197, 94, 0.16);
+            border-color: rgba(34, 197, 94, 0.45);
+            color: #4ade80;
+        }
+
+        .msg-action-btn.active-down {
+            background: rgba(239, 68, 68, 0.16);
+            border-color: rgba(239, 68, 68, 0.45);
+            color: #f87171;
+        }
+
+        .msg-action-btn.share-card-btn {
+            margin-left: auto;
+            background: rgba(34, 197, 94, 0.09);
+            border-color: rgba(34, 197, 94, 0.28);
+            color: #86efac;
+        }
+
+        .msg-action-btn.share-card-btn:hover {
+            background: rgba(34, 197, 94, 0.18);
+            color: #ffffff;
+            border-color: rgba(34, 197, 94, 0.5);
+        }
+
+        .share-card-preview-wrap {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 0;
+        }
+
+        .share-card-preview-canvas {
+            width: 100%;
+            max-width: 280px;
+            aspect-ratio: 4 / 5;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+            background: #09090b;
+            display: block;
+        }
     </style>
 </head>
 
@@ -2203,6 +2298,11 @@
 
             <!-- Sidebar Footer -->
             <div class="sidebar-footer">
+                <button id="sidebar-checkin-btn" class="btn-link"
+                    onclick="toggleDrawer(false); triggerDailyCheckIn();"
+                    style="width: 100%; border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; background: rgba(245, 158, 11, 0.08);">
+                    🔥 Daily Check-In
+                </button>
                 <button class="btn-link" onclick="toggleDrawer(false); openDemoVideoModal();" style="width: 100%;">
                     ▶ Watch 35s Real Demo
                 </button>
@@ -2246,6 +2346,10 @@
                 </div>
 
                 <div class="header-actions">
+                    <div id="streak-badge-pill" class="badge-pill streak-pill" onclick="triggerDailyCheckIn()"
+                        title="Daily Check-In Streak" style="display:none;">
+                        🔥 1d
+                    </div>
                     <div id="plan-badge-pill" class="badge-pill trial" onclick="handlePlanBadgeClick()">
                         ⚡ Free Trial
                     </div>
@@ -2577,6 +2681,27 @@
         </div>
     </div>
 
+    <!-- ─── SHAREABLE HASSAN QUOTE CARD MODAL (1080×1350 PNG) ────── -->
+    <div class="modal-overlay" id="share-card-modal-overlay">
+        <div class="modal-card" style="max-width: 380px;">
+            <button class="modal-close-icon" onclick="closeShareCardModal()" aria-label="Close share card">✕</button>
+            <div class="modal-header">
+                <h2 class="modal-title" style="font-size: 17px;">Share Hassan Quote Card</h2>
+                <p class="modal-desc">Post to WhatsApp Status, Instagram Story, or send to a friend.</p>
+            </div>
+            <div class="share-card-preview-wrap">
+                <canvas id="quote-card-canvas" class="share-card-preview-canvas" width="1080" height="1350"></canvas>
+            </div>
+            <button type="button" class="form-btn" onclick="shareQuoteCardImage()">
+                📲 Share Story / Status
+            </button>
+            <button type="button" class="form-btn" onclick="downloadQuoteCardImage()"
+                style="background: rgba(255, 255, 255, 0.08); color: #ffffff; border: 1px solid var(--border);">
+                ⬇ Save PNG Image
+            </button>
+        </div>
+    </div>
+
     <!-- ─── TOAST NOTIFICATION ──────────────────────────────────── -->
     <div id="app-toast-box" class="toast-notify">Copied to clipboard ✓</div>
 
@@ -2604,6 +2729,9 @@
             referralCode: 'HASSAN-XXXX',
             isSubscribed: false,
             subscriptionExpiry: '',
+            currentStreak: 0,
+            longestStreak: 0,
+            checkedInToday: false,
             drawerOpen: false,
             googleEnabled: GOOGLE_OAUTH_ENABLED,
             welcomeInjected: false,
@@ -2615,6 +2743,11 @@
             isTranscribing: false,
             isSending: false
         };
+
+        const AI_REPLY_STORE = new Map();
+        let _aiReplySeq = 0;
+        let _activeShareReplyKey = null;
+        let _quoteAvatarImg = null;
 
         // ── Consistent PKT (Asia/Karachi, UTC+5) Time Helpers (Matches Admin Dashboard) ──
         function parseUtcTimestamp(iso) {
@@ -2788,6 +2921,7 @@
                 closePaywallModal();
                 closeReferralModal();
                 closeDemoVideoModal();
+                closeShareCardModal();
             }
         });
 
@@ -2894,6 +3028,12 @@
             if (demoOverlay) {
                 demoOverlay.addEventListener('click', (e) => {
                     if (e.target === demoOverlay) closeDemoVideoModal();
+                });
+            }
+            const shareOverlay = document.getElementById('share-card-modal-overlay');
+            if (shareOverlay) {
+                shareOverlay.addEventListener('click', (e) => {
+                    if (e.target === shareOverlay) closeShareCardModal();
                 });
             }
             const obOverlay = document.getElementById('onboarding-modal-overlay');
@@ -3132,10 +3272,20 @@
             APP_STATE.maxFreeTrial = user.max_free_trial || APP_STATE.maxFreeTrial;
             APP_STATE.isSubscribed = !!user.is_subscribed;
             APP_STATE.subscriptionExpiry = user.subscription_expiry || '';
+            if (typeof user.current_streak === 'number') {
+                APP_STATE.currentStreak = user.current_streak;
+            }
+            if (typeof user.longest_streak === 'number') {
+                APP_STATE.longestStreak = user.longest_streak;
+            }
+            if (typeof user.checked_in_today === 'boolean') {
+                APP_STATE.checkedInToday = user.checked_in_today;
+            }
 
             renderUserProfileUI();
             updateTrialIndicator();
             updateTierUI(APP_STATE.currentTier);
+            updateStreakUI();
         }
 
         function renderHydratedHistory(messages) {
@@ -3490,6 +3640,430 @@
             _voiceMediaRecorder.start(250);
         }
 
+        // ── Phase 2: Streak Badge, Daily Check-In, Reply Feedback & Shareable Quote Card ──
+        function updateStreakUI() {
+            const pill = document.getElementById('streak-badge-pill');
+            const checkinBtn = document.getElementById('sidebar-checkin-btn');
+            const n = Number(APP_STATE.currentStreak || 0);
+            const best = Number(APP_STATE.longestStreak || n);
+            if (pill) {
+                if (APP_STATE.authenticated && n >= 1) {
+                    pill.style.display = 'inline-flex';
+                    pill.textContent = `🔥 ${n}d`;
+                    pill.title = `${n}-day check-in streak (best: ${best}d) — tap for daily check-in`;
+                } else {
+                    pill.style.display = 'none';
+                }
+            }
+            if (checkinBtn) {
+                if (APP_STATE.authenticated && n >= 1) {
+                    checkinBtn.textContent = APP_STATE.checkedInToday
+                        ? `🔥 Daily Check-In (✓ ${n}d streak)`
+                        : `🔥 Daily Check-In (${n}d streak)`;
+                } else {
+                    checkinBtn.textContent = '🔥 Daily Check-In';
+                }
+            }
+        }
+
+        function triggerDailyCheckIn() {
+            if (APP_STATE.isSending) return;
+            if (!APP_STATE.authenticated && APP_STATE.guestPreviewUsed) {
+                openAuthModal();
+                return;
+            }
+            if (
+                APP_STATE.authenticated
+                && !APP_STATE.isSubscribed
+                && APP_STATE.trialQuestionsUsed >= APP_STATE.maxFreeTrial
+            ) {
+                openPaywallModal();
+                return;
+            }
+            const nextDay = APP_STATE.checkedInToday
+                ? Math.max(1, APP_STATE.currentStreak)
+                : (APP_STATE.currentStreak + 1);
+            const promptText = APP_STATE.authenticated && APP_STATE.currentStreak >= 1
+                ? `Daily check-in (Day ${nextDay}): Aaj ka mera ek focus aur mindset check karwa do — seedhi accountability do.`
+                : 'Daily check-in: Aaj ka din waste nahi karna — mujhe 1 clear action aur mindset reminder do.';
+            const input = document.getElementById('user-chat-input');
+            if (input) {
+                input.value = promptText;
+                handleSendAction();
+            }
+        }
+
+        function _stripMarkdownForPlainText(text) {
+            return String(text || '')
+                .replace(/\n\n_\(Free Trial:[\s\S]*?\)_\s*$/i, '')
+                .replace(/\*\*(.*?)\*\*/g, '$1')
+                .replace(/(^|[\s(])_([^_\n]+?)_(?=[\s).,!?:;]|$)/g, '$1$2')
+                .replace(/`([^`]+)`/g, '$1')
+                .replace(/\r/g, '')
+                .trim();
+        }
+
+        function _isActionableAiReply(text) {
+            const raw = String(text || '').trim();
+            if (raw.length < 20) return false;
+            const skipNeedles = [
+                'free questions are up',
+                'reply with your Transaction ID',
+                'Unlock **Full Access',
+                'payment verification request',
+                'This Transaction ID has already',
+                'Connection was interrupted',
+                'No response received',
+                'Something went wrong',
+                'Sign in with Google to continue'
+            ];
+            return !skipNeedles.some(needle => raw.includes(needle));
+        }
+
+        function _buildAiActionsBarHtml(content, msgId = null) {
+            if (!_isActionableAiReply(content)) return '';
+            const key = 'r' + (++_aiReplySeq);
+            AI_REPLY_STORE.set(key, { text: String(content || ''), msgId: msgId || null, rating: null });
+            return `
+                <div class="msg-actions-bar" data-reply-key="${key}">
+                    <button type="button" class="msg-action-btn" data-rate="up" onclick="rateAiReply('${key}', 'up', this)" title="Helpful reply">👍</button>
+                    <button type="button" class="msg-action-btn" data-rate="down" onclick="rateAiReply('${key}', 'down', this)" title="Could be better">👎</button>
+                    <button type="button" class="msg-action-btn" onclick="copyAiReply('${key}', this)" title="Copy reply">📋 Copy</button>
+                    <button type="button" class="msg-action-btn share-card-btn" onclick="openShareCardModal('${key}')" title="Generate shareable Hassan Quote Card">📸 Share Card</button>
+                </div>`;
+        }
+
+        async function rateAiReply(replyKey, rating, btnEl) {
+            const entry = AI_REPLY_STORE.get(replyKey);
+            if (!entry) return;
+            if (!APP_STATE.authenticated) {
+                showToast('Sign in with Google to rate replies');
+                return;
+            }
+            const bar = btnEl ? btnEl.closest('.msg-actions-bar') : null;
+            if (bar) {
+                bar.querySelectorAll('[data-rate]').forEach(b => {
+                    b.classList.remove('active-up', 'active-down');
+                });
+            }
+            if (btnEl) {
+                btnEl.classList.add(rating === 'up' ? 'active-up' : 'active-down');
+            }
+            entry.rating = rating;
+            try {
+                const res = await fetch('/api/chat/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        rating,
+                        message_id: entry.msgId,
+                        snippet: _stripMarkdownForPlainText(entry.text).slice(0, 300)
+                    })
+                });
+                if (res.ok) {
+                    showToast(rating === 'up' ? 'Thanks! Glad that hit home 👍' : 'Noted — we will sharpen this 👎');
+                }
+            } catch (e) { }
+        }
+
+        function copyAiReply(replyKey, btnEl) {
+            const entry = AI_REPLY_STORE.get(replyKey);
+            if (!entry) return;
+            const plain = _stripMarkdownForPlainText(entry.text);
+            copySnippet(plain, btnEl);
+        }
+
+        function _drawRoundedRectPath(ctx, x, y, w, h, r) {
+            const radius = Math.min(r, w / 2, h / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + w - radius, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+            ctx.lineTo(x + w, y + h - radius);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+            ctx.lineTo(x + radius, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        function _wrapQuoteLines(ctx, text, maxWidth, maxLines) {
+            const paragraphs = String(text || '').split(/\n+/).map(p => p.trim()).filter(Boolean);
+            const out = [];
+            let truncated = false;
+            for (let pi = 0; pi < paragraphs.length; pi++) {
+                const words = paragraphs[pi].split(/\s+/);
+                let line = '';
+                for (let wi = 0; wi < words.length; wi++) {
+                    const test = line ? (line + ' ' + words[wi]) : words[wi];
+                    if (ctx.measureText(test).width > maxWidth && line) {
+                        out.push(line);
+                        line = words[wi];
+                        if (out.length >= maxLines) {
+                            truncated = true;
+                            break;
+                        }
+                    } else {
+                        line = test;
+                    }
+                }
+                if (truncated) break;
+                if (line) out.push(line);
+                if (out.length >= maxLines) {
+                    if (pi < paragraphs.length - 1) truncated = true;
+                    break;
+                }
+                if (pi < paragraphs.length - 1 && out.length < maxLines - 1) {
+                    out.push('');
+                }
+            }
+            if (truncated && out.length) {
+                let lastIdx = out.length - 1;
+                while (lastIdx > 0 && !out[lastIdx]) lastIdx--;
+                out.length = lastIdx + 1;
+                out[lastIdx] = out[lastIdx].replace(/[.,!?;:\s]+$/, '') + '…';
+            }
+            return out;
+        }
+
+        function renderQuoteCardCanvas(rawText) {
+            const canvas = document.getElementById('quote-card-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const W = 1080;
+            const H = 1350;
+            canvas.width = W;
+            canvas.height = H;
+
+            // 1. Luxury obsidian dark background + subtle emerald top aura
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+            bgGrad.addColorStop(0, '#09090c');
+            bgGrad.addColorStop(0.55, '#111217');
+            bgGrad.addColorStop(1, '#08080a');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, W, H);
+
+            const aura = ctx.createRadialGradient(W * 0.5, 160, 40, W * 0.5, 220, 620);
+            aura.addColorStop(0, 'rgba(34, 197, 94, 0.18)');
+            aura.addColorStop(1, 'rgba(34, 197, 94, 0)');
+            ctx.fillStyle = aura;
+            ctx.fillRect(0, 0, W, H);
+
+            // 2. Inner luxury card frame
+            _drawRoundedRectPath(ctx, 56, 56, W - 112, H - 112, 44);
+            ctx.fillStyle = 'rgba(20, 20, 24, 0.78)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+            ctx.stroke();
+
+            // 3. Top author row (avatar + title)
+            const avX = 154;
+            const avY = 166;
+            const avR = 46;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.fillStyle = '#18181b';
+            ctx.fill();
+            ctx.clip();
+            if (_quoteAvatarImg && _quoteAvatarImg.complete && _quoteAvatarImg.naturalWidth > 0) {
+                const iw = _quoteAvatarImg.naturalWidth;
+                const ih = _quoteAvatarImg.naturalHeight;
+                const scale = Math.max((avR * 2) / iw, (avR * 2) / ih);
+                const dw = iw * scale;
+                const dh = ih * scale;
+                ctx.drawImage(_quoteAvatarImg, avX - dw / 2, avY - dh * 0.36, dw, dh);
+            } else {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(avX - avR, avY - avR, avR * 2, avR * 2);
+                ctx.fillStyle = '#0b0b0d';
+                ctx.font = '800 34px -apple-system, BlinkMacSystemFont, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('HF', avX, avY + 2);
+            }
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.arc(avX, avY, avR + 2, 0, Math.PI * 2);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#22c55e';
+            ctx.stroke();
+
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '700 32px "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif';
+            ctx.fillText('HASSAN ALI FARRUKH AI', 224, 160);
+
+            ctx.fillStyle = '#a1a1aa';
+            ctx.font = '600 20px "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif';
+            ctx.fillText('UNOFFICIAL AI MENTOR  •  PUBLIC REELS', 224, 194);
+
+            // 4. Quote glyph + emerald accent rail + adaptive wrapped text
+            const cleanText = _stripMarkdownForPlainText(rawText).slice(0, 480);
+            let fontSize = 46;
+            let maxLines = 10;
+            if (cleanText.length > 320) {
+                fontSize = 33;
+                maxLines = 14;
+            } else if (cleanText.length > 200) {
+                fontSize = 39;
+                maxLines = 12;
+            }
+            const lineHeight = Math.round(fontSize * 1.46);
+            ctx.font = `600 ${fontSize}px "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif`;
+            const lines = _wrapQuoteLines(ctx, cleanText, 792, maxLines);
+
+            const totalTextH = lines.reduce((acc, l) => acc + (l === '' ? Math.round(lineHeight * 0.45) : lineHeight), 0);
+            const bodyTop = 278;
+            const bodyBottom = 1090;
+            const startY = Math.max(bodyTop + 76, Math.round((bodyTop + bodyBottom - totalTextH) / 2) + fontSize * 0.85);
+
+            // Decorative quote mark
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.34)';
+            ctx.font = '800 116px Georgia, serif';
+            ctx.fillText('\u201C', 108, startY - fontSize - 8);
+
+            // Emerald vertical accent bar
+            const barTop = startY - fontSize + 6;
+            const barHeight = Math.max(84, Math.min(bodyBottom - barTop, totalTextH + 8));
+            _drawRoundedRectPath(ctx, 114, barTop, 7, barHeight, 4);
+            ctx.fillStyle = '#22c55e';
+            ctx.fill();
+
+            // Render quote lines
+            ctx.fillStyle = '#f4f4f5';
+            ctx.font = `600 ${fontSize}px "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif`;
+            let cursorY = startY;
+            for (const ln of lines) {
+                if (ln === '') {
+                    cursorY += Math.round(lineHeight * 0.45);
+                    continue;
+                }
+                if (cursorY > bodyBottom) break;
+                ctx.fillText(ln, 152, cursorY);
+                cursorY += lineHeight;
+            }
+
+            // 5. Footer divider + domain + referral code pill
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.09)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(106, 1128);
+            ctx.lineTo(W - 106, 1128);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(120, 1188, 7, 0, Math.PI * 2);
+            ctx.fillStyle = '#22c55e';
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '700 28px "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif';
+            ctx.fillText('hassanalifarrukh.store', 142, 1197);
+
+            ctx.fillStyle = '#a1a1aa';
+            ctx.font = '500 21px "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif';
+            ctx.fillText('Try free in Urdu & English', 142, 1232);
+
+            const refCode = (APP_STATE.referralCode || '').trim();
+            const pillText = (APP_STATE.authenticated && refCode && refCode !== 'HASSAN-XXXX')
+                ? `CODE: ${refCode}`
+                : '267+ REELS INDEXED';
+            ctx.font = '700 22px ui-monospace, SFMono-Regular, Menlo, monospace';
+            const pillTextW = ctx.measureText(pillText).width;
+            const pillW = pillTextW + 42;
+            const pillH = 54;
+            const pillX = W - 106 - pillW;
+            const pillY = 1172;
+            _drawRoundedRectPath(ctx, pillX, pillY, pillW, pillH, 27);
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.14)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.45)';
+            ctx.stroke();
+
+            ctx.fillStyle = '#4ade80';
+            ctx.textAlign = 'center';
+            ctx.fillText(pillText, pillX + pillW / 2, pillY + 35);
+            ctx.textAlign = 'left';
+        }
+
+        function openShareCardModal(replyKey) {
+            const entry = AI_REPLY_STORE.get(replyKey);
+            if (!entry) return;
+            _activeShareReplyKey = replyKey;
+            const overlay = document.getElementById('share-card-modal-overlay');
+            if (overlay) overlay.classList.add('active');
+
+            if (!_quoteAvatarImg) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    _quoteAvatarImg = img;
+                    if (_activeShareReplyKey === replyKey) {
+                        renderQuoteCardCanvas(entry.text);
+                    }
+                };
+                img.src = '/static/hassan_avatar.jpg';
+            }
+            renderQuoteCardCanvas(entry.text);
+        }
+
+        function closeShareCardModal() {
+            const overlay = document.getElementById('share-card-modal-overlay');
+            if (overlay) overlay.classList.remove('active');
+            _activeShareReplyKey = null;
+        }
+
+        function downloadQuoteCardImage() {
+            const canvas = document.getElementById('quote-card-canvas');
+            if (!canvas) return;
+            try {
+                const url = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'hassan-ai-quote.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showToast('Quote Card saved! Share to WhatsApp Status or IG Story ✓');
+            } catch (e) {
+                showToast('Could not save image on this browser.');
+            }
+        }
+
+        async function shareQuoteCardImage() {
+            const canvas = document.getElementById('quote-card-canvas');
+            if (!canvas) return;
+            const refCode = (APP_STATE.referralCode || '').trim();
+            const shareUrl = (APP_STATE.authenticated && refCode && refCode !== 'HASSAN-XXXX')
+                ? `${window.location.origin}/?ref=${encodeURIComponent(refCode)}`
+                : `${window.location.origin}/`;
+            const caption = `Real talk from Hassan AI Mentor — try it free: ${shareUrl}`;
+
+            try {
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                if (blob && navigator.share) {
+                    const file = new File([blob], 'hassan-ai-quote.png', { type: 'image/png' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file], title: 'Hassan AI Quote Card', text: caption });
+                        return;
+                    }
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
+            }
+            downloadQuoteCardImage();
+        }
+
         // ── Streaming AI Bubble Helper ─────────────────────────────────
         function createStreamingAiBubble() {
             const messagesBox = document.getElementById('chat-messages-flow');
@@ -3507,6 +4081,7 @@
                 <div class="msg-bubble">
                     <div class="stream-content"></div>
                     <div class="stream-extra"></div>
+                    <div class="stream-actions"></div>
                     <div class="msg-meta">
                         <span>Hassan AI • Unofficial AI Mentor</span>
                         <span>${timeStr}</span>
@@ -3519,6 +4094,7 @@
                 row,
                 contentEl: row.querySelector('.stream-content'),
                 extraEl: row.querySelector('.stream-extra'),
+                actionsEl: row.querySelector('.stream-actions'),
             };
         }
 
@@ -3690,9 +4266,15 @@
                                     }));
                                 } catch (e) { }
                                 streamBubble.extraEl.innerHTML = _buildGuestSignupCardHtml();
+                                if (streamBubble.actionsEl) {
+                                    streamBubble.actionsEl.innerHTML = _buildAiActionsBarHtml(finalReply);
+                                }
                             } else {
                                 const paywallHtml = _buildPaywallActionHtml(finalReply);
                                 streamBubble.extraEl.innerHTML = paywallHtml || (evt.trial_exhausted ? _buildTrialExhaustedCardHtml() : '');
+                                if (streamBubble.actionsEl && !paywallHtml) {
+                                    streamBubble.actionsEl.innerHTML = _buildAiActionsBarHtml(finalReply);
+                                }
                                 if (evt.paywalled || finalReply.includes('free questions are up')) {
                                     APP_STATE.trialQuestionsUsed = APP_STATE.maxFreeTrial;
                                     updateTrialIndicator();
@@ -3718,6 +4300,9 @@
                     setTypingState(false);
                     if (streamBubble && streamedRaw) {
                         streamBubble.contentEl.innerHTML = formatMarkdown(streamedRaw);
+                        if (streamBubble.actionsEl) {
+                            streamBubble.actionsEl.innerHTML = _buildAiActionsBarHtml(streamedRaw);
+                        }
                     }
                 }
 
@@ -3744,6 +4329,9 @@
                                     setTypingState(false);
                                     if (streamBubble) {
                                         streamBubble.contentEl.innerHTML = formatMarkdown(last.content || '');
+                                        if (streamBubble.actionsEl) {
+                                            streamBubble.actionsEl.innerHTML = _buildAiActionsBarHtml(last.content || '', last.id || null);
+                                        }
                                         if (last.id) APP_STATE.renderedMessageIds.add(last.id);
                                     } else {
                                         appendMessageBubble('ai', last.content || '', last.created_at || null, last.id || null);
@@ -3822,6 +4410,8 @@
         `;
             }
 
+            const aiActionsHtml = (role === 'ai' && !paywallButtonHtml) ? _buildAiActionsBarHtml(content, msgId) : '';
+
             const bubbleHtml = role === 'user' ? `
         <div class="msg-row user">
             <div class="msg-bubble">
@@ -3838,6 +4428,7 @@
             <div class="msg-bubble">
                 <div>${formattedContent}</div>
                 ${paywallButtonHtml}
+                ${aiActionsHtml}
                 <div class="msg-meta">
                     <span>Hassan AI • Unofficial AI Mentor</span>
                     <span>${timeStr}</span>
@@ -4088,7 +4679,7 @@
                     el.textContent = 'Copied!';
                     setTimeout(() => { el.textContent = orig; }, 1800);
                 }
-                showToast(`Copied ${text} ✓`);
+                showToast(String(text || '').length > 48 ? 'Copied to clipboard ✓' : `Copied ${text} ✓`);
             }
         }
 

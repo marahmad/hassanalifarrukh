@@ -11,6 +11,7 @@ from src.config import (
     DB_PATH,
     FREE_TRIAL_QUESTIONS,
     MAX_REFERRAL_BONUS_QUESTIONS,
+    PENDING_TRX_GRACE_QUESTIONS,
     SIGNUP_REFERRAL_BONUS_QUESTIONS,
 )
 from src.phone_utils import (
@@ -323,6 +324,7 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_trial_questions INTEGER DEFAULT 0;")
             db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_referral_credited INTEGER DEFAULT 0;")
             db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS memory_summary TEXT DEFAULT '';")
+            db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_grace_granted INTEGER DEFAULT 0;")
             db.execute("CREATE INDEX IF NOT EXISTS users_contact_phone_idx ON users(contact_phone);")
             db.execute("CREATE INDEX IF NOT EXISTS users_email_lower_idx ON users(LOWER(email));")
 
@@ -354,6 +356,15 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE INDEX IF NOT EXISTS chat_history_phone_idx ON chat_history(phone_number, id DESC);
+                CREATE TABLE IF NOT EXISTS chat_feedback (
+                    id SERIAL PRIMARY KEY,
+                    phone_number TEXT,
+                    message_id INTEGER,
+                    rating TEXT,
+                    snippet TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS chat_feedback_phone_idx ON chat_feedback(phone_number, id DESC);
             """)
         else:
             db.execute("""
@@ -378,6 +389,7 @@ def init_db():
                     auth_provider TEXT DEFAULT 'phone',
                     contact_phone TEXT,
                     memory_summary TEXT DEFAULT '',
+                    pending_grace_granted INTEGER DEFAULT 0,
                     created_at TIMESTAMP,
                     last_active TIMESTAMP
                 )
@@ -392,6 +404,8 @@ def init_db():
                 db.execute("ALTER TABLE users ADD COLUMN signup_referral_credited INTEGER DEFAULT 0")
             if "memory_summary" not in existing_cols:
                 db.execute("ALTER TABLE users ADD COLUMN memory_summary TEXT DEFAULT ''")
+            if "pending_grace_granted" not in existing_cols:
+                db.execute("ALTER TABLE users ADD COLUMN pending_grace_granted INTEGER DEFAULT 0")
 
             db.execute("CREATE INDEX IF NOT EXISTS users_contact_phone_idx ON users(contact_phone)")
             db.execute("CREATE INDEX IF NOT EXISTS users_email_idx ON users(email)")
@@ -428,6 +442,19 @@ def init_db():
             """)
             db.execute("""
                 CREATE INDEX IF NOT EXISTS chat_history_phone_idx ON chat_history(phone_number, id DESC)
+            """)
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS chat_feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phone_number TEXT,
+                    message_id INTEGER,
+                    rating TEXT,
+                    snippet TEXT DEFAULT '',
+                    created_at TIMESTAMP
+                )
+            """)
+            db.execute("""
+                CREATE INDEX IF NOT EXISTS chat_feedback_phone_idx ON chat_feedback(phone_number, id DESC)
             """)
 
 
@@ -735,6 +762,97 @@ def submit_trx_id(phone_number: str, trx_id: str, plan_selected: str = "pro") ->
             return False
 
 
+def get_payment_by_trx(trx_id: str) -> dict | None:
+    """Looks up a payment request by TRX ID (case-insensitive trimmed match)."""
+    clean = str(trx_id or "").strip()
+    if not clean:
+        return None
+    with DBContext() as db:
+        db.execute("SELECT * FROM payment_requests WHERE LOWER(trx_id) = LOWER(?)", (clean,))
+        row = db.fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        if d.get("created_at"):
+            d["created_at"] = _to_utc_iso(d["created_at"])
+        return d
+
+
+def grant_pending_trx_grace(identifier: str, grace_questions: int = PENDING_TRX_GRACE_QUESTIONS) -> tuple[bool, dict | None]:
+    """
+    Grants temporary grace messages (+2 by default) ONCE when a paywalled user submits a
+    pending TRX ID so they can keep chatting immediately while waiting for admin verification.
+    Cannot be farmed via repeated TRX submissions because `pending_grace_granted` stays 1 until approved/rejected.
+    """
+    if grace_questions <= 0:
+        return False, None
+    with DBContext() as db:
+        row = _find_user_row(db, identifier)
+        if not row:
+            return False, None
+        u = _serialize_user_row(row)
+        uid = u["phone_number"]
+        if u.get("is_subscribed"):
+            return False, u
+        if int(u.get("pending_grace_granted") or 0) > 0:
+            return False, u
+        used = int(u.get("trial_questions_used") or 0)
+        if used < get_user_trial_limit(u):
+            # Still has free trial credits left — no grace needed
+            return False, u
+
+        db.execute(
+            """
+            UPDATE users
+            SET bonus_trial_questions = COALESCE(bonus_trial_questions, 0) + ?,
+                pending_grace_granted = ?
+            WHERE phone_number = ?
+            """,
+            (grace_questions, grace_questions, uid),
+        )
+        db.execute("SELECT * FROM users WHERE phone_number = ?", (uid,))
+        updated = db.fetchone()
+        return True, _serialize_user_row(updated) if updated else u
+
+
+def reject_payment_by_trx(trx_id: str) -> tuple[bool, dict | str]:
+    """
+    Marks a pending payment request as 'rejected' and revokes any unspent pending TRX grace
+    messages that were temporarily granted to that user.
+    """
+    clean = str(trx_id or "").strip()
+    if not clean:
+        return False, "Missing TRX ID."
+    with DBContext() as db:
+        db.execute("SELECT * FROM payment_requests WHERE LOWER(trx_id) = LOWER(?)", (clean,))
+        row = db.fetchone()
+        if not row:
+            return False, f"Payment TRX '{clean}' not found."
+        pay = dict(row)
+        if pay.get("status") == "approved":
+            return False, f"Payment TRX '{clean}' was already approved."
+
+        db.execute("UPDATE payment_requests SET status = 'rejected' WHERE id = ?", (pay["id"],))
+        uid = str(pay["phone_number"])
+        db.execute("SELECT pending_grace_granted FROM users WHERE phone_number = ?", (uid,))
+        urow = db.fetchone()
+        grace_amt = int((urow["pending_grace_granted"] if urow else 0) or 0)
+        if grace_amt > 0:
+            fn = "GREATEST" if db.is_pg else "MAX"
+            db.execute(
+                f"""
+                UPDATE users
+                SET bonus_trial_questions = {fn}(0, COALESCE(bonus_trial_questions, 0) - ?),
+                    pending_grace_granted = 0
+                WHERE phone_number = ?
+                """,
+                (grace_amt, uid),
+            )
+        pay["status"] = "rejected"
+        pay["grace_revoked"] = grace_amt
+        return True, pay
+
+
 def activate_user(phone_number: str, days: int = 30, tier: str = "pro") -> tuple[datetime, str, str, dict | None]:
     # Single unified all-access monthly plan
     tier_clean = "pro"
@@ -750,7 +868,7 @@ def activate_user(phone_number: str, days: int = 30, tier: str = "pro") -> tuple
     with DBContext() as db:
         db.execute("""
             UPDATE users
-            SET subscription_expiry = ?, tier = ?
+            SET subscription_expiry = ?, tier = ?, pending_grace_granted = 0
             WHERE phone_number = ?
         """, (_db_ts(db, new_expiry), tier_clean, user_id))
 
@@ -955,6 +1073,21 @@ def get_system_metrics() -> dict:
 
         db_backend = "Supabase PostgreSQL" if db.is_pg else "Local SQLite"
 
+        feedback_up = 0
+        feedback_down = 0
+        try:
+            db.execute("SELECT rating, COUNT(*) AS cnt FROM chat_feedback GROUP BY rating")
+            for frow in db.fetchall():
+                r_key = str(frow["rating"] or "").lower()
+                if r_key == "up":
+                    feedback_up = int(frow["cnt"] or 0)
+                elif r_key == "down":
+                    feedback_down = int(frow["cnt"] or 0)
+        except Exception:
+            pass
+        fb_total = feedback_up + feedback_down
+        feedback_satisfaction_pct = round((feedback_up / fb_total) * 100, 1) if fb_total > 0 else 0.0
+
     return {
         "total_users": total_users,
         "active_subscribers": active_subscribers,
@@ -971,8 +1104,143 @@ def get_system_metrics() -> dict:
         "chart_dates": chart_dates,
         "chart_queries": chart_queries,
         "chart_new_users": chart_new_users,
+        "feedback_up": feedback_up,
+        "feedback_down": feedback_down,
+        "feedback_satisfaction_pct": feedback_satisfaction_pct,
         "db_backend": db_backend,
     }
+
+
+def record_chat_feedback(
+    identifier: str,
+    rating: str,
+    message_id: int | None = None,
+    snippet: str = "",
+) -> bool:
+    """Stores a user's 👍 ('up') or 👎 ('down') rating on an AI response."""
+    clean_rating = str(rating or "").strip().lower()
+    if clean_rating not in ("up", "down"):
+        return False
+    clean_snippet = str(snippet or "").strip()[:300]
+    now = _utc_now()
+    try:
+        with DBContext() as db:
+            row = _find_user_row(db, identifier)
+            uid = str(row["phone_number"]) if row else str(identifier or "").strip()
+            if not uid:
+                return False
+            db.execute(
+                """
+                INSERT INTO chat_feedback (phone_number, message_id, rating, snippet, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (uid, message_id, clean_rating, clean_snippet, _db_ts(db, now)),
+            )
+            return True
+    except Exception as e:
+        print(f"[Warning] Failed to save chat feedback: {e}")
+        return False
+
+
+def get_feedback_summary(limit_recent: int = 20) -> dict:
+    """Returns aggregate thumbs-up/down counts and recent negative/positive feedback snippets."""
+    up_cnt = 0
+    down_cnt = 0
+    recent = []
+    try:
+        with DBContext() as db:
+            db.execute("SELECT rating, COUNT(*) AS cnt FROM chat_feedback GROUP BY rating")
+            for r in db.fetchall():
+                rk = str(r["rating"] or "").lower()
+                if rk == "up":
+                    up_cnt = int(r["cnt"] or 0)
+                elif rk == "down":
+                    down_cnt = int(r["cnt"] or 0)
+            db.execute(
+                "SELECT phone_number, rating, snippet, created_at FROM chat_feedback ORDER BY id DESC LIMIT ?",
+                (limit_recent,),
+            )
+            for r in db.fetchall():
+                d = dict(r)
+                d["created_at"] = _to_utc_iso(d.get("created_at"))
+                recent.append(d)
+    except Exception:
+        pass
+    total = up_cnt + down_cnt
+    return {
+        "up": up_cnt,
+        "down": down_cnt,
+        "total": total,
+        "satisfaction_pct": round((up_cnt / total) * 100, 1) if total > 0 else 0.0,
+        "recent": recent,
+    }
+
+
+def get_user_streak(identifier: str) -> dict:
+    """
+    Computes a user's daily chat check-in streak in PKT (UTC+5) calendar days directly from `chat_history`.
+    Returns {"current_streak": int, "longest_streak": int, "active_days": int, "checked_in_today": bool}.
+    """
+    empty = {"current_streak": 0, "longest_streak": 0, "active_days": 0, "checked_in_today": False}
+    if not identifier:
+        return empty
+    try:
+        with DBContext() as db:
+            row = _find_user_row(db, identifier)
+            if not row:
+                return empty
+            uid = str(row["phone_number"])
+            db.execute(
+                "SELECT created_at FROM chat_history WHERE phone_number = ? AND role = 'user' ORDER BY id ASC",
+                (uid,),
+            )
+            rows = db.fetchall()
+            if not rows:
+                return empty
+
+        pkt_dates_set = set()
+        for r in rows:
+            dt = _parse_dt(r["created_at"])
+            if dt:
+                pkt_dates_set.add((dt + timedelta(hours=5)).date())
+        if not pkt_dates_set:
+            return empty
+
+        sorted_days = sorted(pkt_dates_set)
+        longest = 1
+        run = 1
+        for i in range(1, len(sorted_days)):
+            if (sorted_days[i] - sorted_days[i - 1]).days == 1:
+                run += 1
+                if run > longest:
+                    longest = run
+            else:
+                run = 1
+
+        today_pkt = (_utc_now() + timedelta(hours=5)).date()
+        checked_in_today = today_pkt in pkt_dates_set
+        yesterday_pkt = today_pkt - timedelta(days=1)
+
+        if checked_in_today:
+            cursor_day = today_pkt
+        elif yesterday_pkt in pkt_dates_set:
+            cursor_day = yesterday_pkt
+        else:
+            cursor_day = None
+
+        current = 0
+        while cursor_day is not None and cursor_day in pkt_dates_set:
+            current += 1
+            cursor_day -= timedelta(days=1)
+
+        return {
+            "current_streak": current,
+            "longest_streak": longest,
+            "active_days": len(pkt_dates_set),
+            "checked_in_today": checked_in_today,
+        }
+    except Exception:
+        return empty
 
 
 def get_subscriber_phones(tier: str = "all") -> list[str]:
@@ -1341,12 +1609,15 @@ def delete_user_completely(identifier: str) -> tuple[bool, dict | str]:
         placeholders = ", ".join(["?"] * len(child_keys))
 
         deleted_counts: dict[str, int] = {}
-        for child_tbl in ("chat_history", "payment_requests", "coaching_leads"):
-            db.execute(
-                f"DELETE FROM {child_tbl} WHERE phone_number IN ({placeholders})",
-                tuple(child_keys),
-            )
-            deleted_counts[child_tbl] = max(0, db.cursor.rowcount or 0)
+        for child_tbl in ("chat_history", "chat_feedback", "payment_requests", "coaching_leads"):
+            try:
+                db.execute(
+                    f"DELETE FROM {child_tbl} WHERE phone_number IN ({placeholders})",
+                    tuple(child_keys),
+                )
+                deleted_counts[child_tbl] = max(0, db.cursor.rowcount or 0)
+            except Exception:
+                deleted_counts[child_tbl] = 0
 
         # Clean up legacy email_otps if that table exists in this database
         otp_deleted = 0

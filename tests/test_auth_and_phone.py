@@ -1203,6 +1203,277 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
         self.assertNotIn("nahi bana pa raha", r_home.text)
         self.assertIn("_buildTrialExhaustedCardHtml", r_home.text)
 
+    def test_phase2_pwa_manifest_feedback_and_daily_streak(self):
+        from datetime import timezone
+        from src.dashboard import PKT_TZ
+
+        # 1. PWA Manifest & Phase 2 UI hooks on GET /
+        r_man = self.client.get("/manifest.json")
+        self.assertEqual(r_man.status_code, 200)
+        self.assertIn("application/manifest+json", r_man.headers.get("content-type", ""))
+        man = r_man.json()
+        self.assertEqual(man["short_name"], "Hassan AI")
+        self.assertEqual(man["display"], "standalone")
+
+        r_home = self.client.get("/")
+        self.assertEqual(r_home.status_code, 200)
+        for token in (
+            'rel="manifest" href="/manifest.json"',
+            "openShareCardModal",
+            "rateAiReply",
+            "triggerDailyCheckIn",
+            "streak-badge-pill",
+            "quote-card-canvas",
+        ):
+            self.assertIn(token, r_home.text)
+
+        # 2. Feedback API requires auth, validates rating, aggregates metrics, and cleans up on delete
+        self.assertEqual(self.client.post("/api/chat/feedback", json={"rating": "up"}).status_code, 401)
+
+        u = database.get_or_create_google_user("g_p2_fb", "fbuser@example.com", "Feedback User")
+        uid = u["phone_number"]
+        self.client.cookies.set(user_auth.USER_SESSION_COOKIE, user_auth.generate_user_session_token(uid))
+
+        self.assertEqual(self.client.post("/api/chat/feedback", json={"rating": "meh"}).status_code, 400)
+        self.assertEqual(
+            self.client.post("/api/chat/feedback", json={"rating": "up", "snippet": "Great advice"}).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post("/api/chat/feedback", json={"rating": "up", "snippet": "Solid answer"}).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post("/api/chat/feedback", json={"rating": "down", "snippet": "Too short"}).status_code,
+            200,
+        )
+
+        fb = database.get_feedback_summary()
+        self.assertEqual(fb["up"], 2)
+        self.assertEqual(fb["down"], 1)
+        self.assertEqual(fb["satisfaction_pct"], 66.7)
+        metrics = database.get_system_metrics()
+        self.assertEqual(metrics["feedback_up"], 2)
+        self.assertEqual(metrics["feedback_down"], 1)
+        self.assertEqual(metrics["feedback_satisfaction_pct"], 66.7)
+
+        # 3. Daily PKT check-in streak across 3 consecutive days (today, yesterday, 2 days ago)
+        now_pkt = datetime.now(timezone.utc).astimezone(PKT_TZ)
+        with database.DBContext() as db:
+            for offset in (0, 1, 2):
+                day_pkt = datetime(now_pkt.year, now_pkt.month, now_pkt.day, 14, 0, 0, tzinfo=PKT_TZ) - timedelta(days=offset)
+                day_utc = day_pkt.astimezone(timezone.utc).replace(tzinfo=None)
+                db.execute(
+                    "INSERT INTO chat_history (phone_number, role, content, created_at) VALUES (?, 'user', ?, ?)",
+                    (uid, f"Day -{offset} check-in", database._db_ts(db, day_utc)),
+                )
+
+        streak = database.get_user_streak(uid)
+        self.assertEqual(streak["current_streak"], 3)
+        self.assertEqual(streak["longest_streak"], 3)
+        self.assertTrue(streak["checked_in_today"])
+
+        r_me = self.client.get("/api/auth/me")
+        self.assertEqual(r_me.status_code, 200)
+        self.assertEqual(r_me.json()["user"]["current_streak"], 3)
+        self.assertTrue(r_me.json()["user"]["checked_in_today"])
+
+        # Deleting user also clears their chat_feedback rows
+        ok_del, _ = database.delete_user_completely(uid)
+        self.assertTrue(ok_del)
+        self.assertEqual(database.get_feedback_summary()["total"], 0)
+
+    def test_phase2_pending_trx_grace_window_and_telegram_1tap_webhook(self):
+        # 1. Paywalled user gets +2 instant grace messages ONCE upon submitting TRX
+        u = database.get_or_create_google_user("g_p2_grace", "payer@example.com", "Grace Payer")
+        uid = u["phone_number"]
+        self.client.cookies.set(user_auth.USER_SESSION_COOKIE, user_auth.generate_user_session_token(uid))
+        self.client.post("/api/auth/link-phone", json={"phone": "03005554433"})
+
+        for _ in range(config.FREE_TRIAL_QUESTIONS):
+            database.record_user_query(uid)
+        can_before, status_before, _ = database.can_user_chat(uid)
+        self.assertFalse(can_before)
+        self.assertEqual(status_before, "paywall_required")
+
+        with patch.object(server, "notify_payment_submitted") as mock_tg_pay:
+            r_trx1 = self.client.post("/api/chat", json={"message": "TRX: 8877665544"})
+            self.assertEqual(r_trx1.status_code, 200)
+            self.assertTrue(r_trx1.json()["grace_granted"])
+            self.assertIn("instant messages", r_trx1.json()["reply"])
+            self.assertTrue(mock_tg_pay.call_args.kwargs.get("grace_granted"))
+
+        # User can immediately chat again with their temporary grace credit!
+        can_after, _, _ = database.can_user_chat(uid)
+        self.assertTrue(can_after)
+        self.assertEqual(
+            database.get_user_by_identifier(uid)["bonus_trial_questions"],
+            config.PENDING_TRX_GRACE_QUESTIONS,
+        )
+
+        # Submitting a 2nd TRX must NOT double-grant temporary grace messages
+        with patch.object(server, "notify_payment_submitted"):
+            r_trx2 = self.client.post("/api/chat", json={"message": "TRX: 8877665599"})
+            self.assertEqual(r_trx2.status_code, 200)
+            self.assertFalse(r_trx2.json()["grace_granted"])
+        self.assertEqual(
+            database.get_user_by_identifier(uid)["bonus_trial_questions"],
+            config.PENDING_TRX_GRACE_QUESTIONS,
+        )
+
+        # Non-paywalled user gets NO extra grace messages when submitting TRX early
+        u_early = database.get_or_create_google_user("g_p2_early", "early@example.com", "Early Payer")
+        granted_early, _ = database.grant_pending_trx_grace(u_early["phone_number"])
+        self.assertFalse(granted_early)
+
+        # 2. Telegram 1-tap webhook security + Reject + Approve flows
+        with patch.object(server, "TELEGRAM_WEBHOOK_SECRET", "super-secret-tg"), \
+             patch.object(server, "TELEGRAM_CHAT_ID", "123456789"), \
+             patch.object(server, "answer_telegram_callback") as mock_ans, \
+             patch.object(server, "edit_telegram_message") as mock_edit, \
+             patch.object(server, "notify_user_activated_email") as mock_email:
+            # Missing / wrong secret -> 403
+            r_bad_sec = self.client.post("/api/telegram/webhook", json={})
+            self.assertEqual(r_bad_sec.status_code, 403)
+
+            # Wrong chat_id -> 403
+            r_bad_chat = self.client.post(
+                "/api/telegram/webhook",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "super-secret-tg"},
+                json={"callback_query": {"id": "cb0", "data": "approve:8877665544", "message": {"message_id": 10, "chat": {"id": 999999}}}},
+            )
+            self.assertEqual(r_bad_chat.status_code, 403)
+
+            # Reject fake TRX -> marks rejected & revokes temporary grace messages
+            r_rej = self.client.post(
+                "/api/telegram/webhook",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "super-secret-tg"},
+                json={"callback_query": {"id": "cb1", "data": "reject:8877665544", "message": {"message_id": 11, "chat": {"id": 123456789}}}},
+            )
+            self.assertEqual(r_rej.status_code, 200)
+            self.assertEqual(r_rej.json()["action"], "rejected")
+            self.assertEqual(r_rej.json()["grace_revoked"], config.PENDING_TRX_GRACE_QUESTIONS)
+            self.assertEqual(database.get_payment_by_trx("8877665544")["status"], "rejected")
+            self.assertEqual(database.get_user_by_identifier(uid)["bonus_trial_questions"], 0)
+            self.assertEqual(mock_edit.call_count, 1)
+
+            # Approve real TRX -> activates 30-day Full Access + sends activation email + edits message
+            r_app = self.client.post(
+                "/api/telegram/webhook",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "super-secret-tg"},
+                json={"callback_query": {"id": "cb2", "data": "approve:8877665599", "message": {"message_id": 12, "chat": {"id": 123456789}}}},
+            )
+            self.assertEqual(r_app.status_code, 200)
+            self.assertEqual(r_app.json()["action"], "approved")
+            self.assertTrue(database.get_user_by_identifier(uid)["is_subscribed"])
+            self.assertEqual(mock_email.call_count, 1)
+            self.assertEqual(mock_edit.call_count, 2)
+            self.assertGreaterEqual(mock_ans.call_count, 2)
+
+    def test_phase2_auto_emails_and_admin_ai_insights(self):
+        from types import SimpleNamespace
+
+        u = database.get_or_create_google_user("g_p2_mail", "mailuser@example.com", "Mail User")
+        uid = u["phone_number"]
+        database.complete_chat_turn(uid, "Ghar walay har baat pe criticize karte hain", "Seedhi baat hai boundaries set karo.")
+
+        # Insights requires admin login
+        self.assertEqual(self.client.post("/api/admin/insights").status_code, 401)
+        self.assertEqual(self.client.post("/api/admin/login", json={"passkey": server.ADMIN_PASSWORD}).status_code, 200)
+
+        # Positive bonus triggers bonus email; negative adjustment does NOT; activate triggers activation email
+        with patch.object(server, "notify_user_bonus_email", return_value=True) as mock_bonus_mail, \
+             patch.object(server, "notify_user_activated_email", return_value=True) as mock_act_mail:
+            r_b1 = self.client.post("/api/admin/bonus", json={"identifier": "mailuser@example.com", "bonus": 5})
+            self.assertEqual(r_b1.status_code, 200)
+            self.assertTrue(r_b1.json()["email_notified"])
+            self.assertEqual(mock_bonus_mail.call_count, 1)
+
+            r_b2 = self.client.post("/api/admin/bonus", json={"identifier": "mailuser@example.com", "bonus": -2})
+            self.assertEqual(r_b2.status_code, 200)
+            self.assertFalse(r_b2.json()["email_notified"])
+            self.assertEqual(mock_bonus_mail.call_count, 1)
+
+            r_act = self.client.post("/api/admin/activate", json={"identifier": "mailuser@example.com", "days": 30})
+            self.assertEqual(r_act.status_code, 200)
+            self.assertEqual(mock_act_mail.call_count, 1)
+
+        # Admin AI Insights returns structured brief + dashboard renders Insights panel & satisfaction stats
+        fake_resp = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="1. TOP 3 USER STRUGGLES:\n- Family pressure"))]
+        )
+        fake_client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: fake_resp))
+        )
+        with patch.object(server, "groq_client", fake_client):
+            r_ins = self.client.post("/api/admin/insights")
+            self.assertEqual(r_ins.status_code, 200)
+            body = r_ins.json()
+            self.assertEqual(body["status"], "ok")
+            self.assertEqual(body["threads_analyzed"], 1)
+            self.assertIn("TOP 3 USER STRUGGLES", body["insights"])
+
+        r_dash = self.client.get("/admin/dashboard")
+        self.assertEqual(r_dash.status_code, 200)
+        self.assertIn("AI Chat Insights", r_dash.text)
+        self.assertIn("generateChatInsights()", r_dash.text)
+        self.assertIn("Reply Satisfaction", r_dash.text)
+
+    def test_phase2_whatsapp_voice_note_and_bridge_transcribe(self):
+        from types import SimpleNamespace
+
+        # 1. Meta WhatsApp Cloud API audio webhook downloads + transcribes + replies
+        wa_payload = {
+            "entry": [{
+                "changes": [{
+                    "value": {
+                        "messages": [{
+                            "from": "923001112233",
+                            "type": "audio",
+                            "audio": {"id": "media_voice_123", "mime_type": "audio/ogg; codecs=opus"},
+                        }]
+                    }
+                }]
+            }]
+        }
+        sent_wa = []
+        with patch.object(server, "_download_whatsapp_media", return_value=(b"\x00" * 512, "audio/ogg")) as mock_dl, \
+             patch.object(server, "_transcribe_audio_bytes", return_value=("Yar gym consistent kaise rakhun?", None, 200)) as mock_tr, \
+             patch.object(server, "send_whatsapp_text", side_effect=lambda to, txt: sent_wa.append((to, txt)) or True), \
+             patch.object(server, "search_knowledge", return_value=[]):
+            r_wh = self.client.post("/webhook", json=wa_payload)
+            self.assertEqual(r_wh.status_code, 200)
+            self.assertEqual(mock_dl.call_count, 1)
+            self.assertEqual(mock_tr.call_count, 1)
+            self.assertEqual(len(sent_wa), 1)
+            self.assertEqual(sent_wa[0][0], "923001112233")
+
+        # 2. Baileys bridge can authenticate to /api/chat/transcribe via X-Bridge-Secret
+        fake_tr_client = SimpleNamespace(
+            audio=SimpleNamespace(
+                transcriptions=SimpleNamespace(
+                    create=lambda **kw: SimpleNamespace(text="Assalamu Alaikum Hassan bhai")
+                )
+            )
+        )
+        self.client.cookies.set(user_auth.GUEST_PREVIEW_COOKIE, user_auth.generate_guest_preview_token())
+        with patch.object(server, "groq_client", fake_tr_client):
+            r_br_bad = self.client.post(
+                "/api/chat/transcribe",
+                content=b"\x00" * 600,
+                headers={"Content-Type": "audio/ogg", "X-Bridge-Secret": "wrong_secret"},
+            )
+            self.assertEqual(r_br_bad.status_code, 401)
+
+            r_br = self.client.post(
+                "/api/chat/transcribe",
+                content=b"\x00" * 600,
+                headers={"Content-Type": "audio/ogg", "X-Bridge-Secret": "test_bridge_secret_xyz"},
+            )
+            self.assertEqual(r_br.status_code, 200)
+            self.assertEqual(r_br.json()["text"], "Assalamu Alaikum Hassan bhai")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
