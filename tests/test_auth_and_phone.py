@@ -1054,6 +1054,155 @@ class AuthAndSecurityIntegrationTests(unittest.TestCase):
             r_ta = self.client.post("/api/admin/test-alert")
             self.assertEqual(r_ta.status_code, 200)
 
+    def test_phase1_persona_handle_filter_sticky_language_and_returning_checkin(self):
+        from datetime import timezone
+        from src.persona import (
+            _compute_returning_gap_note,
+            _detect_query_language,
+            _extract_natural_first_name,
+            build_hassan_chat_messages,
+        )
+
+        # 1. Smart handle/name filter prevents awkward "Hey Hero" / "Royal" / "Bhai AR"
+        self.assertEqual(_extract_natural_first_name("Hero"), "")
+        self.assertEqual(_extract_natural_first_name("Royal Deity"), "")
+        self.assertEqual(_extract_natural_first_name("AR DJ"), "")
+        self.assertEqual(_extract_natural_first_name("Hello World"), "")
+        self.assertEqual(_extract_natural_first_name("Ch Asad"), "Asad")
+        self.assertEqual(_extract_natural_first_name("SAFI-ULLAH-KHAN"), "Safi")
+        self.assertEqual(_extract_natural_first_name("Ahmad hassan"), "Ahmad")
+
+        # 2. Sticky language detection keeps Roman Urdu on short follow-ups ("Yes", "23", "Ok")
+        ur_history = [
+            {"role": "user", "content": "Yar discipline nahi ban raha aaj kal"},
+            {"role": "assistant", "content": "Batao abhi age aur routine kya hai?"},
+        ]
+        self.assertEqual(_detect_query_language("Yes", history=ur_history), "roman_urdu")
+        self.assertEqual(_detect_query_language("23", history=ur_history), "roman_urdu")
+        self.assertEqual(_detect_query_language("Ok", history=ur_history), "roman_urdu")
+        # Full explicit English message still switches cleanly to English
+        self.assertEqual(
+            _detect_query_language("Actually let's switch to English, I want career advice", history=ur_history),
+            "english",
+        )
+
+        # 3. Returning-user check-in activates after >= 20 hours and stays silent for fresh chats
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat().replace("+00:00", "Z")
+        recent_ts = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+        self.assertIn("3 days ago", _compute_returning_gap_note([{"role": "user", "content": "Hi", "created_at": old_ts}]))
+        self.assertEqual(_compute_returning_gap_note([{"role": "user", "content": "Hi", "created_at": recent_ts}]), "")
+
+        # 4. System prompt includes real Hassan worldview, anti-cliché bans, Umang safety, and omits handle names
+        msgs = build_hassan_chat_messages(
+            "What is life",
+            history=[{"role": "user", "content": "Earlier", "created_at": old_ts}],
+            user_name="Hero",
+        )
+        sys_txt = msgs[0]["content"]
+        self.assertNotIn("The person messaging you is named Hero", sys_txt)
+        self.assertIn("RETURNING USER CHECK-IN", sys_txt)
+        self.assertIn("on a scale of 1-10", sys_txt)
+        self.assertIn("Umang (0311-7786264)", sys_txt)
+
+    def test_phase1_rag_query_enrichment_and_whisper_noise_cleanup(self):
+        from src.knowledge_base import build_rag_search_query, clean_and_validate_chunk
+
+        # Short follow-up inherits prior user topic for pgvector continuity
+        hist = [
+            {"role": "user", "content": "I struggle with confidence and fear of being judged in gatherings"},
+            {"role": "assistant", "content": "Where does this hit hardest?"},
+        ]
+        enriched = build_rag_search_query("At office meetings", history=hist)
+        self.assertIn("fear of being judged", enriched)
+        self.assertIn("At office meetings", enriched)
+
+        # Whisper stutter loops collapse and Hataff/greeting errors normalize cleanly
+        ok, cleaned, _ = clean_and_validate_chunk(
+            "Caption: Test\nSpoken Transcript: جی ازام علیکم خطف کے گارڈ ہمیشہ تیار رہتے ہیں سکھو سکھو سکھو سکھو سکھو محنت ضروری ہے",
+            "speech",
+        )
+        self.assertTrue(ok)
+        self.assertIn("جی السلام علیکم", cleaned)
+        self.assertIn("ہتف (Hataff) کے گارڈ", cleaned)
+        self.assertNotIn("سکھو سکھو سکھو سکھو", cleaned)
+
+    def test_phase1_trx_false_positives_free_greetings_memory_and_clean_web_bubbles(self):
+        import json as _json
+        from types import SimpleNamespace
+
+        # 1. is_trx_message rejects ordinary chat answers while accepting real TRX IDs
+        for normal_msg in [
+            "100000 salary",
+            "120000 pkr",
+            "2024-2026",
+            "22saal",
+            "75percent",
+            "bs2026",
+            "03001234567",
+        ]:
+            self.assertFalse(server.is_trx_message(normal_msg, "free_trial"), f"False positive TRX on: {normal_msg!r}")
+
+        for real_trx in [
+            "TRX: 20261122001 PRO",
+            "TRX 107382822$37",
+            "202410319874",
+            "TID99887766 PRO",
+        ]:
+            self.assertTrue(server.is_trx_message(real_trx, "free_trial"), f"Missed valid TRX: {real_trx!r}")
+
+        # 2. Pure greeting does NOT burn a free-trial credit on Turn 1; real question does
+        u = database.get_or_create_google_user("g_p1_1", "p1user@example.com", "Ch Asad")
+        uid = u["phone_number"]
+        self.client.cookies.set(user_auth.USER_SESSION_COOKIE, user_auth.generate_user_session_token(uid))
+
+        r_greet = self.client.post("/api/chat", json={"message": "Aoa Hassan bhai"})
+        self.assertEqual(r_greet.status_code, 200)
+        self.assertEqual(database.get_user_by_identifier(uid)["trial_questions_used"], 0)
+        self.assertEqual(database.get_user_by_identifier(uid)["total_queries"], 1)
+        # Web bubbles must NOT contain ugly raw underscore trial footers
+        self.assertNotIn("_(Free Trial:", r_greet.json()["reply"])
+
+        r_real = self.client.post("/api/chat", json={"message": "How do I build real confidence?"})
+        self.assertEqual(r_real.status_code, 200)
+        self.assertEqual(database.get_user_by_identifier(uid)["trial_questions_used"], 1)
+        self.assertNotIn("_(Free Trial:", r_real.json()["reply"])
+
+        # 3. Final free turn on /api/chat/stream sets trial_exhausted=True with zero raw underscores
+        for _ in range(config.FREE_TRIAL_QUESTIONS - 2):
+            database.record_user_query(uid)
+
+        def fake_stream(**kwargs):
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Hassan: Stay sharp and consistent."))])
+
+        fake_client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=fake_stream)))
+        with patch.object(server, "groq_client", fake_client), \
+             patch.object(server, "search_knowledge", return_value=[]), \
+             patch.object(server, "_schedule_memory_update"), \
+             patch.object(server, "notify_paywall_hit") as mock_pw:
+            r_last = self.client.post("/api/chat/stream", json={"message": "My final free question"})
+
+        self.assertEqual(r_last.status_code, 200)
+        self.assertEqual(mock_pw.call_count, 1)
+        events = [_json.loads(l[5:].strip()) for l in r_last.text.splitlines() if l.startswith("data:")]
+        done_evt = [e for e in events if e.get("type") == "done"][0]
+        self.assertTrue(done_evt["trial_exhausted"])
+        self.assertEqual(done_evt["reply"], "Stay sharp and consistent.")
+        self.assertNotIn("_(You have used your last free question", done_evt["reply"])
+
+        # 4. Memory model order puts fast non-reasoning model first & refreshes on Turn 1, 2, 4, 7
+        self.assertEqual(server.GROQ_MEMORY_MODELS[0][0], "llama-3.1-8b-instant")
+        self.assertTrue(server._should_refresh_memory(1))
+        self.assertTrue(server._should_refresh_memory(2))
+        self.assertFalse(server._should_refresh_memory(3))
+        self.assertTrue(server._should_refresh_memory(4))
+        self.assertTrue(server._should_refresh_memory(7))
+
+        # 5. Home page renders gender-neutral bilingual chips & italic formatter
+        r_home = self.client.get("/")
+        self.assertIn("Confidence &amp; fear of judgment", r_home.text)
+        self.assertNotIn("nahi bana pa raha", r_home.text)
+        self.assertIn("_buildTrialExhaustedCardHtml", r_home.text)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -47,7 +47,8 @@ logger = logging.getLogger("knowledge_base")
 
 EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIM = 768
-MIN_SIMILARITY_SCORE = 0.45
+MIN_SIMILARITY_SCORE = 0.42
+SOFT_MIN_SIMILARITY_SCORE = 0.36
 
 # Noise & foreign-script filters (strips Hindi/Punjabi song lyrics, CJK spam, Whisper hallucinations)
 _FOREIGN_SCRIPT_RE = re.compile(
@@ -59,6 +60,16 @@ _STRIP_NOISE_RE = re.compile(
     r"Thank you for watching[.!]?|Subtitles by\s+\S+.*$|"
     r"amara\.org.*$|请不吝点赞.*$|[♪🎵]+)",
     re.IGNORECASE,
+)
+# Collapses Whisper stutter loops like "سکھو سکھو سکھو سکھو سکھو"
+_WHISPER_REPEAT_RE = re.compile(r"(\S+(?:\s+\S+){0,2})(?:\s+\1){3,}", re.UNICODE)
+_WHISPER_FIXUPS = (
+    ("ہتھر سیکیورٹی", "ہتف سیکیورٹی (Hataff)"),
+    ("خطف کے گارڈ", "ہتف (Hataff) کے گارڈ"),
+    ("جی سامنے کم", "جی السلام علیکم"),
+    ("جی ازام علیکم", "جی السلام علیکم"),
+    ("جی عزام علیکم", "جی السلام علیکم"),
+    ("جی اسلام علیکم", "جی السلام علیکم"),
 )
 _FILLER_PHRASES = {
     "thank you",
@@ -162,8 +173,8 @@ def _embed_query_cached(query: str) -> tuple[float, ...] | None:
 
 def clean_and_validate_chunk(content: str, content_type: str = "speech") -> tuple[bool, str, str]:
     """
-    Strips Whisper music/caption noise and rejects gibberish, foreign-script songs,
-    and empty chunks before indexing into vector search.
+    Strips Whisper music/caption noise, collapses Whisper repetition loops, fixes common
+    Urdu Whisper misspellings, and rejects gibberish/foreign-script songs before indexing.
     Returns (is_valid, cleaned_content, reason).
     """
     text = (content or "").strip()
@@ -182,6 +193,13 @@ def clean_and_validate_chunk(content: str, content_type: str = "speech") -> tupl
             text,
         ).strip()
         spoken = re.sub(r"\nDate:.*$", "", spoken, flags=re.DOTALL).strip()
+
+    # Collapse Whisper repetition loops & fix recurring Urdu brand/greeting transcription errors
+    spoken = _WHISPER_REPEAT_RE.sub(r"\1", spoken)
+    for bad, good in _WHISPER_FIXUPS:
+        if bad in spoken:
+            spoken = spoken.replace(bad, good)
+    spoken = re.sub(r"\s{2,}", " ", spoken).strip()
 
     # Reject chunks dominated by non-Hassan scripts (Hindi Devanagari songs, Gurmukhi songs, CJK, Cyrillic)
     foreign_chars = len(_FOREIGN_SCRIPT_RE.findall(spoken))
@@ -203,6 +221,43 @@ def clean_and_validate_chunk(content: str, content_type: str = "speech") -> tupl
 
     rebuilt = f"{prefix}Spoken Transcript: {spoken}".strip() if prefix else text
     return True, rebuilt, "ok"
+
+
+def build_rag_search_query(
+    user_query: str,
+    history: list[dict] = None,
+    user_memory: str = "",
+) -> str:
+    """
+    Builds a context-aware retrieval query for multi-turn chats.
+    Short follow-up replies (e.g. 'Fear of being judged', 'Moving alone', 'Management accounting 1')
+    inherit the prior user message's topic so pgvector keeps retrieving Hassan's relevant reels.
+    """
+    current = (user_query or "").strip()
+    if not current:
+        return ""
+
+    word_count = len(current.split())
+    parts = []
+    if history and word_count < 14:
+        prev_user_msgs = [
+            (m.get("content") or "").strip()
+            for m in history
+            if m.get("role") == "user" and (m.get("content") or "").strip()
+        ]
+        # Attach up to the 2 most recent distinct user turns for topic continuity
+        recent_ctx = [m[:180] for m in prev_user_msgs[-2:] if m.lower() != current.lower()]
+        if recent_ctx:
+            parts.extend(recent_ctx)
+
+    parts.append(current[:360])
+
+    # For very terse turns (< 5 words), lightly ground with memory snippet if no recent history
+    if word_count < 5 and not history and (user_memory or "").strip():
+        parts.append(user_memory.strip()[:160])
+
+    combined = " | ".join(parts)
+    return combined[:650]
 
 
 def _search_knowledge_pg_keywords(query: str, n_results: int = 4) -> list[str]:
@@ -233,7 +288,8 @@ def _search_knowledge_pg_keywords(query: str, n_results: int = 4) -> list[str]:
 def search_knowledge_supabase(query: str, n_results: int = 4) -> list[str]:
     """
     Retrieves top matching knowledge chunks from Supabase pgvector using multilingual
-    Gemini embeddings. Prioritizes Hassan's spoken transcripts and caps duplicates per reel.
+    Gemini embeddings. Prioritizes Hassan's spoken transcripts, caps duplicates per reel,
+    and falls back to top 2 soft matches (>= 0.36) for short cross-lingual queries.
     """
     clean_q = (query or "").strip()
     if not clean_q or not _db_mod.DATABASE_URL:
@@ -251,7 +307,7 @@ def search_knowledge_supabase(query: str, n_results: int = 4) -> list[str]:
                 return []
             db.execute(
                 """
-                SELECT reel_id, content_type, content,
+                SELECT reel_id, content_type, caption, content,
                        1 - (embedding <=> %s::vector) AS similarity
                 FROM knowledge_vectors
                 ORDER BY embedding <=> %s::vector
@@ -263,29 +319,46 @@ def search_knowledge_supabase(query: str, n_results: int = 4) -> list[str]:
             if not rows:
                 return []
 
-        # Re-rank slightly favoring actual spoken talks over bare short captions,
-        # drop low-similarity noise, and diversify across reels (max 2 per reel_id).
-        scored = []
+        # Re-rank favoring actual spoken talks over bare short captions,
+        # and diversify across reels (max 2 per reel_id).
+        strong_scored = []
+        soft_scored = []
         for r in rows:
             sim = float(r.get("similarity") or 0.0)
-            if sim < MIN_SIMILARITY_SCORE:
-                continue
             ctype = (r.get("content_type") or "").lower()
             boost = 0.035 if ctype == "speech" else 0.0
-            scored.append((sim + boost, r))
+            if sim >= MIN_SIMILARITY_SCORE:
+                strong_scored.append((sim + boost, r))
+            elif sim >= SOFT_MIN_SIMILARITY_SCORE:
+                soft_scored.append((sim + boost, r))
 
-        scored.sort(key=lambda item: item[0], reverse=True)
+        if strong_scored:
+            pool = strong_scored
+            cap = n_results
+        elif soft_scored:
+            pool = soft_scored
+            cap = min(2, n_results)
+        else:
+            return []
+
+        pool.sort(key=lambda item: item[0], reverse=True)
 
         selected: list[str] = []
         reel_counts: dict[str, int] = {}
-        for _, r in scored:
+        for _, r in pool:
             rid = str(r.get("reel_id") or "")
             if rid and reel_counts.get(rid, 0) >= 2:
                 continue
-            selected.append(r["content"])
+            raw_content = (r.get("content") or "").strip()
+            cap_txt = (r.get("caption") or "").strip()
+            if cap_txt and not raw_content.startswith(("Caption:", "Topic / Caption:", "[Hassan Reel:")):
+                formatted = f'[Hassan Reel: "{cap_txt}"]\n{raw_content}'
+            else:
+                formatted = raw_content
+            selected.append(formatted)
             if rid:
                 reel_counts[rid] = reel_counts.get(rid, 0) + 1
-            if len(selected) >= n_results:
+            if len(selected) >= cap:
                 break
 
         return selected

@@ -2294,27 +2294,27 @@
                 </div>
             </div>
 
-            <!-- Quick Topics Horizontal Chips -->
+            <!-- Quick Topics Horizontal Chips (Gender-Neutral, Bilingual, Real Top Questions) -->
             <div class="chips-scroll-area" id="quick-topics-row">
                 <button class="topic-chip"
-                    onclick="handleChipClick('Yar main discipline nahi bana pa raha, har baar 2-3 din baad routine toot jati hai.')">
-                    💪 Can't stay disciplined
+                    onclick="handleChipClick('Honestly I struggle with confidence and fear of being judged in gatherings. How do I fix this?')">
+                    🧠 Confidence &amp; fear of judgment
                 </button>
                 <button class="topic-chip"
-                    onclick="handleChipClick('Career aur paise ko le kar bohot confused hoon Pakistan mein, samajh nahi aa raha kya karun.')">
-                    🎯 Stuck in career
+                    onclick="handleChipClick('Ghar walay aur rishtedaar har baat pe criticize karte hain, kitni bhi mehnat kar lo — kaise deal karun?')">
+                    🏠 Judgmental relatives &amp; family
                 </button>
                 <button class="topic-chip"
-                    onclick="handleChipClick('Bohot zyada overthinking hoti hai aaj kal, dimagh sukoon mein nahi rehta.')">
-                    🧠 Overthinking a lot
+                    onclick="handleChipClick('Career, paise aur shadi ke pressure mein bohot confusion ho rahi hai — sahi rasta kaise choose karun?')">
+                    🎯 Career vs Shadi pressure
                 </button>
                 <button class="topic-chip"
-                    onclick="handleChipClick('Kuch log meri energy aur waqt bohot zaya karte hain, unse kaise deal karun?')">
-                    🔥 Toxic people
+                    onclick="handleChipClick('Discipline aur daily routine har 2-3 din baad toot jati hai, isko permanent kaise banayein?')">
+                    💪 Staying disciplined
                 </button>
                 <button class="topic-chip"
-                    onclick="handleChipClick('Fitness aur daily workout routine dobara shuru karni hai, kahan se start karun?')">
-                    🏋️ Getting back in shape
+                    onclick="handleChipClick('Kuch log sirf energy aur waqt zaya karte hain, unke saath boundaries kaise set karein?')">
+                    🔥 Fake friends &amp; boundaries
                 </button>
             </div>
 
@@ -3299,8 +3299,8 @@
             <div class="msg-avatar"><img src="/static/hassan_avatar.jpg" alt="Hassan AI" loading="eager"></div>
             <div class="msg-bubble">
                 <p>Assalamu Alaikum <strong>${escapeHtml(displayName)}</strong>!</p>
-                <p>Good to have you here. Seedhi baat karte hain — aaj kal kya chal raha hai? Career, routine, fitness, ya koi cheez dimagh mein atki hui hai?</p>
-                <p>Bina hesitate kiye jo dil mein hai likh do — bilkul aise jaise kisi bare bhai ya close mentor se baat kar rahe ho.</p>
+                <p>Good to have you here. Seedhi baat karte hain — aaj kal kya chal raha hai? Career, confidence, family pressure, fitness, ya koi cheez dimagh mein atki hui hai?</p>
+                <p>Bina hesitate kiye Urdu ya English mein likh do (ya 🎙️ mic tap kar ke bol do) — seedhi, honest baat karte hain.</p>
                 ${trialNote}
 
                 <div class="msg-meta">
@@ -3563,6 +3563,23 @@
             </div>`;
         }
 
+        function _buildTrialExhaustedCardHtml() {
+            return `
+            <div class="guest-inline-cta" style="margin-top: 12px;">
+                <div style="font-size: 12.5px; color: #e4e4e7; line-height: 1.45;">
+                    <strong style="color:#fbbf24;">That was your last free message.</strong> Unlock unlimited chats for <strong>PKR __MONTHLY_PRICE__/mo</strong> — or invite a friend for <strong>+__SIGNUP_BONUS_QUESTIONS__ free messages</strong> right now.
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" class="guest-inline-cta-btn" style="flex:1; min-width:140px;" onclick="openPaywallModal()">
+                        👑 Unlock Full Access
+                    </button>
+                    <button type="button" onclick="openReferralModal()" style="flex:1; min-width:140px; padding:10px 12px; border-radius:10px; background:rgba(255,255,255,0.08); border:1px solid var(--border); color:#ffffff; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit;">
+                        🎁 +__SIGNUP_BONUS_QUESTIONS__ Free Msgs
+                    </button>
+                </div>
+            </div>`;
+        }
+
         // ── Send & Word-by-Word Streaming Flow (Authenticated + 1-Msg Guest Preview) ──
         async function handleSendAction() {
             if (APP_STATE.isSending || APP_STATE.isRecording) return;
@@ -3674,7 +3691,8 @@
                                 } catch (e) { }
                                 streamBubble.extraEl.innerHTML = _buildGuestSignupCardHtml();
                             } else {
-                                streamBubble.extraEl.innerHTML = _buildPaywallActionHtml(finalReply);
+                                const paywallHtml = _buildPaywallActionHtml(finalReply);
+                                streamBubble.extraEl.innerHTML = paywallHtml || (evt.trial_exhausted ? _buildTrialExhaustedCardHtml() : '');
                                 if (evt.paywalled || finalReply.includes('free questions are up')) {
                                     APP_STATE.trialQuestionsUsed = APP_STATE.maxFreeTrial;
                                     updateTrialIndicator();
@@ -4134,6 +4152,7 @@
             if (!text) return '';
             let out = escapeHtml(text);
             out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            out = out.replace(/(^|[\s(])_([^_\n]+?)_(?=[\s).,!?:;]|$)/g, '$1<em style="color:var(--text-secondary);">$2</em>');
             out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
             out = out.replace(/\n/g, '<br>');
             return out;

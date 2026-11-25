@@ -76,7 +76,7 @@ from src.database import (
     submit_trx_id,
     update_user_memory_summary,
 )
-from src.knowledge_base import search_knowledge
+from src.knowledge_base import build_rag_search_query, search_knowledge
 from src.persona import build_hassan_chat_messages, build_hassan_prompt
 from src.phone_utils import (
     format_pk_phone_display,
@@ -123,9 +123,10 @@ GROQ_WHISPER_MODELS = [
     "whisper-large-v3",
 ]
 
+# Non-reasoning fast model first so hidden thinking tokens never starve compact memory cards
 GROQ_MEMORY_MODELS = [
-    "openai/gpt-oss-20b",
-    "llama-3.1-8b-instant",
+    ("llama-3.1-8b-instant", False),
+    ("openai/gpt-oss-20b", True),
 ]
 
 _RATE_LIMIT_LOCK = threading.Lock()
@@ -164,6 +165,15 @@ def _allow_rate_limited(bucket: dict[str, list[float]], key: str, max_hits: int,
         return True
 
 
+def _should_refresh_memory(total_queries: int) -> bool:
+    """Refreshes memory on queries 1, 2, 4, and every 3rd turn thereafter (7, 10, 13...)."""
+    if total_queries <= 0:
+        return False
+    if total_queries in (1, 2, 4):
+        return True
+    return total_queries >= 7 and (total_queries - 4) % 3 == 0
+
+
 def _schedule_memory_update(
     user_id: str,
     existing_memory: str,
@@ -174,18 +184,19 @@ def _schedule_memory_update(
 ) -> None:
     """
     Refreshes a user's compact long-term memory card asynchronously on a daemon thread
-    on query 1 and every 3rd query thereafter — adds 0ms to user response latency.
+    on queries 1, 2, 4, and every 3rd turn thereafter — adds 0ms to user response latency.
+    Captures verified personal facts, constraints, AND active commitments/goals for accountability.
     """
     if not groq_client or not user_id:
         return
-    if total_queries != 1 and (total_queries % 3 != 0):
+    if not _should_refresh_memory(total_queries):
         return
 
     recent_snippet_lines = []
     for turn in (history or [])[-8:]:
         r = "User" if turn.get("role") == "user" else "Assistant"
         recent_snippet_lines.append(f"{r}: {(turn.get('content') or '')[:260]}")
-    recent_snippet_lines.append(f"User: {(user_text or '')[:300]}")
+    recent_snippet_lines.append(f"User: {(user_text or '')[:320]}")
     recent_snippet_lines.append(f"Assistant: {(ai_reply or '')[:300]}")
     transcript_block = "\n".join(recent_snippet_lines)
 
@@ -193,23 +204,36 @@ def _schedule_memory_update(
         prompt = (
             "Update this user's compact long-term profile memory card based ONLY on verified facts they shared.\n"
             "Rules:\n"
-            "- Output 3 to 5 short plain-text bullet facts (max 380 characters total, NO markdown bolding or headers).\n"
-            "- Capture only concrete personal facts: gender (if clear), age, city/living setup, job/studies, skills, core goals, and hard constraints (e.g. lives with mother, cannot relocate).\n"
-            "- Preserve still-valid facts from Existing Memory and add new ones. Never guess or invent facts.\n\n"
+            "- Output 2 to 5 short plain-text bullet facts (max 420 characters total, NO markdown bolding or headers).\n"
+            "- Capture concrete personal facts: gender (if clear), age, city/living setup, job/studies/exams, skills, core struggle/goals, hard constraints (e.g. lives with mother, cannot relocate), and any active commitment or next step.\n"
+            "- Preserve still-valid facts from Existing Memory and add new ones. Never guess or invent facts.\n"
+            "- If the user has not shared ANY concrete personal fact or struggle yet (e.g. only said 'Hi' or 'What is life'), output exactly: NONE\n\n"
             f"Existing Memory:\n{existing_memory or '(none yet)'}\n\n"
             f"Recent Conversation:\n{transcript_block}\n\n"
             "Updated Memory Card:"
         )
-        for model_id in GROQ_MEMORY_MODELS:
+        for model_id, supports_effort in GROQ_MEMORY_MODELS:
             try:
-                resp = groq_client.chat.completions.create(
-                    model=model_id,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2,
-                    max_completion_tokens=220,
-                )
+                kwargs = {
+                    "model": model_id,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                    "max_completion_tokens": 450 if supports_effort else 240,
+                }
+                if supports_effort:
+                    kwargs["reasoning_effort"] = "low"
+                try:
+                    resp = groq_client.chat.completions.create(**kwargs)
+                except TypeError:
+                    kwargs.pop("reasoning_effort", None)
+                    kwargs["max_tokens"] = kwargs.pop("max_completion_tokens")
+                    resp = groq_client.chat.completions.create(**kwargs)
+
                 summary = _sanitize_ai_reply((resp.choices[0].message.content or "").strip())
-                if summary and len(summary) >= 12:
+                low = summary.lower().strip(".! ")
+                if low in ("", "none", "n/a", "(none yet)", "no personal facts", "no facts yet"):
+                    return
+                if len(summary) >= 12:
                     update_user_memory_summary(user_id, summary[:480])
                     return
             except Exception as e:
@@ -297,10 +321,11 @@ def _format_pkt_ymd(dt: datetime) -> str:
 
 
 def _sanitize_ai_reply(text: str) -> str:
-    """Strips accidental markdown bolding or heading hashes so replies read like natural chat."""
+    """Strips accidental markdown bolding, heading hashes, or speaker labels so replies read like natural chat."""
     if not text:
         return text
-    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    cleaned = re.sub(r"^\s*(?:Hassan(?:\s+Ali\s+Farrukh)?(?:\s+AI)?|Assistant)\s*:\s*", "", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
     cleaned = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
@@ -479,22 +504,102 @@ def parse_trx_text(text: str) -> tuple[str, str, str]:
     return trx_id, plan, referral_code
 
 
+_VALID_TRX_SECOND_TOKENS = frozenset({"BASIC", "PRO", "FULL", "MONTHLY"})
+_YEAR_RANGE_RE = re.compile(r"^(?:19|20)\d{2}\s*[-/–]\s*(?:19|20)\d{2}$")
+
+_GREETING_TOKENS = frozenset({
+    "hi", "hii", "hiii", "hey", "heyy", "hello", "helo", "yo", "sup",
+    "salam", "salaam", "slam", "aoa", "assalam", "assalamu", "asalam", "asalamu",
+    "assalamo", "assalamualikum", "assalamualaikum", "asalamualaikum", "alaikum",
+    "alikum", "walekum", "walaikum", "o", "u", "ji",
+    "hassan", "hasan", "bhai", "bro", "sir", "janab", "ali", "farrukh",
+})
+
+
+def _is_pure_greeting(text: str) -> bool:
+    """
+    Returns True ONLY for short, pure greetings with no actual question attached
+    (e.g. 'Hi', 'Salam', 'Aoa Hassan bhai', 'Assalamu Alaikum sir').
+    """
+    raw = (text or "").strip()
+    if not raw or "?" in raw or len(raw) > 42:
+        return False
+    tokens = re.findall(r"[a-zA-Z]+", raw.lower())
+    if not tokens or len(tokens) > 5:
+        return False
+    # Must contain at least one actual greeting word (not just 'sir' or 'hassan')
+    core_greetings = {
+        "hi", "hii", "hiii", "hey", "heyy", "hello", "helo", "yo", "sup",
+        "salam", "salaam", "slam", "aoa", "assalam", "assalamu", "asalam",
+        "asalamu", "assalamo", "assalamualikum", "assalamualaikum", "asalamualaikum",
+    }
+    if not any(tok in core_greetings for tok in tokens):
+        return False
+    return all(tok in _GREETING_TOKENS for tok in tokens)
+
+
+def _should_deduct_trial(status: str, user: dict, user_text: str) -> bool:
+    """
+    Avoids burning a user's first free-trial credit on a pure greeting ('Hi'/'Salam').
+    Capped to the user's opening exchange (`trial_questions_used == 0` and `total_queries < 2`)
+    so greetings can never be abused for unlimited chatting.
+    """
+    if status != "free_trial" or not user:
+        return True
+    used = int(user.get("trial_questions_used") or 0)
+    total = int(user.get("total_queries") or 0)
+    if used == 0 and total < 2 and _is_pure_greeting(user_text):
+        return False
+    return True
+
+
 def is_trx_message(text: str, user_status: str = "free_trial") -> bool:
     """
     Checks if a message is a payment Transaction ID submission,
-    either explicitly formatted (TRX: ...) or a direct raw transaction ID.
+    either explicitly formatted (TRX: ...) or a genuine raw bank/EasyPaisa TRX ID.
+    Avoids false-positives on normal user answers like '100000 salary', '2024-2026', '22saal',
+    '75percent', or standalone Pakistani phone numbers during active free-trial chats.
     """
-    t = text.strip()
+    t = (text or "").strip()
+    if not t:
+        return False
     u = t.upper()
     if u.startswith("TRX:") or u.startswith("TRX ID:") or u.startswith("TRX ") or u == "TRX":
         return True
 
-    if user_status != "subscribed":
-        tokens = t.split()
-        if 1 <= len(tokens) <= 2:
-            candidate = tokens[0].replace("-", "").replace("_", "")
-            if 6 <= len(candidate) <= 32 and any(c.isdigit() for c in candidate) and candidate.isalnum():
-                return True
+    if user_status == "subscribed":
+        return False
+
+    if _YEAR_RANGE_RE.match(t):
+        return False
+
+    tokens = t.split()
+    if not (1 <= len(tokens) <= 2):
+        return False
+
+    # If a 2nd token is present, it MUST be a known plan or referral token (never 'salary', 'pkr', 'saal', etc.)
+    if len(tokens) == 2:
+        t2 = tokens[1].strip().upper()
+        if not (
+            t2 in _VALID_TRX_SECOND_TOKENS
+            or t2.startswith(("HASSAN-", "REF:", "CODE:"))
+        ):
+            return False
+
+    candidate = tokens[0].replace("-", "").replace("_", "")
+    if not candidate.isalnum():
+        return False
+
+    # Don't confuse a raw Pakistani mobile number with a TRX ID while user is still chatting
+    if user_status != "paywall_required" and normalize_pk_phone_or_none(tokens[0]):
+        return False
+
+    digit_count = sum(1 for c in candidate if c.isdigit())
+    min_len = 6 if user_status == "paywall_required" else 8
+    min_digits = 5 if user_status == "paywall_required" else 6
+    if min_len <= len(candidate) <= 32 and digit_count >= min_digits:
+        return True
+
     return False
 
 
@@ -1301,15 +1406,14 @@ async def receive_whatsapp(request: Request):
             send_whatsapp_text(sender_phone, PAYWALL_TEXT)
             return {"status": "ok"}
 
-        # 6. Search Knowledge Base (Full 6-chunk archive for all paid subscribers)
-        retrieval_count = 6 if status == "subscribed" else 3
-        matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
-
-        # 7. Retrieve Conversation History (20 messages = 10 full turns)
-        history = get_recent_chat_history(sender_phone, limit=CHAT_HISTORY_CONTEXT_MESSAGES)
-
-        # 8. Generate AI Response via Groq
+        # 6. Retrieve Conversation History (20 messages = 10 full turns) & Context-Aware Knowledge Search
         u_pre = get_or_create_user(sender_phone)
+        history = get_recent_chat_history(sender_phone, limit=CHAT_HISTORY_CONTEXT_MESSAGES)
+        retrieval_count = 6 if status == "subscribed" else 3
+        rag_query = build_rag_search_query(user_text, history=history, user_memory=u_pre.get("memory_summary", ""))
+        matching_chunks = search_knowledge(rag_query, n_results=retrieval_count)
+
+        # 7. Generate AI Response via Groq
         if groq_client:
             messages = build_hassan_chat_messages(
                 user_text,
@@ -1323,10 +1427,8 @@ async def receive_whatsapp(request: Request):
         else:
             ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
 
-        save_chat_message(sender_phone, "user", user_text)
-        save_chat_message(sender_phone, "assistant", ai_reply)
-        record_user_query(sender_phone)
-        u_info = get_or_create_user(sender_phone)
+        deduct_trial = _should_deduct_trial(status, u_pre, user_text)
+        u_info = complete_chat_turn(sender_phone, user_text, ai_reply, deduct_trial=deduct_trial)
         _schedule_memory_update(
             u_info["phone_number"],
             u_pre.get("memory_summary", ""),
@@ -1339,7 +1441,8 @@ async def receive_whatsapp(request: Request):
         if status == "free_trial":
             remaining = get_user_trial_limit(u_info) - (u_info.get("trial_questions_used") or 0)
             if remaining > 0:
-                ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
+                if deduct_trial:
+                    ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
             else:
                 notify_paywall_hit(u_info, user_text)
                 ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
@@ -1554,14 +1657,13 @@ async def process_chat(request: Request):
     if not can_chat:
         return {"reply": PAYWALL_TEXT, "paywalled": True, "user": _public_user_payload(current_user)}
 
-    # 7. Search Knowledge Base (Full 6-chunk archive for all paid subscribers)
-    retrieval_count = 6 if status == "subscribed" else 3
-    matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
-
-    # 8. Retrieve Conversation History for Multi-Turn Context (20 messages = 10 full turns)
+    # 7. Retrieve Conversation History (20 messages = 10 full turns) & Context-Aware Knowledge Search
     history = get_recent_chat_history(sender_id, limit=CHAT_HISTORY_CONTEXT_MESSAGES)
+    retrieval_count = 6 if status == "subscribed" else 3
+    rag_query = build_rag_search_query(user_text, history=history, user_memory=current_user.get("memory_summary", ""))
+    matching_chunks = search_knowledge(rag_query, n_results=retrieval_count)
 
-    # 9. Generate AI Response (never deduct a trial question if upstream LLM fails)
+    # 8. Generate AI Response (never deduct a trial question if upstream LLM fails)
     if groq_client:
         messages = build_hassan_chat_messages(
             user_text,
@@ -1586,8 +1688,9 @@ async def process_chat(request: Request):
     else:
         ai_reply = f"[Demo Mode] Hassan AI: I received your question: '{user_text}'."
 
-    # Single pooled DB round trip: save user + assistant messages, increment usage, return updated user
-    u_info = complete_chat_turn(sender_id, user_text, ai_reply)
+    # Single pooled DB round trip: save user + assistant messages, update usage, return updated user
+    deduct_trial = _should_deduct_trial(status, current_user, user_text)
+    u_info = complete_chat_turn(sender_id, user_text, ai_reply, deduct_trial=deduct_trial)
     _schedule_memory_update(
         sender_id,
         current_user.get("memory_summary", ""),
@@ -1602,13 +1705,18 @@ async def process_chat(request: Request):
         welcome_prefix = build_welcome_message(tier, u_info.get("referral_code", "")) + "\n\n━━━━━━━━━━━━━━━━\n\n"
         mark_welcome_sent(sender_id)
 
+    trial_exhausted = False
     if status == "free_trial":
         remaining = get_user_trial_limit(u_info) - (u_info.get("trial_questions_used") or 0)
         if remaining > 0:
-            ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
+            # Append inline trial counter ONLY on WhatsApp bridge (web UI already displays the top progress bar)
+            if is_bridge and deduct_trial:
+                ai_reply += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
         else:
+            trial_exhausted = True
             notify_paywall_hit(u_info, user_text)
-            ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
+            if is_bridge:
+                ai_reply += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
 
     elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
         stats = get_referral_stats(sender_id)
@@ -1623,6 +1731,7 @@ async def process_chat(request: Request):
 
     return {
         "reply": welcome_prefix + ai_reply,
+        "trial_exhausted": trial_exhausted,
         "user": _public_user_payload(u_info),
     }
 
@@ -1991,9 +2100,10 @@ async def process_chat_stream(request: Request):
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    retrieval_count = 6 if status == "subscribed" else 3
-    matching_chunks = search_knowledge(user_text, n_results=retrieval_count)
     history = get_recent_chat_history(sender_id, limit=CHAT_HISTORY_CONTEXT_MESSAGES)
+    retrieval_count = 6 if status == "subscribed" else 3
+    rag_query = build_rag_search_query(user_text, history=history, user_memory=current_user.get("memory_summary", ""))
+    matching_chunks = search_knowledge(rag_query, n_results=retrieval_count)
     messages = build_hassan_chat_messages(
         user_text,
         matching_chunks,
@@ -2030,7 +2140,8 @@ async def process_chat_stream(request: Request):
                 })
                 return
 
-        u_info = complete_chat_turn(sender_id, user_text, ai_reply)
+        deduct_trial = _should_deduct_trial(status, current_user, user_text)
+        u_info = complete_chat_turn(sender_id, user_text, ai_reply, deduct_trial=deduct_trial)
         _schedule_memory_update(
             sender_id,
             current_user.get("memory_summary", ""),
@@ -2046,13 +2157,12 @@ async def process_chat_stream(request: Request):
             mark_welcome_sent(sender_id)
 
         final_display = ai_reply
+        trial_exhausted = False
         if status == "free_trial":
             remaining = get_user_trial_limit(u_info) - (u_info.get("trial_questions_used") or 0)
-            if remaining > 0:
-                final_display += f"\n\n_(Free Trial: {remaining} question{'s' if remaining != 1 else ''} remaining)_"
-            else:
+            if remaining <= 0:
+                trial_exhausted = True
                 notify_paywall_hit(u_info, user_text)
-                final_display += f"\n\n_(You have used your last free question. Subscribe for PKR {MONTHLY_PRICE_PKR:,}/month for unlimited access, or invite a friend for +{SIGNUP_REFERRAL_BONUS_QUESTIONS} bonus free messages.)_"
         elif status == "subscribed" and u_info.get("total_queries", 0) > 0 and u_info.get("total_queries", 0) % 10 == 0:
             stats = get_referral_stats(sender_id)
             final_display += (
@@ -2066,6 +2176,7 @@ async def process_chat_stream(request: Request):
         yield _sse_event({
             "type": "done",
             "reply": welcome_prefix + final_display,
+            "trial_exhausted": trial_exhausted,
             "user": _public_user_payload(u_info),
         })
 

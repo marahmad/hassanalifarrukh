@@ -1020,12 +1020,15 @@ def save_chat_message(phone_number: str, role: str, content: str):
         print(f"[Warning] Failed to save chat message: {e}")
 
 
-def complete_chat_turn(user_id: str, user_text: str, ai_reply: str) -> dict:
+def complete_chat_turn(user_id: str, user_text: str, ai_reply: str, deduct_trial: bool = True) -> dict:
     """
-    Saves both user + assistant messages, increments usage counters, and returns the updated
+    Saves both user + assistant messages, updates usage counters, and returns the updated
     serialized user row in a SINGLE pooled database connection (eliminates 4 separate round trips).
+    When `deduct_trial=False` (e.g. a user's initial pure greeting like 'Hi'/'Salam'), messages are
+    still logged and `total_queries` increments, without burning one of their free trial credits.
     """
     now = _utc_now()
+    trial_inc = 1 if deduct_trial else 0
     with DBContext() as db:
         ts = _db_ts(db, now)
         row = _find_user_row(db, user_id)
@@ -1044,11 +1047,11 @@ def complete_chat_turn(user_id: str, user_text: str, ai_reply: str) -> dict:
             """, (canonical_uid, ai_reply, ts))
             db.execute("""
                 UPDATE users SET
-                trial_questions_used = trial_questions_used + 1,
+                trial_questions_used = trial_questions_used + ?,
                 total_queries = total_queries + 1,
                 last_active = ?
                 WHERE phone_number = ?
-            """, (ts, canonical_uid))
+            """, (trial_inc, ts, canonical_uid))
             db.execute("SELECT * FROM users WHERE phone_number = ?", (canonical_uid,))
             updated = db.fetchone()
             if updated:
@@ -1056,7 +1059,8 @@ def complete_chat_turn(user_id: str, user_text: str, ai_reply: str) -> dict:
 
     save_chat_message(user_id, "user", user_text)
     save_chat_message(user_id, "assistant", ai_reply)
-    record_user_query(user_id)
+    if deduct_trial:
+        record_user_query(user_id)
     return get_or_create_user(user_id)
 
 
