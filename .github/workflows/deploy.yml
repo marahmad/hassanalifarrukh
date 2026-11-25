@@ -38,6 +38,7 @@ jobs:
           ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
           ORACLE_HOST: ${{ vars.ORACLE_HOST || '157.151.163.109' }}
           ORACLE_USER: ${{ vars.ORACLE_USER || 'ubuntu' }}
+          DEPLOY_SHA: ${{ github.sha }}
         run: |
           if [ -z "$ORACLE_SSH_KEY" ]; then
             echo "::warning::Secret ORACLE_SSH_KEY is not set yet in GitHub Settings -> Secrets and variables -> Actions. Skipping SSH deploy until added."
@@ -47,7 +48,7 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           trap 'rm -f ~/.ssh/oracle_deploy_key' EXIT
-          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/oracle_deploy_key
+          printf '%s\n' "$ORACLE_SSH_KEY" | tr -d '\r' > ~/.ssh/oracle_deploy_key
           chmod 600 ~/.ssh/oracle_deploy_key
           ssh-keyscan -H "$ORACLE_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
@@ -68,6 +69,7 @@ jobs:
               fi
 
               sudo systemctl restart hassan-ai.service
+              echo "'"${DEPLOY_SHA}"' $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .last_deploy
 
               # Verify live HTTP 200 health check
               for i in $(seq 1 15); do
