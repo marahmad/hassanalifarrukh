@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "oracle-oci-cloud": {
+      "command": "uvx",
+      "args": [
+        "--python",
+        "3.13",
+        "oracle.oci-cloud-mcp-server@latest"
+      ],
+      "env": {
+        "OCI_CONFIG_PROFILE": "DEFAULT",
+        "OCI_MCP_AUTH_TYPE": "auto",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    }
+  }
+}
